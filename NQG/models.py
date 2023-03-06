@@ -8,7 +8,7 @@ from torch.nn import CrossEntropyLoss
 from utils import kl_weight, kl_loss
 import copy
 
-class T5VAEForNTR(T5ForConditionalGeneration):
+class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
     _keys_to_ignore_on_load_missing = [
         r"encoder.embed_tokens.weight",
         r"decoder.embed_tokens.weight",
@@ -116,22 +116,17 @@ class T5VAEForNTR(T5ForConditionalGeneration):
         this model use L tokens embedding reconstruction VAE process instead.
         hidden_states (B L H)
         """
-        # # ======T5 VAE ===== (1) test one
-        # # REPARAMETERIZATION
-        # batch_size, seq_length = hidden_states.shape[:2]
-        # hidden_states_vae = hidden_states
-        #
-        # mean = self.hidden2mean(hidden_states_vae) # let the batch squeezed
-        # logv = self.hidden2logv(hidden_states_vae)
-        # std = torch.exp(0.5 * logv)
-        #
-        # # z = torch.randn([batch_size, self.latent_size])
-        # z = torch.randn([batch_size, seq_length, self.latent_size]).to(hidden_states_vae.device)
-        # z = z * std + mean
-        #
-        # # DECODER
-        # hidden_states_vae = self.latent2hidden(z)
-        # # # ======T5 VAE =====
+        # ======T5 VAE ===== 
+        # REPARAMETERIZATION
+        batch_size, seq_length = hidden_states.shape[:2]
+        # [NOTE] Regarding each element (i.e., d dimensions x |L| tokens)
+        mean = self.hidden2mean(hidden_states_vae) 
+        logv = self.hidden2logv(hidden_states_vae)
+        std = torch.exp(0.5 * logv)
+        z = torch.randn([batch_size, seq_length, self.latent_size]).to(hidden_states_vae.device)
+        z = z * std + mean
+        hidden_states = self.latent2hidden(z)
+        # ======T5 VAE =====
 
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
@@ -182,29 +177,10 @@ class T5VAEForNTR(T5ForConditionalGeneration):
             sequence_output = sequence_output * (self.model_dim**-0.5)
 
 
-        """
-        In this T5 VAE setting, adopt the Late-VAE-style 
-        Based on variations of decoder hidden states
-        hidden_states: (B L H)
-        """
-        # ======T5 VAE ===== (1) test one
-        # REPARAMETERIZATION
-        hidden_states_vae = sequence_output
-
-        mean = self.hidden2mean(hidden_states_vae) # let the batch squeezed
-        logv = self.hidden2logv(hidden_states_vae)
-        std = torch.exp(0.5 * logv)
-
-        z = torch.randn(mean.size()).to(hidden_states_vae.device)
-
-        z = z * std + mean
-
-        hidden_states_vae = self.latent2hidden(z)
-
-        # DECODER
         lm_logits = self.lm_head(sequence_output)
-        # ======T5 VAE =====
 
+        # ======T5 VAE ===== 
+        # Calculate losses
         loss = None
         loss_ce = 0
         loss_kl = 0
@@ -216,9 +192,12 @@ class T5VAEForNTR(T5ForConditionalGeneration):
             loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
 
             # kl loss (vae loss)
-            loss_kl_w = kl_weight(self.config.annealing_fn, steps, self.config.k, self.config.x0)
-            loss_kl = kl_loss(logv.view(-1, self.latent_size),
-                              mean.view(-1, self.latent_size))
+            loss_kl_w = kl_weight(
+                    self.config.annealing_fn, steps, self.config.k, self.config.x0
+            )
+            loss_kl = kl_loss(
+                    logv.view(-1, self.latent_size), mean.view(-1, self.latent_size)
+            )
 
             loss = loss_ce + loss_kl * loss_kl_w
 
@@ -228,12 +207,11 @@ class T5VAEForNTR(T5ForConditionalGeneration):
                 with torch.no_grad():
                     self.is_training = False
                     temp=self.generate(input_ids)
-                    print(self.tokenizer.decode(temp[0], skip_special_tokens=True))
+                    print("+:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
                     self.is_training = True
-                    temp=self.generate(input_ids)
-                    print(self.tokenizer.decode(temp[0], skip_special_tokens=True))
-                    labels_reformulate = [l for l in labels[0] if l != -100]
-                    print(self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+                    z = encoder_outputs
+                    temp=self.generate(input_ids, encoder_outputs=z)
+                    print("-:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
 
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs

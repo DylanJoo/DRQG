@@ -16,7 +16,7 @@ from transformers import (
 from datasets import load_dataset, DatasetDict, concatenate_datasets
 from trainers import T5VAETrainer
 from utils import random_masking
-from models_t5vae import T5VAEForNTR
+from models_t5vae import T5VAEForConditionalGeneration
 
 import os
 os.environ["WANDB_DISABLED"] = "true"
