@@ -9,11 +9,11 @@ from transformers import (
     TrainingArguments,
     Trainer,
     HfArgumentParser,
-    DataCollatorForSeq2Seq,
 )
 from datasets import load_dataset, DatasetDict, concatenate_datasets
 from models import T5VAEForConditionalGeneration
 from trainers import T5VAETrainer
+from datacollator import DataCollatorForT5VAE
 import msmarco 
 
 import os
@@ -100,19 +100,19 @@ def main():
     )
 
     ## data collator
-    data_collator = DataCollatorForSeq2Seq(
+    data_collator = DataCollatorForT5VAE(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt'
     )
 
     # Trainer
-    train_dataset=msmarco.triplet_dataset(data_args)
+    train_dataset = msmarco.triplet_dataset(data_args)
 
     trainer = T5VAETrainer(
             model=model, 
             args=training_args,
-            train_dataset=train_dataset,
+            train_dataset=train_dataset['train'],
             eval_dataset=None,
             data_collator=data_collator
     )
