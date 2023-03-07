@@ -13,6 +13,7 @@ class DataCollatorForT5VAE:
     pad_to_multiple_of: Optional[int] = None
     return_tensors: str = "pt"
     padding: Union[bool, str] = True
+    istrain: Union[bool, str] = True
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -23,7 +24,7 @@ class DataCollatorForT5VAE:
 
         # positive 
         inputs = self.tokenizer(
-                [f"{texts_pp} Write a question based on this passage."], 
+                [f"{p} Write a question based on this passage." for p in texts_pp], 
                 max_length=self.max_length,
                 truncation=True,
                 padding=True,
@@ -32,11 +33,11 @@ class DataCollatorForT5VAE:
 
         if self.istrain:
             targets = self.tokenizer(
-                    texts_q
-                    truncation=True,
+                    texts_q,
+                    padding=True,
                     return_tensors=self.return_tensors
             ).input_ids
-            inputs['labels'] = target
+            inputs['labels'] = targets
 
         return inputs
 

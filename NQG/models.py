@@ -120,10 +120,10 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         # REPARAMETERIZATION
         batch_size, seq_length = hidden_states.shape[:2]
         # [NOTE] Regarding each element (i.e., d dimensions x |L| tokens)
-        mean = self.hidden2mean(hidden_states_vae) 
-        logv = self.hidden2logv(hidden_states_vae)
+        mean = self.hidden2mean(hidden_states) 
+        logv = self.hidden2logv(hidden_states)
         std = torch.exp(0.5 * logv)
-        z = torch.randn([batch_size, seq_length, self.latent_size]).to(hidden_states_vae.device)
+        z = torch.randn([batch_size, seq_length, self.latent_size]).to(hidden_states.device)
         z = z * std + mean
         hidden_states = self.latent2hidden(z)
         # ======T5 VAE =====
