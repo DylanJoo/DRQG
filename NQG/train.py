@@ -20,7 +20,7 @@ import os
 os.environ["WANDB_DISABLED"] = "true"
 
 @dataclass
-class OurModelArguments:
+class OurHFModelArguments:
     # Huggingface's original arguments
     model_name_or_path: Optional[str] = field(default='t5-small')
     config_name: Optional[str] = field(default='t5-small')
@@ -29,7 +29,9 @@ class OurModelArguments:
     use_fast_tokenizer: bool = field(default=True)
     model_revision: str = field(default="main")
     use_auth_token: bool = field(default=False)
-    # Customized arguments
+
+@dataclass
+class OurModelArguments:
     vae_latent_size: int = field(default=128)
     vae_k: float = field(default=0.0025)
     vae_x0: int = field(default=2500)
@@ -72,29 +74,28 @@ class OurTrainingArguments(TrainingArguments):
 def main():
 
     # Parseing argument for huggingface packages
-    parser = HfArgumentParser((OurModelArguments, OurDataArguments, OurTrainingArguments))
+    parser = HfArgumentParser((OurHFModelArguments, OurModelArguments, OurDataArguments, OurTrainingArguments))
     # model_args, data_args, training_args = parser.parse_args_into_datalcasses()
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = \
+        hfmodel_args, model_args, data_args, training_args = \
                 parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         # [CONCERN] Deprecated? or any parser issue.
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        hfmodel_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # additional config for models
-    config = AutoConfig.from_pretrained(model_args.config_name)
-    config_kwargs = {
+    config = AutoConfig.from_pretrained(hfmodel_args.config_name)
+    vae_config = {
             "latent_size": model_args.vae_latent_size, 
             "k": model_args.vae_k,
             "x0": model_args.vae_x0,
             "annealing_fn": model_args.vae_annealing_fn,
-            "output_hidden_states": True,
     }
-    config.update(config_kwargs)
+    config.update({'vae_config': vae_config})
 
-    tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
     model = T5VAEForConditionalGeneration.from_pretrained(
-            pretrained_model_name_or_path=model_args.model_name_or_path,
+            pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config,
             tokenizer=tokenizer
     )
