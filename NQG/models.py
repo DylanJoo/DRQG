@@ -118,28 +118,23 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         pn_boundary = batch_size // 2
 
         # [NOTE] Transform it into a single vector (i.e., d dimensions x 1 tokens) with mask
-        aggregation_mask = torch.tensor(
-            [[1] + [0] * (seq_length-1)]
-        ).transpose(0, 1).repeat(1, d_model).repeat(batch_size, 1, 1).to(hidden_states.device)
-        hidden_states = hidden_states * aggregation_mask
-        encoder_outputs.hidden_states = hidden_states
-
-        # [NOTE] Regarding each element (i.e., d dimensions x |L| tokens)
-        # None
-
-        mean = self.hidden2pmean(hidden_states[:, :1, :])
-        logv = self.hidden2plogv(hidden_states[:, :1, :])
+        mean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
+        logv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
         std = torch.exp(0.5 * logv)
-        z = torch.randn([batch_size//2, 1, self.latent_size]).to(hidden_states.device)
+        z = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
         z = z * std + mean
-        hidden_states[:pn_boundary, :1, :] += self.latent2hidden(z)
+        positive = self.latent2hidden(z)
 
-        mean = self.hidden2nmean(hidden_states[:, :1, :])
-        logv = self.hidden2nlogv(hidden_states[:, :1, :])
+        mean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
+        logv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
         std = torch.exp(0.5 * logv)
-        z = torch.randn([batch_size//2, 1, self.latent_size]).to(hidden_states.device)
+        z = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
         z = z * std + mean
-        hidden_states[:pn_boundary, :1, :] += self.latent2hidden(z)
+        negative = self.latent2hidden(z)
+        zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
+
+        residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
+        hidden_states = hidden_states + residuals
 
         # ======T5 VAE =====
 
@@ -208,10 +203,14 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
             # kl loss (vae loss)
             loss_kl_w = kl_weight(
-                    self.vae_config.annealing_fn, steps, self.vae_config.k, self.vae_config.x0
+                    self.vae_config.annealing_fn, 
+                    steps, 
+                    self.vae_config.k, 
+                    self.vae_config.x0
             )
             loss_kl = kl_loss(
-                    logv.view(-1, self.latent_size), mean.view(-1, self.latent_size)
+                    logv.view(-1, self.latent_size), 
+                    mean.view(-1, self.latent_size)
             )
 
             loss = loss_ce + loss_kl * loss_kl_w
@@ -241,4 +240,5 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+
 

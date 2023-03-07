@@ -9,6 +9,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
     HfArgumentParser,
+    GenerationConfig
 )
 from models import T5VAEForConditionalGeneration
 from trainers import VAETrainer
