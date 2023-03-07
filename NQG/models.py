@@ -18,7 +18,7 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-    def __init__(self, config: T5Config, tokenizer=None):
+    def __init__(self, config: T5Config, tokenizer=None, vae_config=None):
         super().__init__(config)
         self.model_dim = config.d_model
 
@@ -30,18 +30,20 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         encoder_config.is_encoder_decoder = False
         self.encoder = T5Stack(encoder_config, self.shared)
 
+
         # ========== VAE setting ==========
+        self.vae_config = vae_config
         hidden_factor = 1
-        self.latent_size = config.latent_size
-        self.hidden2mean = nn.Linear(encoder_config.d_model * hidden_factor, config.latent_size)
-        self.hidden2logv = nn.Linear(encoder_config.d_model * hidden_factor, config.latent_size)
-        self.latent2hidden = nn.Linear(config.latent_size, encoder_config.d_model * hidden_factor)
+        self.latent_size = self.vae_config.latent_size
+        self.hidden2mean = nn.Linear(encoder_config.d_model * hidden_factor, self.vae_self.vae_config.latent_size)
+        self.hidden2logv = nn.Linear(encoder_config.d_model * hidden_factor, self.vae_config.latent_size)
+        self.latent2hidden = nn.Linear(self.vae_config.latent_size, encoder_config.d_model * hidden_factor)
         self.tokenizer = tokenizer
         self.is_training = True
         # ========== VAE setting ==========
-        assert self.config.k is not None, 'Need to specify k'
-        assert self.config.x0 is not None, 'Need to specify x0'
-        assert self.config.annealing_fn is not None, 'Need to specify annealing function'
+        assert self.vae_config.k is not None, 'Need to specify k'
+        assert self.vae_config.x0 is not None, 'Need to specify x0'
+        assert self.vae_config.annealing is not None, 'Need to specify annealing function'
 
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
@@ -56,8 +58,8 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
         # Model parallel
         self.model_parallel = False
-        assert self.config.k is not None, 'Need to specify k'
-        assert self.config.x0 is not None, 'Need to specify x0'
+        assert self.vae_config.k is not None, 'Need to specify k'
+        assert self.vae_config.x0 is not None, 'Need to specify x0'
         self.device_map = None
 
     def forward(
@@ -193,7 +195,7 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
             # kl loss (vae loss)
             loss_kl_w = kl_weight(
-                    self.config.annealing_fn, steps, self.config.k, self.config.x0
+                    self.vae_config.annealing, steps, self.vae_config.k, self.vae_config.x0
             )
             loss_kl = kl_loss(
                     logv.view(-1, self.latent_size), mean.view(-1, self.latent_size)

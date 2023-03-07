@@ -1,3 +1,4 @@
+export CUDA_VISIBLE_DEVICES=0
 python3 train.py \
   --model_name_or_path t5-small \
   --tokenizer_name t5-small \

@@ -85,18 +85,11 @@ def main():
 
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
-    vae_config = {
-            "latent_size": model_args.vae_latent_size, 
-            "k": model_args.vae_k,
-            "x0": model_args.vae_x0,
-            "annealing_fn": model_args.vae_annealing_fn,
-    }
-    config.update({'vae_config': vae_config})
-
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
     model = T5VAEForConditionalGeneration.from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
-            config=config,
+            config=config, 
+            vae_config=vae_config,
             tokenizer=tokenizer
     )
 
