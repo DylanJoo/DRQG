@@ -30,20 +30,16 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         encoder_config.is_encoder_decoder = False
         self.encoder = T5Stack(encoder_config, self.shared)
 
-
         # ========== VAE setting ==========
         self.vae_config = vae_config
-        hidden_factor = 1
         self.latent_size = self.vae_config.latent_size
-        self.hidden2mean = nn.Linear(encoder_config.d_model * hidden_factor, self.vae_self.vae_config.latent_size)
-        self.hidden2logv = nn.Linear(encoder_config.d_model * hidden_factor, self.vae_config.latent_size)
-        self.latent2hidden = nn.Linear(self.vae_config.latent_size, encoder_config.d_model * hidden_factor)
+        self.hidden2pmean = nn.Linear(encoder_config.d_model, self.vae_config.latent_size)
+        self.hidden2nmean = nn.Linear(encoder_config.d_model, self.vae_config.latent_size)
+        self.hidden2plogv = nn.Linear(encoder_config.d_model, self.vae_config.latent_size)
+        self.hidden2nlogv = nn.Linear(encoder_config.d_model, self.vae_config.latent_size)
+        self.latent2hidden = nn.Linear(self.vae_config.latent_size, encoder_config.d_model)
         self.tokenizer = tokenizer
-        self.is_training = True
         # ========== VAE setting ==========
-        assert self.vae_config.k is not None, 'Need to specify k'
-        assert self.vae_config.x0 is not None, 'Need to specify x0'
-        assert self.vae_config.annealing is not None, 'Need to specify annealing function'
 
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
@@ -58,8 +54,6 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
         # Model parallel
         self.model_parallel = False
-        assert self.vae_config.k is not None, 'Need to specify k'
-        assert self.vae_config.x0 is not None, 'Need to specify x0'
         self.device_map = None
 
     def forward(
@@ -120,14 +114,33 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         """
         # ======T5 VAE ===== 
         # REPARAMETERIZATION
-        batch_size, seq_length = hidden_states.shape[:2]
+        batch_size, seq_length, d_model = hidden_states.shape
+        pn_boundary = batch_size // 2
+
+        # [NOTE] Transform it into a single vector (i.e., d dimensions x 1 tokens) with mask
+        aggregation_mask = torch.tensor(
+            [[1] + [0] * (seq_length-1)]
+        ).transpose(0, 1).repeat(1, d_model).repeat(batch_size, 1, 1).to(hidden_states.device)
+        hidden_states = hidden_states * aggregation_mask
+        encoder_outputs.hidden_states = hidden_states
+
         # [NOTE] Regarding each element (i.e., d dimensions x |L| tokens)
-        mean = self.hidden2mean(hidden_states) 
-        logv = self.hidden2logv(hidden_states)
+        # None
+
+        mean = self.hidden2pmean(hidden_states[:, :1, :])
+        logv = self.hidden2plogv(hidden_states[:, :1, :])
         std = torch.exp(0.5 * logv)
-        z = torch.randn([batch_size, seq_length, self.latent_size]).to(hidden_states.device)
+        z = torch.randn([batch_size//2, 1, self.latent_size]).to(hidden_states.device)
         z = z * std + mean
-        hidden_states = self.latent2hidden(z)
+        hidden_states[:pn_boundary, :1, :] += self.latent2hidden(z)
+
+        mean = self.hidden2nmean(hidden_states[:, :1, :])
+        logv = self.hidden2nlogv(hidden_states[:, :1, :])
+        std = torch.exp(0.5 * logv)
+        z = torch.randn([batch_size//2, 1, self.latent_size]).to(hidden_states.device)
+        z = z * std + mean
+        hidden_states[:pn_boundary, :1, :] += self.latent2hidden(z)
+
         # ======T5 VAE =====
 
         if self.model_parallel:
@@ -195,7 +208,7 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
             # kl loss (vae loss)
             loss_kl_w = kl_weight(
-                    self.vae_config.annealing, steps, self.vae_config.k, self.vae_config.x0
+                    self.vae_config.annealing_fn, steps, self.vae_config.k, self.vae_config.x0
             )
             loss_kl = kl_loss(
                     logv.view(-1, self.latent_size), mean.view(-1, self.latent_size)
@@ -204,17 +217,15 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
             loss = loss_ce + loss_kl * loss_kl_w
 
             if steps % 20 == 0:
-                print(f"NLL: {loss_ce}\
+                print(f"\nNLL: {loss_ce}\
                         \nKL: {loss_kl * loss_kl_w} = {loss_kl} * {loss_kl_w}")
                 with torch.no_grad():
-                    self.is_training = False
                     temp=self.generate(input_ids)
-                    print("+:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
-                    self.is_training = True
-                    z = encoder_outputs
-                    temp=self.generate(input_ids, encoder_outputs=z)
-                    print("-:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
-
+                    print("1:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
+                    temp=self.generate(input_ids, encoder_outputs=encoder_outputs)
+                    print("2:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
+                    labels_reformulate = [l for l in labels[0] if l != -100]
+                    print("*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
             return ((loss,) + output) if loss is not None else output
@@ -230,3 +241,4 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+
