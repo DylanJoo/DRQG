@@ -4,8 +4,8 @@ from transformers import T5ForConditionalGeneration, T5Config
 from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 from torch import nn
-from torch.nn import CrossEntropyLoss
-from utils import kl_weight, kl_loss
+from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
+from utils import kl_weight, kl_loss, hellinger_loss
 import copy
 
 class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
@@ -120,16 +120,16 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         # [NOTE] Transform it into a single vector (i.e., d dimensions x 1 tokens) with mask
         # [NOTE] Thinking of adopting a single random vector to align two distribution.
         r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        mean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
-        logv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
-        std = torch.exp(0.5 * logv)
-        z = r * std + mean
+        pmean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
+        plogv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
+        pstd = torch.exp(0.5 * plogv)
+        z = r * pstd + pmean
         positive = self.latent2hidden(z)
 
-        mean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
-        logv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
-        std = torch.exp(0.5 * logv)
-        z = r * std + mean
+        nmean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
+        nlogv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
+        nstd = torch.exp(0.5 * nlogv)
+        z = r * nstd + nmean
         negative = self.latent2hidden(z)
         zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
 
@@ -195,29 +195,50 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         loss_ce = 0
         loss_kl = 0
         loss_kl_w = 0
+        loss_hlg = 0
+        loss_cosine = 0
 
         if labels is not None:
             # nll loss
             loss_fct = CrossEntropyLoss(ignore_index=-100)
             loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+            loss_cosine = CosineEmbeddingLoss()
 
             # kl loss (vae loss)
             loss_kl_w = kl_weight(
-                    self.vae_config.annealing_fn, 
-                    steps, 
-                    self.vae_config.k, 
-                    self.vae_config.x0
+                self.vae_config.annealing_fn, 
+                steps, 
+                self.vae_config.k, 
+                self.vae_config.x0
             )
             loss_kl = kl_loss(
-                    logv.view(-1, self.latent_size), 
-                    mean.view(-1, self.latent_size)
+                plogv.view(-1, self.latent_size), 
+                pmean.view(-1, self.latent_size)
+            ) + kl_loss(
+                nlogv.view(-1, self.latent_size), 
+                nmean.view(-1, self.latent_size)
             )
 
-            loss = loss_ce + loss_kl * loss_kl_w
+            # distance loss (dd loss)
+            # loss_hlg = hellinger_loss(
+            #     pmean.view(-1, self.latent_size), 
+            #     pstd.view(-1, self.latent_size), 
+            #     nmean.view(-1, self.latent_size), 
+            #     nstd.view(-1, self.latent_size)
+            # )
+            loss_cosine = loss_cosine(
+                pmean.view(-1, self.latent_size),
+                nmean.view(-1, self.latent_size),
+                torch.tensor([-1] * pmean.shape[0]).to(pmean.device)
+            )
+
+            loss = loss_ce + (loss_kl+loss_hlg) * loss_kl_w 
 
             if steps % 20 == 0:
                 print(f"\nNLL: {loss_ce}\
-                        \nKL: {loss_kl * loss_kl_w} = {loss_kl} * {loss_kl_w}")
+                        \nKL: {loss_kl * loss_kl_w} = {loss_kl} * {loss_kl_w}\
+                        \nCOS: {loss_cosine}\
+                        \nDD: {loss_hlg * loss_kl_w} = {loss_hlg} * {loss_kl_w}")
                 with torch.no_grad():
                     temp=self.generate(input_ids)
                     print("1:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
@@ -240,5 +261,3 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
-
-

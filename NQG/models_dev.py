@@ -134,15 +134,6 @@ class BartVAE(BartPretrainedModel):
         lm_logits = self.lm_head(outputs[0])
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-        masked_lm_loss = None
-        if labels is not None:
-            loss_fct = CrossEntropyLoss()
-            masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
-
-        if not return_dict:
-            output = (lm_logits,) + outputs[1:]
-            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
-
         ## [Discriminative]
         ## The following codes from `BartForSequenceClassification`
         ## But use the bi-encoder architecture
@@ -154,9 +145,20 @@ class BartVAE(BartPretrainedModel):
         sentence_representation = hidden_states[eos_mask, :].view(
                 hidden_states.size(0), -1, hidden_states.size(-1)
         )[:, -1, :]
-
-        ## Constrastive learning
+        ## VAE
         logits = self.classification_head(sentence_representation)
+
+        masked_lm_loss = None
+        classification_loss = None
+
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
+            classification_loss = loss_fct(logits.view(-1, self.config.num_labels), torch)
+
+        if not return_dict:
+            output = (lm_logits,) + outputs[1:]
+            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,

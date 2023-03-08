@@ -24,7 +24,7 @@ class DataCollatorForT5VAE:
 
         # positive 
         inputs = self.tokenizer(
-                [f"<extra_id_10> {p}" for p in texts_pp] + [f"{p}" for p in texts_pn], 
+                [f"<extra_id_10> {p}" for p in texts_pp] + [f"<extra_id_10> {p}" for p in texts_pn], 
                 max_length=self.max_length,
                 truncation=True,
                 padding=True,
@@ -63,7 +63,7 @@ class DataCollatorForBartVAE:
 
         # positive 
         inputs = self.tokenizer(
-                [f"document: {p}" for p in texts_pp + texts_pn], 
+                [f"{p}" for p in texts_pp + texts_pn], 
                 max_length=self.max_length,
                 truncation=True,
                 padding='max_length',
