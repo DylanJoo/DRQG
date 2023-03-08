@@ -5,13 +5,13 @@ python3 train.py \
   --config_name t5-base \
   --output_dir ./checkpoints/testing \
   --max_length 256 \
-  --per_device_train_batch_size 16 \
+  --per_device_train_batch_size 8 \ # batch size 8 (in fact 16) used 15G GPU
   --evaluation_strategy 'steps' \
   --triplet temp/triples.train.small.sample.tsv \
-  --max_steps 1000 \
-  --save_steps 500 \
+  --max_steps 10000 \
+  --save_steps 2500 \
   --latent_size 256 \
-  --k 0.0025 \
-  --x0 5000 \
+  --k 0.00025 \
+  --x0 2500 \
   --annealing logistic \
   --do_train
