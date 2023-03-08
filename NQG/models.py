@@ -118,18 +118,18 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         pn_boundary = batch_size // 2
 
         # [NOTE] Transform it into a single vector (i.e., d dimensions x 1 tokens) with mask
+        # [NOTE] Thinking of adopting a single random vector to align two distribution.
+        r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
         mean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
         logv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
         std = torch.exp(0.5 * logv)
-        z = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        z = z * std + mean
+        z = r * std + mean
         positive = self.latent2hidden(z)
 
         mean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
         logv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
         std = torch.exp(0.5 * logv)
-        z = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        z = z * std + mean
+        z = r * std + mean
         negative = self.latent2hidden(z)
         zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
 
