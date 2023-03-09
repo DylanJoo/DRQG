@@ -234,16 +234,15 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
             loss = loss_ce + (loss_kl+loss_hlg) * loss_kl_w 
 
-            if steps % 20 == 0:
+            if steps % 500 == 0:
                 print(f"\nNLL: {loss_ce}\
                         \nKL: {loss_kl * loss_kl_w} = {loss_kl} * {loss_kl_w}\
-                        \nCOS: {loss_cosine}\
-                        \nDD: {loss_hlg * loss_kl_w} = {loss_hlg} * {loss_kl_w}")
+                        \nCOS: {loss_cosine}")
                 with torch.no_grad():
+                    n=input_ids.shape[0]
                     temp=self.generate(input_ids)
-                    print("1:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
-                    temp=self.generate(input_ids, encoder_outputs=encoder_outputs)
-                    print("2:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
+                    print("D+2Q:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
+                    print("D-2Q:", self.tokenizer.decode(temp[n], skip_special_tokens=True))
                     labels_reformulate = [l for l in labels[0] if l != -100]
                     print("*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
         if not return_dict:
