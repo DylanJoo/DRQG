@@ -20,6 +20,14 @@ def kl_loss(logv, mean):
     """
     return -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
 
+def hellinger_loss(p, q):
+    return np.sqrt(np.sum((np.sqrt(p) - np.sqrt(q)) ** 2)) /np.sqrt(2)
+
+def hellinger_loss(p, q):
+    return torch.sqrt(
+            torch.sum((torch.sqrt(p) - torch.sqrt(q)) ** 2)
+    ) / np.sqrt(2)
+
 def random_masking(tokens_lists, masked_token):
 
     for i, tokens_list in enumerate(tokens_lists):

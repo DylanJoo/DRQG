@@ -1,5 +1,4 @@
 import sys
-import multiprocessing
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -9,11 +8,10 @@ from transformers import (
     TrainingArguments,
     Trainer,
     HfArgumentParser,
-    GenerationConfig
 )
-from models import T5VAEForConditionalGeneration
-from trainers import VAETrainer
-from datacollator import DataCollatorForT5VAE
+from models import BartVAE
+from trainers import BartVAETrainer
+from datacollator import DataCollatorForBartVAE
 import msmarco 
 
 import os
@@ -22,9 +20,9 @@ os.environ["WANDB_DISABLED"] = "true"
 @dataclass
 class OurHFModelArguments:
     # Huggingface's original arguments
-    model_name_or_path: Optional[str] = field(default='t5-small')
-    config_name: Optional[str] = field(default='t5-small')
-    tokenizer_name: Optional[str] = field(default='t5-small')
+    model_name_or_path: Optional[str] = field(default='bart-base')
+    config_name: Optional[str] = field(default='bart-base')
+    tokenizer_name: Optional[str] = field(default='bart-base')
     cache_dir: Optional[str] = field(default=None)
     use_fast_tokenizer: bool = field(default=True)
     model_revision: str = field(default="main")
@@ -86,7 +84,7 @@ def main():
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
-    model = T5VAEForConditionalGeneration.from_pretrained(
+    model = BartVAE.from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             vae_config=model_args,
@@ -103,7 +101,7 @@ def main():
     model.generation_config = generation_config
 
     ## data collator
-    data_collator = DataCollatorForT5VAE(
+    data_collator = DataCollatorForBartVAE(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt'
