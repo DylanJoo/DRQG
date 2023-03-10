@@ -4,10 +4,10 @@ python3 train.py \
   --model_name_or_path t5-base \
   --tokenizer_name t5-base \
   --config_name t5-base \
-  --output_dir ./checkpoints/testing \
+  --output_dir ./checkpoints/t5-base-doc2distQ \
   --max_length 256 \
   --per_device_train_batch_size 8 \
-  --triplet /tmp2/jhju/datasets/triples.train.small.tsv \
+  --triplet /home/jhju/datasets/triples.train.small.tsv \
   --max_steps 10000 \
   --save_steps 2500 \
   --latent_size 256 \
