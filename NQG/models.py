@@ -232,7 +232,7 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
                 torch.tensor([-1] * pmean.shape[0]).to(pmean.device)
             )
 
-            loss = loss_ce + (loss_kl+loss_hlg) * loss_kl_w 
+            loss = loss_ce + loss_kl * loss_kl_w  + loss_cosine
 
             if steps % 500 == 0:
                 print(f"\nNLL: {loss_ce}\
