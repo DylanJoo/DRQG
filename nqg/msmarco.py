@@ -39,8 +39,7 @@ def query_aligned_triplet_dataset(args):
 
 ## (4) Triplet dataset with passage aligned
 def passage_aligned_triplet_dataset(args):
-    # if not os.path.exists(args.p_aligned_triplet):
-    if True:
+    if not os.path.exists(args.p_aligned_triplet):
         triplet = collections.defaultdict(dict)
         collection = load_collection(args.collection, inverse=True)
 
@@ -78,14 +77,26 @@ def passage_aligned_triplet_dataset(args):
         collection = load_collection(args.collection)
         with open(args.p_aligned_triplet, 'w') as f:
             for pid, queries in triplet.items():
-                # Setting1: inner join
-                for pos, neg in zip(queries['positive'], 
-                                    queries['negative']):
+                # Setting0: inner join with all negative. For each p
+                ## Contains at most min(n_pos, n_neg) instances
+                positives = list(queries['positive'])
+                negatives = list(queries['negative'])
+                n_pos = len(positives)
+                n_neg = len(negatives)
+
+                # Setting1: neatives innger-join. For each p
+                ## Contains at most n_neg*2 instances
+                if args.joinbynegative:
+                    if (n_pos > 0) and (n_pos < n_neg):
+                        positives = (positives * n_neg)[:n_neg]
+
+                for pos, neg in zip(positives, negatives):
                     f.write(json.dumps({
                         "passage": collection[pid],
                         "positive": pos, 
                         "negative": neg
                     }, ensure_ascii=False)+'\n')
+
     else:
         print(f"Load data from: {args.p_aligned_triplet}...")
     dataset = load_dataset('json', data_files=args.p_aligned_triplet)
