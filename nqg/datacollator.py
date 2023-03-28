@@ -13,7 +13,7 @@ class DataCollatorForT5VAE:
     pad_to_multiple_of: Optional[int] = None
     return_tensors: str = "pt"
     padding: Union[bool, str] = True
-    istrain: Union[bool, str] = True
+    is_train: Union[bool, str] = False
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -31,7 +31,7 @@ class DataCollatorForT5VAE:
                 return_tensors=self.return_tensors
         )
 
-        if self.istrain:
+        if self.is_train:
             targets = self.tokenizer(
                     texts_q + texts_q,
                     padding=True,
@@ -52,7 +52,7 @@ class DataCollatorForBartVAE:
     pad_to_multiple_of: Optional[int] = None
     return_tensors: str = "pt"
     padding: Union[bool, str] = True
-    istrain: Union[bool, str] = True
+    is_train: Union[bool, str] = False
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -70,7 +70,7 @@ class DataCollatorForBartVAE:
                 return_tensors=self.return_tensors
         )
 
-        if self.istrain:
+        if self.is_train:
             targets = self.tokenizer(
                     texts_q + texts_q,
                     padding=True,

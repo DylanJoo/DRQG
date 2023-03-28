@@ -51,6 +51,7 @@ class OurDataArguments:
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
+    q_aligned_triplet: Optional[str] = field(default=None)
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -102,20 +103,21 @@ def main():
     )
     model.generation_config = generation_config
 
-    ## data collator
+    ## data 
+    dataset = msmarco.query_aligned_triplet_dataset(data_args)
     data_collator = DataCollatorForT5VAE(
             tokenizer=tokenizer, 
             padding=True,
-            return_tensors='pt'
+            return_tensors='pt',
+            is_train=True
     )
 
     # Trainer
-    train_dataset = msmarco.triplet_dataset(data_args)
 
     trainer = VAETrainer(
             model=model, 
             args=training_args,
-            train_dataset=train_dataset['train'],
+            train_dataset=dataset['train'],
             eval_dataset=None,
             data_collator=data_collator
     )
