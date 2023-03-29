@@ -7,7 +7,7 @@ python3 train.py \
   --max_length 256 \
   --per_device_train_batch_size 8 \
   --evaluation_strategy 'steps' \
-  --train_file /content/DRQG/nqg/triples.train.small.v1.sample.jsonl \
+  --train_file data/triples.train.small.v0.sample.jsonl \
   --max_steps 10000 \
   --save_steps 2500 \
   --latent_size 256 \
