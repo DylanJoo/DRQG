@@ -8,7 +8,7 @@ from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
 from utils import kl_weight, kl_loss
 import copy
 
-class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
+class T5VQG(T5ForConditionalGeneration):
     _keys_to_ignore_on_load_missing = [
         r"encoder.embed_tokens.weight",
         r"decoder.embed_tokens.weight",

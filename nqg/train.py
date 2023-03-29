@@ -11,9 +11,9 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from models_revise import T5VAEForConditionalGeneration
+from models import T5VQG
 from trainers import VAETrainer
-from datacollator_new import DataCollatorForT5VAE
+from datacollator_new import DataCollatorForT5VQG
 import msmarco 
 
 import os
@@ -89,7 +89,7 @@ def main():
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
-    model = T5VAEForConditionalGeneration.from_pretrained(
+    model = T5VQG.from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             vae_config=model_args,
@@ -106,7 +106,7 @@ def main():
     model.generation_config = generation_config
 
     ## data collator
-    data_collator = DataCollatorForT5VAE(
+    data_collator = DataCollatorForT5VQG(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',

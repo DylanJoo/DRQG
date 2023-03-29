@@ -5,7 +5,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.tokenization_utils_base import PaddingStrategy, PreTrainedTokenizerBase
 
 @dataclass
-class DataCollatorForT5VAE:
+class DataCollatorForT5VQG:
     tokenizer: Union[PreTrainedTokenizerBase] = None
     padding: Union[bool, str, PaddingStrategy] = True
     truncation: Union[bool, str] = True
