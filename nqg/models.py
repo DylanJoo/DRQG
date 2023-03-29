@@ -128,9 +128,10 @@ class T5VQG(T5ForConditionalGeneration):
                 decoder_attention_mask = decoder_attention_mask.to(self.decoder.first_device)
 
         # forward with variational module
-        hidden_states, loss_reparam, loss_discr = self.forward_variational(
+        hidden_states, loss_variational = self.forward_variational(
                 hidden_states, steps=steps
         )
+        loss_reparam, loss_discr = loss_variational
 
         # Decode
         decoder_outputs = self.decoder(
