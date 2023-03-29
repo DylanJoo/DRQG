@@ -1,6 +1,8 @@
 from transformers import Trainer
+import torch
+import copy
 
-class VAETrainer(Trainer):
+class TrainerForT5VQG(Trainer):
 
     # customized loss counting function
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -14,11 +16,11 @@ class VAETrainer(Trainer):
         else:
             labels = None
 
+        training_steps = copy.deepcopy(self.state.global_step)
         # ===== add steps information into inputs =====
         # step would be given by huggingface `trainer.state.global_step`
-        inputs.update({'steps': self.state.global_step})
+        outputs = model(**inputs, steps=training_steps)
 
-        outputs = model(**inputs)
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
@@ -31,3 +33,4 @@ class VAETrainer(Trainer):
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
         return (loss, outputs) if return_outputs else loss
+

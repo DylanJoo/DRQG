@@ -11,9 +11,9 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from models import T5VAEForConditionalGeneration
+from models_revise import T5VAEForConditionalGeneration
 from trainers import VAETrainer
-from datacollator import DataCollatorForT5VAE
+from datacollator_new import DataCollatorForT5VAE
 import msmarco 
 
 import os
@@ -46,14 +46,14 @@ class OurDataArguments:
     preprocessing_num_workers: Optional[int] = field(default=None)
     # Customized arguments
     train_file: Optional[str] = field(default=None)
-    max_length: int = field(default=256)
+    max_length: int = field(default=5)
     triplet: Optional[str] = field(default=None)
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
     triplet: Optional[str] = field(default=None)
     joinbynegative: bool = field(default=False)
-    p_aligned_triplet: Optional[str] = field(default='triples.train.small.v1.jsonl')
+    p_aligned_triplet: Optional[str] = field(default='triples.train.small.v1.sample.jsonl')
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -67,8 +67,8 @@ class OurTrainingArguments(TrainingArguments):
     save_steps: int = field(default=5000)
     eval_steps: int = field(default=2500)
     evaluation_strategy: Optional[str] = field(default='no')
-    per_device_train_batch_size: int = field(default=8)
-    per_device_eval_batch_size: int = field(default=8)
+    per_device_train_batch_size: int = field(default=2)
+    per_device_eval_batch_size: int = field(default=2)
     logging_dir: Optional[str] = field(default='./logs')
     resume_from_checkpoint: Optional[str] = field(default=None)
     # Customized arguments
@@ -109,7 +109,8 @@ def main():
     data_collator = DataCollatorForT5VAE(
             tokenizer=tokenizer, 
             padding=True,
-            return_tensors='pt'
+            return_tensors='pt',
+            is_train=True
     )
 
     # Trainer

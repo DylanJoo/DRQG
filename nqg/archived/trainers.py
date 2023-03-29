@@ -1,6 +1,6 @@
 from transformers import Trainer
 
-class T5VAETrainer(Trainer):
+class VAETrainer(Trainer):
 
     # customized loss counting function
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -31,4 +31,3 @@ class T5VAETrainer(Trainer):
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
         return (loss, outputs) if return_outputs else loss
-

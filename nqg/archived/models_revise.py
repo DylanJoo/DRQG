@@ -149,7 +149,6 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
         sequence_output = decoder_outputs[0]
 
-
         # Set device for model parallelism
         if self.model_parallel:
             torch.cuda.set_device(self.encoder.first_device)
@@ -171,6 +170,10 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
 
             # add varaiational losses
             loss= loss + loss_varational
+
+        if steps % 20 == 0:
+            print(f"\nNLL: {loss} \
+                    \nKLD: {loss_varational}")
 
         # inferece during training
         with torch.no_grad():
@@ -209,7 +212,7 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
     def forward_variational(
         self, 
         hidden_states: Optional[torch.FloatTensor] = None, 
-        **kwargs
+        steps: Optional[int] = None, 
     ) -> Optional[torch.FloatTensor]:
         """ The standard version of forward passing (training) 
         params
@@ -222,7 +225,7 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
         # Thinking of adopting a single random vector to align two distribution.
         """
         batch_size, seq_length, d_model = hidden_states.shape
-        idx_boundary = batch_size // 2
+        pn_boundary = batch_size // 2
 
         # Positive 
         r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
@@ -250,14 +253,14 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
     
     def compute_loss_variational(self, pmean, plogv, nmean, nlogv, steps):
         loss_kl = 0
-
         loss_kl_pos = kl_loss(plogv.view(-1, self.latent_size), 
                               pmean.view(-1, self.latent_size)) 
         loss_kl_neg = kl_loss(nlogv.view(-1, self.latent_size), 
                               nmean.view(-1, self.latent_size))
-        loss_cosine = loss_cosine(pmean.view(-1, self.latent_size),
-                                  nmean.view(-1, self.latent_size),
-                                  torch.tensor([-1] * pmean.shape[0]).to(pmean.device))
+        loss_fct = CosineEmbeddingLoss()
+        loss_discr = loss_fct(pmean.view(-1, self.latent_size),
+                              nmean.view(-1, self.latent_size),
+                              torch.tensor([-1] * pmean.shape[0]).to(pmean.device))
 
         # calcuate the weighted losses
         loss_kl_w = kl_weight(
@@ -274,5 +277,5 @@ class T5VAEForConditionalGeneration(T5ForConditionalGeneration):
                     \nKL (WEIGHTED): {loss_kl} \
                     \nCOS: {loss_cosine}")
 
-        return loss_kl + loss_cosine
+        return loss_kl + loss_discr
 
