@@ -51,6 +51,9 @@ class OurDataArguments:
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
+    triplet: Optional[str] = field(default=None)
+    joinbynegative: bool = field(default=False)
+    p_aligned_triplet: Optional[str] = field(default='triples.train.small.v1.jsonl')
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -110,12 +113,12 @@ def main():
     )
 
     # Trainer
-    train_dataset = msmarco.triplet_dataset(data_args)
+    dataset = msmarco.passage_aligned_triplet_dataset(data_args)
 
     trainer = VAETrainer(
             model=model, 
             args=training_args,
-            train_dataset=train_dataset['train'],
+            train_dataset=dataset['train'],
             eval_dataset=None,
             data_collator=data_collator
     )
