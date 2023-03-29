@@ -246,7 +246,7 @@ class T5VQG(T5ForConditionalGeneration):
 
         # Compute variational losses
         loss_reparam = self.compute_loss_reparam(pmean, plogv, nmean, nlogv, steps)
-        loss_discr = self.compute_loss_reparam(pmean, plogv, nmean, nlogv, steps)
+        loss_discr = self.compute_loss_discrepancy(pmean, nmean)
 
         return hidden_states, (loss_reparam, loss_discr)
     
