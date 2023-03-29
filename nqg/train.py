@@ -12,7 +12,7 @@ from transformers import (
     GenerationConfig
 )
 from models import T5VQG
-from trainers import VAETrainer
+from trainers import TrainerForT5VQG
 from datacollator_new import DataCollatorForT5VQG
 import msmarco 
 
@@ -116,7 +116,7 @@ def main():
     # Trainer
     dataset = msmarco.passage_aligned_triplet_dataset(data_args)
 
-    trainer = VAETrainer(
+    trainer = TrainerForT5VQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
