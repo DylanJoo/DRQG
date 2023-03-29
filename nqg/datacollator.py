@@ -15,15 +15,13 @@ class DataCollatorForT5VQG:
     padding: Union[bool, str] = True
     is_train: Union[bool, str] = False
     # spec
-    p_centric: Optional[bool] = True
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         # text and id info 
-        if self.p_centric:
-            texts_p = [batch['passage'] for batch in features]
-            texts_pq = [batch['positive'] for batch in features]
-            texts_nq = [batch['negative'] for batch in features]
+        texts_p = [batch['passage'] for batch in features]
+        texts_pq = [batch['positive'] for batch in features]
+        texts_nq = [batch['negative'] for batch in features]
 
         # positive 
         inputs = self.tokenizer(

@@ -2,7 +2,11 @@ from transformers import Trainer
 import torch
 import copy
 
+<<<<<<< HEAD:nqg/trainers.py
 class TrainerForT5VQG(Trainer):
+=======
+class VAETrainer(Trainer):
+>>>>>>> aeec14d3fa5bafe1c7c282f2d27a3767279ce719:NQG/trainers.py
 
     # customized loss counting function
     def compute_loss(self, model, inputs, return_outputs=False):
