@@ -13,7 +13,7 @@ from transformers import (
 )
 from models import T5VQG
 from trainers import TrainerForT5VQG
-from datacollator_new import DataCollatorForT5VQG
+from datacollator import DataCollatorForT5VQG
 import msmarco 
 
 import os
