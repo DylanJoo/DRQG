@@ -27,19 +27,21 @@ def triplet_dataset(args):
 
 ## (3) Triplet dataset
 def query_aligned_triplet_dataset(args):
-    if not os.path.exists(args.q_aligned_triplet):
+    path = args.train_file or args.q_aligned_triplet
+    if not os.path.exists(path):
         ## Step1: load triplet dictionary
         triplet = load_triplet(args.triplet, True)
         ## Step2: convert to jsonl and saved
-        convert_triplet_to_jsonl(triplet, args.q_aligned_triplet)
+        convert_triplet_to_jsonl(triplet, args.path)
 
-    dataset = load_dataset('json', data_files=args.q_aligned_triplet)
+    dataset = load_dataset('json', data_files=path)
     print(f"Number of instances in dataset: {len(dataset['train'])}")
     return dataset
 
 ## (4) Triplet dataset with passage aligned
 def passage_aligned_triplet_dataset(args):
-    if not os.path.exists(args.p_aligned_triplet):
+    path = args.train_file or args.p_aligned_triplet
+    if not os.path.exists(path):
         triplet = collections.defaultdict(dict)
         collection = load_collection(args.collection, inverse=True)
 
@@ -75,7 +77,7 @@ def passage_aligned_triplet_dataset(args):
 
         # output jsonl
         collection = load_collection(args.collection)
-        with open(args.p_aligned_triplet, 'w') as f:
+        with open(args.path, 'w') as f:
             for pid, queries in triplet.items():
                 # Setting0: inner join with all negative. For each p
                 ## Contains at most min(n_pos, n_neg) instances
@@ -98,8 +100,8 @@ def passage_aligned_triplet_dataset(args):
                     }, ensure_ascii=False)+'\n')
 
     else:
-        print(f"Load data from: {args.p_aligned_triplet}...")
-    dataset = load_dataset('json', data_files=args.p_aligned_triplet)
+        print(f"Load data from: {path}...")
+    dataset = load_dataset('json', data_files=path)
     print(f"Number of instances: {len(dataset['train'])}")
     return dataset
 

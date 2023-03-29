@@ -46,12 +46,12 @@ class OurDataArguments:
     preprocessing_num_workers: Optional[int] = field(default=None)
     # Customized arguments
     train_file: Optional[str] = field(default=None)
+    eval_file: Optional[str] = field(default=None)
     max_length: int = field(default=5)
     triplet: Optional[str] = field(default=None)
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
-    triplet: Optional[str] = field(default=None)
     joinbynegative: bool = field(default=False)
     p_aligned_triplet: Optional[str] = field(default='triples.train.small.v1.sample.jsonl')
 
@@ -115,12 +115,19 @@ def main():
 
     # Trainer
     dataset = msmarco.passage_aligned_triplet_dataset(data_args)
+    N = len(dataset['train'])
+    if training_args.do_eval and data_args.eval_file is None:
+        # split 10% for evaluation
+        dataset = dataset['train'].train_test_split(test_size=0.1)
+    else:
+        dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
+
 
     trainer = TrainerForT5VQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
-            eval_dataset=None,
+            eval_dataset=dataset['test'],
             data_collator=data_collator
     )
     
