@@ -93,7 +93,6 @@ def passage_centric_triplet_dataset(args):
     print(f"Number of instances: {len(dataset['train'])}")
     return dataset
 
-
 ### Load entities
 def load_collection(path, inverse=False):
     collection = {}
