@@ -251,10 +251,17 @@ class T5VQG(T5ForConditionalGeneration):
         return hidden_states, (loss_reparam, loss_discr)
     
     def compute_loss_discrepancy(self, pmean, nmean):
+        # cosine similarity loss
         loss_fct = CosineEmbeddingLoss()
         loss = loss_fct(pmean.view(-1, self.latent_size),
                         nmean.view(-1, self.latent_size),
                         torch.tensor([-1] * pmean.shape[0]).to(pmean.device))
+
+        # MSE loss
+        # loss_fct = CosineEmbeddingLoss()
+        # loss = loss_fct(pmean.view(-1, self.latent_size),
+        #                 nmean.view(-1, self.latent_size),
+        #                 torch.tensor([-1] * pmean.shape[0]).to(pmean.device))
         return loss
 
     def compute_loss_reparam(self, pmean, plogv, nmean, nlogv, steps):
