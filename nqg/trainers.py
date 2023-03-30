@@ -2,12 +2,7 @@ from transformers import Trainer
 import torch
 import copy
 
-<<<<<<< HEAD:nqg/trainers.py
 class TrainerForT5VQG(Trainer):
-=======
-class VAETrainer(Trainer):
->>>>>>> aeec14d3fa5bafe1c7c282f2d27a3767279ce719:NQG/trainers.py
-
     # customized loss counting function
     def compute_loss(self, model, inputs, return_outputs=False):
         """
@@ -20,9 +15,8 @@ class VAETrainer(Trainer):
         else:
             labels = None
 
+        # [NOTE] add training steps info 
         training_steps = copy.deepcopy(self.state.global_step)
-        # ===== add steps information into inputs =====
-        # step would be given by huggingface `trainer.state.global_step`
         outputs = model(**inputs, steps=training_steps)
 
         # Save past state if it exists

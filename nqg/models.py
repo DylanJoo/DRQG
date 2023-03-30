@@ -173,21 +173,20 @@ class T5VQG(T5ForConditionalGeneration):
 
             # add varaiational losses
             if steps % 50 == 0:
-                print(f"\nNLL: {loss_ce} \
-                        \nKLD: {loss_reparam} \
-                        \nCOS: {loss_discr}")
+                print(f"\nNLL: {loss_ce}\tKLD: {loss_reparam}\tCOS: {loss_discr}")
                 # inferece during training
-                with torch.no_grad():
-                    temp=self.generate(input_ids)
+                if steps % 200 == 0:
+                    with torch.no_grad():
+                        temp=self.generate(input_ids)
 
-                    labels_reformulate = [l for l in labels[0] if l != -100]
-                    print("D2Q+:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
-                    print("D2Q+*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+                        labels_reformulate = [l for l in labels[0] if l != -100]
+                        print("D2Q+:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
+                        print("D2Q+*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
 
-                    n=input_ids.shape[0]//2
-                    labels_reformulate = [l for l in labels[n] if l != -100]
-                    print("D2Q-:", self.tokenizer.decode(temp[n], skip_special_tokens=True))
-                    print("D2Q-*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+                        n=input_ids.shape[0]//2
+                        labels_reformulate = [l for l in labels[n] if l != -100]
+                        print("D2Q-:", self.tokenizer.decode(temp[n], skip_special_tokens=True))
+                        print("D2Q-*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
 
             loss = loss_ce + loss_reparam + loss_discr
 
@@ -252,10 +251,13 @@ class T5VQG(T5ForConditionalGeneration):
         return hidden_states, (loss_reparam, loss_discr)
     
     def compute_loss_discrepancy(self, pmean, nmean):
+        # cosine similarity loss
         loss_fct = CosineEmbeddingLoss()
         loss = loss_fct(pmean.view(-1, self.latent_size),
                         nmean.view(-1, self.latent_size),
                         torch.tensor([-1] * pmean.shape[0]).to(pmean.device))
+
+        # [TODO] MSE loss
         return loss
 
     def compute_loss_reparam(self, pmean, plogv, nmean, nlogv, steps):

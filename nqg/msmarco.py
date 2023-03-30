@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 ## (1) doc2query dataset 
 # i.e., query generation task
+# [TODO] this code is unfinished
 def doc2query_dataset(args):
     dataset = None
     collection = load_collection(args.collection)
@@ -15,7 +16,7 @@ def doc2query_dataset(args):
     qrels = load_qrels(args.qrels)
     return dataset
 
-## (2) Triplet dataset
+## (2) Triplet dataset (query-centric)
 def triplet_dataset(args):
     dataset = load_dataset('csv', 
             data_files=args.triplet, 
@@ -25,27 +26,14 @@ def triplet_dataset(args):
     print(f"Number of instances in dataset: {len(dataset['train'])}")
     return dataset
 
-## (3) Triplet dataset
-def query_aligned_triplet_dataset(args):
-    path = args.train_file or args.q_aligned_triplet
-    if not os.path.exists(path):
-        ## Step1: load triplet dictionary
-        triplet = load_triplet(args.triplet, True)
-        ## Step2: convert to jsonl and saved
-        convert_triplet_to_jsonl(triplet, args.path)
-
-    dataset = load_dataset('json', data_files=path)
-    print(f"Number of instances in dataset: {len(dataset['train'])}")
-    return dataset
-
-## (4) Triplet dataset with passage aligned
-def passage_aligned_triplet_dataset(args):
-    path = args.train_file or args.p_aligned_triplet
+## (4) Triplet dataset (passage-centric)
+def passage_centric_triplet_dataset(args):
+    path = args.train_file or args.p_centric_triplet
     if not os.path.exists(path):
         triplet = collections.defaultdict(dict)
         collection = load_collection(args.collection, inverse=True)
 
-        # load triplet with p aligned
+        # load triplet with p-centered
         with open(args.triplet, 'r') as f:
             for line in tqdm(f):
                 query, positive, negative = line.strip().split('\t')
@@ -86,8 +74,8 @@ def passage_aligned_triplet_dataset(args):
                 n_pos = len(positives)
                 n_neg = len(negatives)
 
-                # Setting1: neatives innger-join. For each p
-                ## Contains at most n_neg*2 instances
+                # Setting1: neatives innger-join. 
+                ## each p contains at most n_neg*2 instances
                 if args.joinbynegative:
                     if (n_pos > 0) and (n_pos < n_neg):
                         positives = (positives * n_neg)[:n_neg]
@@ -104,44 +92,6 @@ def passage_aligned_triplet_dataset(args):
     dataset = load_dataset('json', data_files=path)
     print(f"Number of instances: {len(dataset['train'])}")
     return dataset
-
-# def load_triplet(path, stats=False):
-#     triplet = collections.defaultdict(dict)
-#     with open(path, 'r') as f:
-#         for line in tqdm(f):
-#             query, positive, negative = line.strip().split('\t')
-#             if query not in data['query']:
-#                 triplet[query]['positive'] = set()
-#                 triplet[query]['negative'] = set()
-#             triplet[query]['negative'].update([negative])
-#             triplet[query]['positive'].update([positive])
-#     print("load triplet done")
-#
-#     if stats:
-#         pos, neg = [], []
-#         for key in triplet:
-#             pos.append(len(triplet[key]['positive']))
-#             neg.append(len(triplet[key]['negative']))
-#
-#         print(f"# Number of queries: {len(triplet)}")
-#         print(f"# Number of average positive: {np.mean(pos)}")
-#         print(f"# Number of average negative: {np.mean(neg)}")
-#     return triplet
-
-def convert_triplet_to_jsonl(triplet, output_path):
-    with open(output_path, 'w') as f:
-        for query, passages in tqdm(triplet.items()):
-            positives = list(passages['positive'])
-            negatives = list(passages['negative'])
-            N = len(negatives)
-
-            f.write(json.dumps({
-                "query": query.strip(), 
-                "positive": random.choices(positives, k=N),
-                "negative": random.sample(negatives, k=N)
-            }, ensure_ascii=False)+'\n')
-    return 0
-
 
 ### Load entities
 def load_collection(path, inverse=False):

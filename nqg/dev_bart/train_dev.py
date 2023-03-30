@@ -1,5 +1,4 @@
 import sys
-import multiprocessing
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -9,11 +8,10 @@ from transformers import (
     TrainingArguments,
     Trainer,
     HfArgumentParser,
-    GenerationConfig
 )
-from models import T5VQG
-from trainers import TrainerForT5VQG
-from datacollator import DataCollatorForT5VQG
+from models import BartVAE
+from trainers import BartVAETrainer
+from datacollator import DataCollatorForBartVAE
 import msmarco 
 
 import os
@@ -22,9 +20,9 @@ os.environ["WANDB_DISABLED"] = "true"
 @dataclass
 class OurHFModelArguments:
     # Huggingface's original arguments
-    model_name_or_path: Optional[str] = field(default='t5-base')
-    config_name: Optional[str] = field(default='t5-base')
-    tokenizer_name: Optional[str] = field(default='t5-base')
+    model_name_or_path: Optional[str] = field(default='bart-base')
+    config_name: Optional[str] = field(default='bart-base')
+    tokenizer_name: Optional[str] = field(default='bart-base')
     cache_dir: Optional[str] = field(default=None)
     use_fast_tokenizer: bool = field(default=True)
     model_revision: str = field(default="main")
@@ -46,14 +44,11 @@ class OurDataArguments:
     preprocessing_num_workers: Optional[int] = field(default=None)
     # Customized arguments
     train_file: Optional[str] = field(default=None)
-    eval_file: Optional[str] = field(default=None)
-    max_length: int = field(default=5)
+    max_length: int = field(default=256)
     triplet: Optional[str] = field(default=None)
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
-    joinbynegative: bool = field(default=False)
-    p_centric_triplet: Optional[str] = field(default='triples.train.small.v1.sample.jsonl')
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -67,8 +62,8 @@ class OurTrainingArguments(TrainingArguments):
     save_steps: int = field(default=5000)
     eval_steps: int = field(default=2500)
     evaluation_strategy: Optional[str] = field(default='no')
-    per_device_train_batch_size: int = field(default=2)
-    per_device_eval_batch_size: int = field(default=2)
+    per_device_train_batch_size: int = field(default=8)
+    per_device_eval_batch_size: int = field(default=8)
     logging_dir: Optional[str] = field(default='./logs')
     resume_from_checkpoint: Optional[str] = field(default=None)
     # Customized arguments
@@ -89,7 +84,7 @@ def main():
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
-    model = T5VQG.from_pretrained(
+    model = BartVAE.from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             vae_config=model_args,
@@ -106,28 +101,20 @@ def main():
     model.generation_config = generation_config
 
     ## data collator
-    data_collator = DataCollatorForT5VQG(
+    data_collator = DataCollatorForBartVAE(
             tokenizer=tokenizer, 
             padding=True,
-            return_tensors='pt',
-            is_train=True
+            return_tensors='pt'
     )
 
     # Trainer
-    dataset = msmarco.passage_centric_triplet_dataset(data_args)
-    N = len(dataset['train'])
-    if training_args.do_eval and data_args.eval_file is None:
-        # split 0.1% for evaluation
-        dataset = dataset['train'].train_test_split(test_size=0.001)
-    else:
-        dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
+    train_dataset = msmarco.triplet_dataset(data_args)
 
-
-    trainer = TrainerForT5VQG(
+    trainer = VAETrainer(
             model=model, 
             args=training_args,
-            train_dataset=dataset['train'],
-            eval_dataset=dataset['test'],
+            train_dataset=train_dataset['train'],
+            eval_dataset=None,
             data_collator=data_collator
     )
     
