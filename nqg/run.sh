@@ -3,7 +3,7 @@ python3 train.py \
   --model_name_or_path t5-base \
   --tokenizer_name t5-base \
   --config_name t5-base \
-  --output_dir ./checkpoints/testing \
+  --output_dir ./t5vqg_v0 \
   --max_length 256 \
   --per_device_train_batch_size 8 \
   --evaluation_strategy 'steps' \
