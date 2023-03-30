@@ -14,6 +14,7 @@ class DataCollatorForT5VQG:
     return_tensors: str = "pt"
     padding: Union[bool, str] = True
     is_train: Union[bool, str] = False
+    is_eval: Union[bool, str] = False
     # spec
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -23,21 +24,36 @@ class DataCollatorForT5VQG:
         texts_pq = [batch['positive'] for batch in features]
         texts_nq = [batch['negative'] for batch in features]
 
-        # positive 
-        inputs = self.tokenizer(
-                [f"<extra_id_10> {p}" for p in texts_p] * 2 ,
-                max_length=self.max_length,
-                truncation=True,
-                padding=True,
-                return_tensors=self.return_tensors
-        )
-
         if self.is_train:
+            """
+            When training, a batch contains two passaegs, this is for 
+            optimizing NQG and PQF(doc2query) in the same batch with
+            discrepancy loss of same passage but different target.
+            """
+            inputs = self.tokenizer(
+                    [f"<extra_id_10> {p}" for p in texts_p] * 2 ,
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
             targets = self.tokenizer(
                     texts_pq+texts_nq,
                     padding=True,
                     return_tensors=self.return_tensors
             ).input_ids
             inputs['labels'] = targets
+        return inputs
 
+        elif self.is_eval:
+            inputs = self.tokenizer(
+                    [f"<extra_id_10> {p}" for p in texts_p],
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
+            inputs['passage'] = texts_p
+            inputs['positive'] = texts_pq
+            inputs['negative'] = texts_nq
         return inputs

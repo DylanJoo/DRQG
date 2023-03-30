@@ -1,3 +1,7 @@
+"""
+TODO: Add a controller to switch the training mode to inference mode
+with positive/negative variational inference decoding.
+"""
 import torch
 from typing import Optional, Tuple, Union
 from transformers import T5ForConditionalGeneration, T5Config
