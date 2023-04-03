@@ -15,16 +15,17 @@ class DataCollatorForT5VQG:
     padding: Union[bool, str] = True
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
+    is_test: Union[bool, str] = False
     # spec
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         # text and id info 
         texts_p = [batch['passage'] for batch in features]
-        texts_pq = [batch['positive'] for batch in features]
-        texts_nq = [batch['negative'] for batch in features]
 
         if self.is_train:
+            texts_pq = [batch['positive'] for batch in features]
+            texts_nq = [batch['negative'] for batch in features]
             """
             When training, a batch contains two passaegs, this is for 
             optimizing NQG and PQF(doc2query) in the same batch with
@@ -53,8 +54,10 @@ class DataCollatorForT5VQG:
                     return_tensors=self.return_tensors
             )
             inputs['passage'] = texts_p
-            inputs['positive'] = texts_pq
-            inputs['negative'] = texts_nq
+
+            if self.is_test is False:
+                inputs['positive'] = texts_pq
+                inputs['negative'] = texts_nq
         return inputs
 
 @dataclass
