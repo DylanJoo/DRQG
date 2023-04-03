@@ -1,4 +1,5 @@
 from tqdm import tqdm
+import torch
 from datacollator import DataCollatorForT5VQG
 from models import T5VQG
 from transformers import AutoConfig, AutoTokenizer
@@ -65,30 +66,31 @@ for batch in tqdm(dataloader):
     hidden_states = oh[0]
     # add gaussian
     if output_positive:
-        mean = model.hidden2pmean(hidden_states)
-        logv = model.hidden2plogv(hidden_states)
+        mean = model.hidden2pmean(hidden_states[:, :1, :])
+        logv = model.hidden2plogv(hidden_states[:, :1, :])
         std = torch.exp(0.5 * logv)
 
     else:
-        mean = model.hidden2nmean(hidden_states)
-        logv = model.hidden2nlogv(hidden_states)
+        mean = model.hidden2nmean(hidden_states[:, :1, :])
+        logv = model.hidden2nlogv(hidden_states[:, :1, :])
         std = torch.exp(0.5 * logv)
 
     # decode
     z = torch.cat(((std+mean), mean, (-std+mean)), 0)
-    bs, sl, d_model = z.shape
-    h = self.latent2hidden(z) 
-    zeros = torch.zeros(bs, sl, d_model).to(hidden_states.device)
+    h = model.latent2hidden(z) 
+    bs, sl, d_model = hidden_states.shape
+    zeros = torch.zeros(bs*3, sl-1, d_model).to(hidden_states.device)
     residuals = torch.cat((h, zeros), 1)
-    encoder_outputs.last_hidden_state = \
-            residuals + hidden_states[0].repeat((3, 1, 1))
+    print(residuals.shape)
+    oh.last_hidden_state = residuals + hidden_states.repeat((3, 1, 1))
 
     o = model.generate(encoder_outputs=oh)
 
     for i, passage in enumerate(passages_info):
-        print("Passages\t", passages)
+        print("Passages\t", passage)
         print("Predicted query1\t", tokenizer.decode(o[i*3+0], skip_special_tokens=True))
         print("Predicted query2\t", tokenizer.decode(o[i*3+1], skip_special_tokens=True))
         print("Predicted query3\t", tokenizer.decode(o[i*3+2], skip_special_tokens=True))
+
 
 
