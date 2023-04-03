@@ -283,6 +283,10 @@ class T5VQG(T5ForConditionalGeneration):
 
 class T5PQG(T5ForConditionalGeneration):
 
+    def set_tokenizer(self, tokenizer=None):
+        # [NOTE] Set a tokenizer: maybe it's better using the similar way like T5VQG
+        self.tokenizer = tokenizer
+
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
