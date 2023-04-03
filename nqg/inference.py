@@ -6,9 +6,11 @@ from dataclasses import dataclass, field
 from datasets import Dataset
 
 PATH="t5vqg_v0/checkpoint-10000"
-device='cpu'
+PATH='t5-base'
+device='cuda'
+output_positive=True
 
-vae_config = {"latent_size" : 128, 
+vae_config = {"latent_size" : 256, 
               "k": 0.0025,
               "x0": 2500,
               "annealing_fn": 'logistic'}
@@ -26,7 +28,8 @@ model = T5VQG.from_pretrained(
         config=config,
         vae_config=OurModelArguments,
         tokenizer=tokenizer
-)
+).to(device)
+model.eval()
 
 text = ["<PAD>", "It is generally safe for pregnant women to eat chocolate because studies have shown to prove certain benefits of eating chocolate during pregnancy. However, pregnant women should ensure their caffeine intake is below 200 mg per day."]
 
@@ -53,18 +56,39 @@ dataloader = DataLoader(
 
 for batch in tqdm(dataloader):
     passages_info = batch.pop('passage')
-    positive_info = batch.pop('positive')
-    negative_info = batch.pop('negative')
 
     for k in batch:
-        batch[k] = battch[k].cuda(device)
+        batch[k] = batch[k].to(device)
 
-    h = model.encoder(**batch)
-    o = model.generate(encoder_output=h)
+    oh = model.encoder(**batch)
 
-    for i, tokens in enumerate(o):
-        print(passage_info[i])
-        print(positive_info[i])
-        print(negative_info[i])
-        print(tokenizer.decode(o[i], skip_special_tokens=True))
+    hidden_states = oh[0]
+    # add gaussian
+    if output_positive:
+        mean = model.hidden2pmean(hidden_states)
+        logv = model.hidden2plogv(hidden_states)
+        std = torch.exp(0.5 * logv)
+
+    else:
+        mean = model.hidden2nmean(hidden_states)
+        logv = model.hidden2nlogv(hidden_states)
+        std = torch.exp(0.5 * logv)
+
+    # decode
+    z = torch.cat(((std+mean), mean, (-std+mean)), 0)
+    bs, sl, d_model = z.shape
+    h = self.latent2hidden(z) 
+    zeros = torch.zeros(bs, sl, d_model).to(hidden_states.device)
+    residuals = torch.cat((h, zeros), 1)
+    encoder_outputs.last_hidden_state = \
+            residuals + hidden_states[0].repeat((3, 1, 1))
+
+    o = model.generate(encoder_outputs=oh)
+
+    for i, passage in enumerate(passages_info):
+        print("Passages\t", passages)
+        print("Predicted query1\t", tokenizer.decode(o[i*3+0], skip_special_tokens=True))
+        print("Predicted query2\t", tokenizer.decode(o[i*3+1], skip_special_tokens=True))
+        print("Predicted query3\t", tokenizer.decode(o[i*3+2], skip_special_tokens=True))
+
 
