@@ -392,8 +392,8 @@ class T5PQG(T5ForConditionalGeneration):
             pn_boundary = labels.size(0) // 2
             labels_pos = copy.deepcopy(labels)
             labels_neg = copy.deepcopy(labels)
-            labels_pos[:pn_boundary, :] = -100
-            labels_neg[pn_boundary:, :] = -100
+            labels_pos[pn_boundary:, :] = -100 # mask NQG (the latter half)
+            labels_neg[:pn_boundary, :] = -100 # mask PQG (the former half)
 
             loss_fct = CrossEntropyLoss(ignore_index=-100)
             loss_ce_pos = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels_pos.view(-1))
