@@ -15,7 +15,6 @@ class DataCollatorForT5VQG:
     padding: Union[bool, str] = True
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
-    is_test: Union[bool, str] = False
     # spec
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -45,7 +44,7 @@ class DataCollatorForT5VQG:
             ).input_ids
             inputs['labels'] = targets
 
-        elif self.is_eval:
+        else:
             inputs = self.tokenizer(
                     [f"<extra_id_10> {p}" for p in texts_p],
                     max_length=self.max_length,
@@ -55,7 +54,7 @@ class DataCollatorForT5VQG:
             )
             inputs['passage'] = texts_p
 
-            if self.is_test is False:
+            if self.is_eval:
                 inputs['positive'] = texts_pq
                 inputs['negative'] = texts_nq
         return inputs
