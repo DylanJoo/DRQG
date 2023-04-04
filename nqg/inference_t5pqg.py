@@ -7,28 +7,6 @@ from transformers import AutoConfig, AutoTokenizer
 from datacollator import DataCollatorForT5VQG
 from models import T5VQG
 
-def parameterized_generation(positive, model, e_embed, std_list=None):
-    # reparameterize
-    if positive:
-        mean = model.hidden2pmean(e_embed)
-        logv = model.hidden2plogv(e_embed)
-    else:
-        mean = model.hidden2nmean(e_embed)
-        logv = model.hidden2nlogv(e_embed)
-
-    std = torch.exp(0.5 * logv)
-    N = len(std_list)
-    zs = [mean+(std*n) for n in std_list]
-
-    ### So far, arranging the first dimension (batch) as batch x len(std_list)
-    z = torch.cat(zs, 0)
-    e_embed = model.latent2hidden(z) 
-    zeros = torch.zeros(
-            e_embed_size(0)*len(std_list), e_embed.size(1)-1, e_embed.size(2)
-    ).to(e_embed.device)
-    resid = torch.cat((e_embed, zeros), 1)
-    return resid + hidden_states.repeat((N, 1, 1))
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # load model
@@ -72,8 +50,8 @@ if __name__ == "__main__":
     # load dataset
     dataset = load_dataset("json", data_files=args.input_jsonl)
 
-    from datacollator import DataCollatorForT5VQG
-    data_collator = DataCollatorForT5VQG(
+    from datacollator import DataCollatorForT5PQG
+    data_collator = DataCollatorForT5PQG(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
@@ -95,39 +73,18 @@ if __name__ == "__main__":
 
         # forward and generate
         with torch.no_grad():
-            ## encode 
-            enc_output = model.encoder(**batch)
+            ## [NOTE] Here arrange the input as batch_size x (positive, negative) in a same batch
+            enc_output = model.generate(
+                    **batch,
+                    num_beams=args.beam_size,
+                    max_length=args.max_length
+            )
 
-            ## Setting1: parameterized generation
-            std_list = [-2, -1, 0, 1, 2]
-            N = len(std_list)
-            if args.positive:
-                enc_output.last_hidden_state = parameterized_generation(
-                        True, model, e_embed, args.std_list
-                )
-                outputs = model.generate(
-                        encoder_outputs=enc_output, 
-                        num_beams=args.beam_size,
-                        max_length=args.max_length
-                )
-                for i in range(len(output_dict)):
-                    output_dict[i]['positive'] = [\
-                            tokenizer.decode(outputs[i+j]) for j in range(N)
-                    ]
-
-            if args.negative:
-                enc_output.last_hidden_state = parameterized_generation(
-                        False, model, e_embed, args.std_list
-                )
-                outputs = model.generate(
-                        encoder_outputs=enc_output, 
-                        num_beams=args.beam_size,
-                        max_length=args.max_length
-                )
-                for i in range(len(output_dict)):
-                    output_dict['negative'] = [\
-                            tokenizer.decode(outputs[i+j]) for j in range(N)
-                    ]
+            for i in range(len(output_dict)):
+                ## one half as positive
+                output_dict[i]['positive'] = tokenizer.decode(outputs[i])
+                ## the other as negative
+                output_dict[i]['negative'] = tokenizer.decode(outputs[i+N])
 
         with open(args.output_jsonl, 'w') as f:
             for k, v in output_dict.items():

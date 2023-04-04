@@ -45,6 +45,10 @@ class DataCollatorForT5VQG:
             inputs['labels'] = targets
 
         else:
+            """
+            When inferencing, a batch contains only one passaegs. 
+            Each passages is the to-be-predicted instance.
+            """
             inputs = self.tokenizer(
                     [f"<extra_id_10> {p}" for p in texts_p],
                     max_length=self.max_length,
@@ -76,18 +80,18 @@ class DataCollatorForT5PQG: # prompt-T5 generation
 
         # text and id info 
         texts_p = [batch['passage'] for batch in features]
-        texts_pq = [batch['positive'] for batch in features]
-        texts_nq = [batch['negative'] for batch in features]
+        inputs = self.tokenizer(
+                [f"positive question generation: passage: {p}" for p in texts_p] + \
+                [f"negative question generation: passage: {p}" for p in texts_p],
+                max_length=self.max_length,
+                truncation=True,
+                padding=True,
+                return_tensors=self.return_tensors
+        )
 
         if self.is_train:
-            inputs = self.tokenizer(
-                    [f"positive question generation: passage: {p}" for p in texts_p] + \
-                    [f"negative question generation: passage: {p}" for p in texts_p],
-                    max_length=self.max_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
+            texts_pq = [batch['positive'] for batch in features]
+            texts_nq = [batch['negative'] for batch in features]
             targets = self.tokenizer(
                     texts_pq+texts_nq,
                     padding=True,
@@ -95,16 +99,9 @@ class DataCollatorForT5PQG: # prompt-T5 generation
             ).input_ids
             inputs['labels'] = targets
 
-        elif self.is_eval:
-            inputs = self.tokenizer(
-                    [f"positive question generation: passage: {p}" for p in texts_p] + \
-                    [f"negative question generation: passage: {p}" for p in texts_p],
-                    max_length=self.max_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
+        else:
             inputs['passage'] = texts_p
-            inputs['positive'] = texts_pq
-            inputs['negative'] = texts_nq
+            if self.is_eval:
+                inputs['positive'] = texts_pq
+                inputs['negative'] = texts_nq
         return inputs
