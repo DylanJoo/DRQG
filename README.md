@@ -21,8 +21,3 @@ TBD
 ## Fine-tune text ranking model
 - Dense retriever ?
 - Passage reranker
-
-
-
-
-

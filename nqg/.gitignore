@@ -1,0 +1,8 @@
+__pycache__/  
+**/logs/
+*.swp
+logs/
+
+# checkpoints
+checkpoints/
+t5vqg*/
