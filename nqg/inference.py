@@ -34,7 +34,6 @@ if __name__ == "__main__":
     # load model
     parser.add_argument("--model_name")
     parser.add_argument("--model_path")
-    parser.add_argument("--beam_size")
     parser.add_argument("--input_jsonl")
     parser.add_argument("--output_jsonl")
     parser.add_argument("--positive", action='store_true', default=False)
