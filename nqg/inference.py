@@ -14,7 +14,7 @@ def interpolated_generation(
         positive, 
         model, 
         hidden_states, 
-        interpolate_n=none, 
+        interpolate_n=None, 
     ):
     e_embed = hidden_states[:, :1, :]
     # reparameterize
@@ -39,7 +39,7 @@ def parameterized_generation(
         positive, 
         model, 
         hidden_states, 
-        std_list=none, 
+        std_list=None, 
     ):
 
     e_embed = hidden_states[:, :1, :]
@@ -74,10 +74,9 @@ if __name__ == "__main__":
     parser.add_argument("--model_path")
     parser.add_argument("--input_jsonl")
     parser.add_argument("--output_jsonl")
-    parser.add_argument("--positive", action='store_true', default=False)
-    parser.add_argument("--negative", action='store_true', default=False)
     parser.add_argument("--device", default='cuda', type=str)
     parser.add_argument("--batch_size", default=2, type=int)
+    parser.add_argument("--flags", nargs='+', type=str)
 
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=256, type=int)
@@ -134,7 +133,6 @@ if __name__ == "__main__":
     # prediction
     for batch in tqdm(dataloader):
         output_dict = {i: {"passage": p} for i, p in enumerate(batch.pop('passage'))}
-        output = {flag: None for flag in args.flags}
 
         for k in batch:
             batch[k] = batch[k].to(args.device)
@@ -151,35 +149,43 @@ if __name__ == "__main__":
             # std_list = [0, 0, 0, 0, 0]
 
             if 'positive' in args.flags:
-                if decoding_type == 'gaussian':
+                if args.decoding_type == 'gaussian':
                     enc_output.last_hidden_state = parameterized_generation(
                             True, model, hidden_states, std_list
                     )
-                if decoding_type == 'interpolate':
+                if args.decoding_type == 'interpolate':
                     pass
-                outputs['positive'] = model.generate(
+                outputs = model.generate(
                         encoder_outputs=enc_output, 
                         num_beams=args.beam_size,
                         max_length=args.max_length,
                         do_sample=args.do_sample,
                         top_k=args.top_k
                 )
+                for i in range(len(output_dict)):
+                    output_dict[i]['positive'] = [\
+                            tokenizer.decode(outputs[i+j]) for j in range(N)
+                    ]
 
                 # making sure that the hidden states are copied not in reference.
             if 'negative' in args.flags:
-                if decoding_type == 'gaussian':
+                if args.decoding_type == 'gaussian':
                     enc_output.last_hidden_state = parameterized_generation(
                             False, model, hidden_states, std_list
                     )
-                if decoding_type == 'interplolate':
+                if args.decoding_type == 'interplolate':
                     pass
-                outputs['positive'] = model.generate(
+                outputs = model.generate(
                         encoder_outputs=enc_output, 
                         num_beams=args.beam_size,
                         max_length=args.max_length,
                         do_sample=args.do_sample,
                         top_k=args.top_k
                 )
+                for i in range(len(output_dict)):
+                    output_dict[i]['negative'] = [\
+                            tokenizer.decode(outputs[i+j]) for j in range(N)
+                    ]
 
             for k, v in output_dict.items():
                 f.write(json.dumps(v)+'\n')
