@@ -8,40 +8,8 @@ from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from datacollator import DataCollatorForT5VQG
 from models import T5VQG
-from utils import interpolate
 
-def interpolated_generation(
-        positive, 
-        model, 
-        hidden_states, 
-        interpolate_n=none, 
-    ):
-    e_embed = hidden_states[:, :1, :]
-    # reparameterize
-    if positive:
-        mean = model.hidden2pmean(e_embed)
-    else:
-        mean = model.hidden2nmean(e_embed)
-
-    ### So far, arranging the first dimension (batch) as batch x len(std_list)
-    z = torch.cat(zs, 0)
-    e_embed_new = model.latent2hidden(z) 
-    zeros = torch.zeros(
-            hidden_states.size(0)*len(std_list), 
-            hidden_states.size(1)-1, 
-            hidden_states.size(2)
-    ).to(e_embed.device)
-    resid = torch.cat((e_embed_new, zeros), 1)
-    return resid + hidden_states.repeat((N, 1, 1))
-
-
-def parameterized_generation(
-        positive, 
-        model, 
-        hidden_states, 
-        std_list=none, 
-    ):
-
+def parameterized_generation(positive, model, hidden_states, std_list=None):
     e_embed = hidden_states[:, :1, :]
     # reparameterize
     if positive:
@@ -51,10 +19,15 @@ def parameterized_generation(
         mean = model.hidden2nmean(e_embed)
         logv = model.hidden2nlogv(e_embed)
 
-    # decoding 1: gaussian
+    # setting 1 
     std = torch.exp(0.5 * logv)
     N = len(std_list)
     zs = [mean+(std*n) for n in std_list]
+
+    # setting 2 
+    # std = (lambda x: torch.exp(0.5*logv * (x**2) ) if x!=0 else x)
+    # N = len(std_list)
+    # zs = [mean+(std(n)) for n in std_list]
 
     ### So far, arranging the first dimension (batch) as batch x len(std_list)
     z = torch.cat(zs, 0)
@@ -139,6 +112,11 @@ if __name__ == "__main__":
 
         # forward and generate
         with torch.no_grad():
+            ## testing
+            # outputs = model.generate(**batch)
+            # for i in range(len(outputs)):
+            #     print(tokenizer.decode(outputs[i], skip_special_tokens=True))
+
             ## encode 
             enc_output = model.encoder(**batch)
             hidden_states = copy.deepcopy(enc_output[0])

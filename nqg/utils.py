@@ -3,6 +3,19 @@ import torch
 import math
 import numpy as np
 
+def interpolate(A=None, B=None, n=3, tokenizer=None):
+    """
+    Params
+    ------
+    A: torch.Tensor
+    B: torch.Tensor (B, H)
+    """
+    if A is None:
+        A = tokenizer('<extra_id_10>', return_tensors='pt').to(B.device)
+        A = torch.repeat((B.shape[0], 1))
+
+    return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
+
 def kl_weight(anneal_fn, step, k, x0):
     if anneal_fn == 'logistic':
         return float(1/(1+np.exp(-k*(step-x0))))

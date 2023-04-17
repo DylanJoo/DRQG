@@ -53,12 +53,13 @@ class T5VQG(T5ForConditionalGeneration):
 
     def _initialize_variational_modules(self, t5_config, config, tokenizer):
         """ [TODO] add docstringss """
-        self.latent_size = config.latent_size
-        self.hidden2pmean = nn.Linear(t5_config.d_model, config.latent_size)
-        self.hidden2nmean = nn.Linear(t5_config.d_model, config.latent_size)
-        self.hidden2plogv = nn.Linear(t5_config.d_model, config.latent_size)
-        self.hidden2nlogv = nn.Linear(t5_config.d_model, config.latent_size)
-        self.latent2hidden = nn.Linear(config.latent_size, t5_config.d_model)
+        self.latent_size = config['latent_size']
+        latent_size = config['latent_size']
+        self.hidden2pmean = nn.Linear(t5_config.d_model, latent_size)
+        self.hidden2nmean = nn.Linear(t5_config.d_model, latent_size)
+        self.hidden2plogv = nn.Linear(t5_config.d_model, latent_size)
+        self.hidden2nlogv = nn.Linear(t5_config.d_model, latent_size)
+        self.latent2hidden = nn.Linear(latent_size, t5_config.d_model)
 
         self.tokenizer = tokenizer
         self.vae_config = config

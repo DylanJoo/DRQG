@@ -171,11 +171,11 @@ class T5VQG_v1(T5ForConditionalGeneration):
         loss = None
 
         if labels is not None:
+            # generative loss
             loss_fct = CrossEntropyLoss(ignore_index=-100)
             loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-            # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
 
-            # add varaiational losses
+            # varaiational losses
             if steps % 50 == 0:
                 print(f"\nNLL: {loss_ce}\tKLD: {loss_reparam}\tCOS: {loss_discr}")
                 # inferece during training
@@ -228,7 +228,6 @@ class T5VQG_v1(T5ForConditionalGeneration):
         batch_size, seq_length, d_model = hidden_states.shape
         pn_boundary = batch_size // 2
 
-        # Positive 
         # r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
         # pmean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
         # plogv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
@@ -237,6 +236,7 @@ class T5VQG_v1(T5ForConditionalGeneration):
         # positive = self.latent2hidden(z)
 
         # Negative (v1 has only negative)
+        # [TODO] Revise a better version?
         r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
         pmean = self.hidden2nmean(hidden_states[:pn_boundary, :1, :])
         nmean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
@@ -244,10 +244,8 @@ class T5VQG_v1(T5ForConditionalGeneration):
         nstd = torch.exp(0.5 * nlogv)
         z = r * nstd + nmean
         negative = self.latent2hidden(pmean)
+        positive = self.latent2hidden(nmean) # add a psuedo positive with zeros
 
-        # [TODO] Revise a better version?
-        # Add a pseudo positive (all zero)
-        positive = self.latent2hidden(nmean)
         zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
         residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
         hidden_states = hidden_states + residuals
