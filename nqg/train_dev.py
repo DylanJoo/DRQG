@@ -12,7 +12,7 @@ from transformers import (
     GenerationConfig
 )
 from models import T5VQG_v1 as T5VQG
-from trainers import TrainerForT5
+from trainers import TrainerForT5VQG
 from datacollator import DataCollatorForT5VQG
 import msmarco 
 

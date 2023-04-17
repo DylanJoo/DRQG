@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_jsonl")
     parser.add_argument("--positive", action='store_true', default=False)
     parser.add_argument("--negative", action='store_true', default=False)
-    parser.add_argument("--device", default='cuda')
+    parser.add_argument("--device", default='cuda', type=str)
     parser.add_argument("--batch_size", default=2, type=int)
 
     # variational inference (only latent_size is required)
