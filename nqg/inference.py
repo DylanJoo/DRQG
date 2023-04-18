@@ -146,6 +146,7 @@ if __name__ == "__main__":
 
             ## Setting1: parameterized generation
             std_list = [-2, -1, 0, 1, 2]
+            N = len(std_list)
             # std_list = [0, 0, 0, 0, 0]
 
             if 'positive' in args.flags:
