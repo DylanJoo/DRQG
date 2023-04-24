@@ -11,27 +11,41 @@ from models import T5VQG
 from utils import interpolate
 
 def interpolated_generation(
-        positive, 
+        positive,
+        negative,
         model, 
         hidden_states, 
+        tokenizer,
         interpolate_n=None, 
     ):
     e_embed = hidden_states[:, :1, :]
+    N = interpolate_n
+
+    # reparameterize with none token
+    none_ = tokenizer('<extra_id_10>', return_tensors='pt').to(e_embed.device)
+    none_ = model.encoder(**none_)[0][:, :1, :]
+
     # reparameterize
     if positive:
-        mean = model.hidden2pmean(e_embed)
-    else:
-        mean = model.hidden2nmean(e_embed)
+        A = model.hidden2pmean(none_)
+        B = model.hidden2pmean(e_embed)
+    if negative:
+        A = model.hidden2nmean(none_)
+        B = model.hidden2nmean(e_embed)
+
+    # decoding 1: interpolation with one endpoints
+    zs = interpolate(A, B, N)
 
     ### So far, arranging the first dimension (batch) as batch x len(std_list)
     z = torch.cat(zs, 0)
     e_embed_new = model.latent2hidden(z) 
     zeros = torch.zeros(
-            hidden_states.size(0)*len(std_list), 
+            hidden_states.size(0) * N,
             hidden_states.size(1)-1, 
             hidden_states.size(2)
     ).to(e_embed.device)
     resid = torch.cat((e_embed_new, zeros), 1)
+    print(e_embed_new[:, 0, 2])
     return resid + hidden_states.repeat((N, 1, 1))
 
 
@@ -81,12 +95,14 @@ if __name__ == "__main__":
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=256, type=int)
     parser.add_argument("--decoding_type", default='gaussian', type=str)
+
     ## the unused parameters
     parser.add_argument("--k", default=0.0025, type=float) 
     parser.add_argument("--x0", default=2500, type=int)
     parser.add_argument("--annealing_fn", default='logistic')
 
     # generation config
+    parser.add_argument("--n_samples", default=2, type=int)
     parser.add_argument("--beam_size", default=5, type=int)
     parser.add_argument("--max_length", default=20, type=int)
     parser.add_argument("--do_sample", default=False, action='store_true')
@@ -95,10 +111,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load configuration
-    vae_config = {"latent_size": args.latent_size,
-                  "annealing_fn": args.annealing_fn,
-                  "k": args.k, 
-                  "x0": args.x0}
+    @dataclass
+    class VaeConfig:
+        latent_size: int
+        annealing_fn: str = field(default='logistic') 
+        k: float = field(default=0.0025)
+        x0: int = field(default=2500)
+
+    vae_config = VaeConfig(args.latent_size)
 
     config = AutoConfig.from_pretrained(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -117,6 +137,8 @@ if __name__ == "__main__":
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
+            is_train=False,
+            is_eval=True # to check the ground truth
     )
     from torch.utils.data import DataLoader
     dataloader = DataLoader(
@@ -132,7 +154,9 @@ if __name__ == "__main__":
 
     # prediction
     for batch in tqdm(dataloader):
-        output_dict = {i: {"passage": p} for i, p in enumerate(batch.pop('passage'))}
+        output_dict = {i: {"passage": p, "positive_truth": pq, "negative_truth": nq} \
+                for i, (p, pq, nq) in enumerate(zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative')))
+        }
 
         for k in batch:
             batch[k] = batch[k].to(args.device)
@@ -141,21 +165,23 @@ if __name__ == "__main__":
         with torch.no_grad():
             ## encode 
             enc_output = model.encoder(**batch)
-            hidden_states = copy.deepcopy(enc_output[0])
             bs = enc_output[0].size(0)
+            hidden_states = copy.deepcopy(enc_output[0])
 
             ## Setting1: parameterized generation
-            std_list = [-2, -1, 0, 1, 2]
-            N = len(std_list)
-            # std_list = [0, 0, 0, 0, 0]
+            std_list = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+            # std_list = [-2, -1, 0, 1, 2]
+            N = len(std_list) if args.n_samples == 0 else args.n_samples
 
             if 'positive' in args.flags:
                 if args.decoding_type == 'gaussian':
                     enc_output.last_hidden_state = parameterized_generation(
                             True, model, hidden_states, std_list
                     )
-                if args.decoding_type == 'interpolate':
-                    pass
+                if args.decoding_type == 'interpolate_none':
+                    enc_output.last_hidden_state = interpolated_generation(
+                            True, None, model, hidden_states, tokenizer, args.n_samples
+                    )
                 outputs = model.generate(
                         encoder_outputs=enc_output, 
                         num_beams=args.beam_size,
@@ -163,9 +189,11 @@ if __name__ == "__main__":
                         do_sample=args.do_sample,
                         top_k=args.top_k
                 )
-                for i in range(len(output_dict)):
+                for i in range(bs):
                     output_dict[i]['positive'] = [\
-                            tokenizer.decode(outputs[i+j]) for j in range(N)
+                            tokenizer.decode(
+                                outputs[i+(j*bs)], skip_special_tokens=True
+                            ) for j in range(N)
                     ]
 
                 # making sure that the hidden states are copied not in reference.
@@ -174,8 +202,11 @@ if __name__ == "__main__":
                     enc_output.last_hidden_state = parameterized_generation(
                             False, model, hidden_states, std_list
                     )
-                if args.decoding_type == 'interplolate':
-                    pass
+                if args.decoding_type == 'interpolate_none':
+                    enc_output.last_hidden_state = interpolated_generation(
+                            None, True, model, hidden_states, tokenizer, args.n_samples
+                    )
+
                 outputs = model.generate(
                         encoder_outputs=enc_output, 
                         num_beams=args.beam_size,
@@ -185,9 +216,18 @@ if __name__ == "__main__":
                 )
                 for i in range(len(output_dict)):
                     output_dict[i]['negative'] = [\
-                            tokenizer.decode(outputs[i+j]) for j in range(N)
+                            tokenizer.decode(
+                                outputs[i+(j*bs)], skip_special_tokens=True
+                            ) for j in range(N)
                     ]
 
             for k, v in output_dict.items():
                 f.write(json.dumps(v)+'\n')
     f.close()
+
+
+    # transform to good read version
+    from utils import transform_pred_to_good_read
+    transform_pred_to_good_read(
+            args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt')
+    )

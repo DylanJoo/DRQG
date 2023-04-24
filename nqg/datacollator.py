@@ -59,8 +59,8 @@ class DataCollatorForT5VQG:
             inputs['passage'] = texts_p
 
             if self.is_eval:
-                inputs['positive'] = texts_pq
-                inputs['negative'] = texts_nq
+                inputs['positive'] = [batch['positive'] for batch in features]
+                inputs['negative'] = [batch['negative'] for batch in features]
         return inputs
 
 @dataclass
@@ -102,6 +102,6 @@ class DataCollatorForT5PQG: # prompt-T5 generation
         else:
             inputs['passage'] = texts_p
             if self.is_eval:
-                inputs['positive'] = texts_pq
-                inputs['negative'] = texts_nq
+                inputs['positive'] = [batch['positive'] for batch in features]
+                inputs['negative'] = [batch['negative'] for batch in features]
         return inputs

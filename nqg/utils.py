@@ -1,19 +1,11 @@
+import json
 import random
 import torch
+from tqdm import tqdm
 import math
 import numpy as np
 
-def interpolate(A=None, B=None, n=3, tokenizer=None):
-    """
-    Params
-    ------
-    A: torch.Tensor
-    B: torch.Tensor (B, H)
-    """
-    if A is None:
-        A = tokenizer('<extra_id_10>', return_tensors='pt').to(B.device)
-        A = torch.repeat((B.shape[0], 1))
-
+def interpolate(A, B, n):
     return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
 
 def kl_weight(anneal_fn, step, k, x0):
@@ -56,3 +48,28 @@ def load_runs(path, output_score=False):
             sorted_run_dict[qid] = [docid for docid, _, _ in sorted_doc_id_ranks]
 
     return sorted_run_dict
+
+def transform_pred_to_good_read(path_jsonl, path_txt): 
+    fr = open(path_jsonl, 'r')
+    fw = open(path_txt, 'w')
+
+    for line in tqdm(fr):
+        data = json.loads(line.strip())
+        fw.write(f"passage: {data['passage']}\n")
+        fw.write("positive:\n")
+        fw.write(f"*\t{data['positive_truth']}\n")
+        qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data['positive'])]
+        fw.write("\n".join(qlist))
+
+        try:
+            fw.write("\nnegative:\n")
+            fw.write(f"*\t{data['negative_truth']}\n")
+            qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data['negative'])]
+            fw.write("\n".join(qlist))
+            fw.write("\n\n")
+        except:
+            fw.write("\n\n")
+
+    fr.close()
+    fw.close()
+
