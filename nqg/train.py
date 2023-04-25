@@ -101,7 +101,7 @@ def main():
     generation_config.update(
         _from_model_config=False,
         num_beams=5,
-        max_length=32
+        max_length=16
     )
     model.generation_config = generation_config
 
@@ -109,6 +109,7 @@ def main():
     data_collator = DataCollatorForT5VQG(
             tokenizer=tokenizer, 
             padding=True,
+            max_length=data_args.max_length,
             return_tensors='pt',
             is_train=True
     )

@@ -102,9 +102,10 @@ if __name__ == "__main__":
     parser.add_argument("--annealing_fn", default='logistic')
 
     # generation config
-    parser.add_argument("--n_samples", default=2, type=int)
+    parser.add_argument("--n_samples", default=0, type=int)
     parser.add_argument("--beam_size", default=5, type=int)
-    parser.add_argument("--max_length", default=20, type=int)
+    parser.add_argument("--max_q_length", default=20, type=int)
+    parser.add_argument("--max_p_length", default=256, type=int)
     parser.add_argument("--do_sample", default=False, action='store_true')
     parser.add_argument("--top_k", default=10, type=int)
 
@@ -137,6 +138,7 @@ if __name__ == "__main__":
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
+            max_length=args.max_p_length,
             is_train=False,
             is_eval=True # to check the ground truth
     )
@@ -153,7 +155,7 @@ if __name__ == "__main__":
     f = open(args.output_jsonl, 'w')
 
     # prediction
-    for batch, batch1, batch0 in tqdm(dataloader):
+    for batch in tqdm(dataloader):
         output_dict = {i: {"passage": p, "positive_truth": pq, "negative_truth": nq} \
                 for i, (p, pq, nq) in enumerate(zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative')))
         }
@@ -185,7 +187,7 @@ if __name__ == "__main__":
                 outputs = model.generate(
                         encoder_outputs=enc_output, 
                         num_beams=args.beam_size,
-                        max_length=args.max_length,
+                        max_length=args.max_q_length,
                         do_sample=args.do_sample,
                         top_k=args.top_k
                 )
@@ -210,7 +212,7 @@ if __name__ == "__main__":
                 outputs = model.generate(
                         encoder_outputs=enc_output, 
                         num_beams=args.beam_size,
-                        max_length=args.max_length,
+                        max_length=args.max_q_length,
                         do_sample=args.do_sample,
                         top_k=args.top_k
                 )

@@ -5,7 +5,7 @@ python3 train_t5pqg.py \
   --model_name_or_path t5-base \
   --tokenizer_name t5-base \
   --config_name t5-base \
-  --output_dir t5pqg_v0 \
+  --output_dir t5pqg \
   --max_length 256 \
   --per_device_train_batch_size 16 \
   --evaluation_strategy 'steps' \
