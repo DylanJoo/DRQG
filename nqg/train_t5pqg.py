@@ -17,7 +17,7 @@ from datacollator import DataCollatorForT5PQG
 import msmarco 
 
 import os
-os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "false"
 
 @dataclass
 class OurHFModelArguments:

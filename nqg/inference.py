@@ -153,7 +153,7 @@ if __name__ == "__main__":
     f = open(args.output_jsonl, 'w')
 
     # prediction
-    for batch in tqdm(dataloader):
+    for batch, batch1, batch0 in tqdm(dataloader):
         output_dict = {i: {"passage": p, "positive_truth": pq, "negative_truth": nq} \
                 for i, (p, pq, nq) in enumerate(zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative')))
         }

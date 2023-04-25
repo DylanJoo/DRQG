@@ -12,7 +12,7 @@ from transformers import (
     GenerationConfig
 )
 from models import T5VQG
-from trainers import TrainerForT5VQG
+from trainers import TrainerForT5
 from datacollator import DataCollatorForT5VQG
 import msmarco 
 
@@ -123,7 +123,7 @@ def main():
         dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
 
 
-    trainer = TrainerForT5VQG(
+    trainer = TrainerForT5(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],

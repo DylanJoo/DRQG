@@ -2,10 +2,10 @@ import torch
 import argparse
 from tqdm import tqdm
 from dataclasses import dataclass, field
-from datasets import Dataset
+from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from datacollator import DataCollatorForT5VQG
-from models import T5VQG
+from models import T5PQG
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -20,31 +20,17 @@ if __name__ == "__main__":
     parser.add_argument("--device", defualt='cuda')
     parser.add_argument("--batch_size", defualt=2)
 
-    # variational inference (only latent_size is required)
-    parser.add_argument("--latent_size", defualt=256)
-    parser.add_argument("--k", defualt=0.0025)
-    parser.add_argument("--x0", defualt=2500)
-    parser.add_argument("--annealing_fn", defualt='logistic')
-
     # generation config
     parser.add_argument("--beam_size", defualt=5)
     parser.add_argument("--max_length", defualt=20)
 
     args = parser.parse_args()
 
-    # load configuration
-    vae_config = {"latent_size": args.latent_size
-                  "annealing_fn": args.annealing_fn
-                  "k": args.k, 
-                  "x0": args.x0}
-
     config = AutoConfig.from_pretrained(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    model = T5VQG.from_pretrained(
+    model = T5PQG.from_pretrained(
             pretrained_model_name_or_path=args.model_path,
             config=config,
-            vae_config=vae_config,
-            tokenizer=tokenizer
     ).to(args.device).eval()
 
     # load dataset
@@ -55,6 +41,8 @@ if __name__ == "__main__":
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
+            is_train=False,
+            is_eval=True # to check the ground truth
     )
     from torch.utils.data import DataLoader
     dataloader = DataLoader(
@@ -65,27 +53,37 @@ if __name__ == "__main__":
             collate_fn=data_collator
     )
 
+    # new a writer
+    f = open(args.output_jsonl, 'w')
+
     # prediction
-    for batch in tqdm(dataloader):
-        output_dict = {i: {"passage": p} for i, p in enumerate(batch.pop('passage'))}
-        for k in batch:
-            batch[k] = batch[k].to(device)
+    for batch, batch1, batch0 in tqdm(dataloader):
+        output_dict = {i: {"passage": p, "positive_truth": pq, "negative_truth": nq} \
+                for i, (p, pq, nq) in enumerate(zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative')))
+        }
+        for k in batch1:
+            batch1[k] = batch1[k].to(device)
+        for k in batch0:
+            batch0[k] = batch0[k].to(device)
 
         # forward and generate
         with torch.no_grad():
-            ## [NOTE] Here arrange the input as batch_size x (positive, negative) in a same batch
-            enc_output = model.generate(
-                    **batch,
+            output1 = model.generate(
+                    **batch1,
+                    num_beams=args.beam_size,
+                    max_length=args.max_length
+            )
+            output0 = model.generate(
+                    **batch0,
                     num_beams=args.beam_size,
                     max_length=args.max_length
             )
 
             for i in range(len(output_dict)):
-                ## one half as positive
-                output_dict[i]['positive'] = tokenizer.decode(outputs[i])
-                ## the other as negative
-                output_dict[i]['negative'] = tokenizer.decode(outputs[i+N])
+                output_dict[i]['positive'] = tokenizer.decode(output1[i], skip_special_tokens=True)
+                output_dict[i]['negative'] = tokenizer.decode(output0[i], skip_special_tokens=True) 
 
-        with open(args.output_jsonl, 'w') as f:
             for k, v in output_dict.items():
-                f.write(json.dumps({v})+'\n')
+                f.write(json.dumps(v)+'\n')
+
+    f.close()

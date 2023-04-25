@@ -80,28 +80,47 @@ class DataCollatorForT5PQG: # prompt-T5 generation
 
         # text and id info 
         texts_p = [batch['passage'] for batch in features]
-        inputs = self.tokenizer(
-                [f"positive question generation: passage: {p}" for p in texts_p] + \
-                [f"negative question generation: passage: {p}" for p in texts_p],
-                max_length=self.max_length,
-                truncation=True,
-                padding=True,
-                return_tensors=self.return_tensors
-        )
 
         if self.is_train:
             texts_pq = [batch['positive'] for batch in features]
             texts_nq = [batch['negative'] for batch in features]
+            inputs = self.tokenizer(
+                    [f"positive question generation: passage: {p}" for p in texts_p] + \
+                    [f"negative question generation: passage: {p}" for p in texts_p],
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
             targets = self.tokenizer(
                     texts_pq+texts_nq,
                     padding=True,
                     return_tensors=self.return_tensors
             ).input_ids
             inputs['labels'] = targets
+            return inputs
 
         else:
-            inputs['passage'] = texts_p
+            inputs1 = self.tokenizer(
+                    [f"positive question generation: passage: {p}" \
+                            for p in texts_p],
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
+            inputs0 = self.tokenizer(
+                    [f"negative question generation: passage: {p}" \
+                            for p in texts_p],
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
+            inputs = {'passage': texts_p}
+
             if self.is_eval:
                 inputs['positive'] = [batch['positive'] for batch in features]
                 inputs['negative'] = [batch['negative'] for batch in features]
-        return inputs
+            return inputs, inputs1, inputs0
+

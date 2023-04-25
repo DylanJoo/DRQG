@@ -173,12 +173,24 @@ class T5VQG(T5ForConditionalGeneration):
 
         if labels is not None:
             loss_fct = CrossEntropyLoss(ignore_index=-100)
-            loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+            # Separate losses into the positive one and negative one
+            # loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+
+            labels_pos = copy.deepcopy(labels)
+            labels_neg = copy.deepcopy(labels)
+
+            pn_boundary = labels.size(0) // 2
+            labels_pos[pn_boundary:, :] = -100 # mask NQG (the latter half)
+            labels_neg[:pn_boundary, :] = -100 # mask PQG (the former half)
+            loss_ce_pos = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels_pos.view(-1))
+            loss_ce_neg = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels_neg.view(-1))
+
             # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
+            loss_ce = (loss_ce_pos + loss_ce_neg) / 2
 
             # add varaiational losses
             if steps % 50 == 0:
-                print(f"\nNLL: {loss_ce}\tKLD: {loss_reparam}\tCOS: {loss_discr}")
+                print(f"\nNLL: (positive) {loss_ce_pos}\t(negative) {loss_ce_neg}\nKLD: {loss_reparam}\tCOS: {loss_discr}")
                 # inferece during training
                 if steps % 200 == 0:
                     with torch.no_grad():
