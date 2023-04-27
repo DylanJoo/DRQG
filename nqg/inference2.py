@@ -10,90 +10,89 @@ from datacollator import DataCollatorForT5VQG
 from models import T5VQG
 from utils import interpolate
 
-def interpolated_generation(
-        positive,
-        negative,
-        model, 
-        hidden_states, 
-        tokenizer,
-        interpolate_n=None, 
-    ):
-    e_embed = hidden_states[:, :1, :]
-    N = interpolate_n
+class QuestionGenerator:
 
-    # reparameterize with none token
-    none_ = tokenizer('<extra_id_10>', return_tensors='pt').to(e_embed.device)
-    none_ = model.encoder(**none_)[0][:, :1, :]
+    def __init__(self, 
+                 model, 
+                 tokenizer, 
+                 sampling, 
+                 **kwargs):
 
-    # reparameterize
-    if positive:
-        A = model.hidden2pmean(none_)
-        B = model.hidden2pmean(e_embed)
-    if negative:
-        A = model.hidden2nmean(none_)
-        B = model.hidden2nmean(e_embed)
+        self.model = model
+        self.model.eval()
+        self.tokenizer = tokenizer
+        self.sampling = sampling
+        self.kwargs = kwargs
+        #`num_beams`, `do_sample`, `top_k`
 
-    # decoding 1: interpolation with one endpoints
-    zs = interpolate(A, B, N)
+    def generate(self, batch):
+        """This generation is for variational inference."""
+        enc_output = self.model.encoder(**batch)
+        hidden_states = enc_output[0]
+        bs = hidden_states.size(0)
 
-    ### So far, arranging the first dimension (batch) as batch x len(std_list)
-    z = torch.cat(zs, 0)
-    e_embed_new = model.latent2hidden(z) 
-    zeros = torch.zeros(
-            hidden_states.size(0) * N,
-            hidden_states.size(1)-1, 
-            hidden_states.size(2)
-    ).to(e_embed.device)
-    resid = torch.cat((e_embed_new, zeros), 1)
-    return resid + hidden_states.repeat((N, 1, 1))
+        # Extract the to-reparam embeddings (the first token)
+        self.embeds = copy.deepcopy(hidden_states[:, :1, :])
 
+        # Encode the input sequence 
+        ## sample with gaussian or interpolation
+        zs = self._gaussian_encoding(type=?)
+        zs = self._interpolate_encoding(type=?)
 
-def parameterized_generation(
-        positive, 
-        model, 
-        hidden_states, 
-        std_list=None, 
-        debug=0
-    ):
+        ## recontruct decoder input
+        dec_inputs = self._reconstruct_z(hidden_states, zs)
 
-    if debug == 1:
-        e_embed = hidden_states[:, :, :]
-    else:
-        e_embed = hidden_states[:, :1, :]
-    # reparameterize
-    if positive:
-        mean = model.hidden2pmean(e_embed)
-        logv = model.hidden2plogv(e_embed)
-    else:
-        mean = model.hidden2nmean(e_embed)
-        logv = model.hidden2nlogv(e_embed)
+        # Decode from the input seqneces (and its variants)
+        outputs = self.model.generate(
+                encoder_outputs=dec_inputs, **self.kwargs
+        )
 
-    # decoding 1: gaussian
-    std = torch.exp(0.5 * logv)
-    N = len(std_list)
-    zs = [mean+(std*n) for n in std_list]
+        ## Convert token to texts
+        texts = [self.tokenizer.decode(
+            output, skip_special_tokens=True) for output in outputs]
 
-    ### So far, arranging the first dimension (batch) as batch x len(std_list)
-    if debug == 0:
-        z = torch.cat(zs, 0)
-        e_embed_new = model.latent2hidden(z) 
+        ## Collect outputs
+        output_dict = collections.defaultdict(list)
+        for i in range(len(texts)):
+            output_dict[i % bs].append(text[i])
+
+        return output_dict
+
+    def _reconstruct_z(self, h, zs):
         zeros = torch.zeros(
-                hidden_states.size(0)*len(std_list), 
-                hidden_states.size(1)-1, 
-                hidden_states.size(2)
-        ).to(e_embed.device)
-        resid = torch.cat((e_embed_new, zeros), 1)
-        return resid + hidden_states.repeat((N, 1, 1))
+                zs.size(0), h.size(1)-1, zs.size(2)
+        ).to(hidden_states.device)
+        resid = torch.cat((zs, zeros), 1)
 
-    elif debug == 1:
-        z = torch.cat(zs, 0)
-        hidden_new = model.latent2hidden(z) 
-        return hidden_new
-    
-    elif debug == 2:
-        z = torch.cat(zs, 0)
-        e_embed_new = model.latent2hidden(z) 
-        return torch.cat((e_embed_new, hidden_states.repeat((N, 1, 1))), 1)
+        return h.repeat((h.size, 1, 1)) + resid
+
+    def _gaussian_encoding(self, type):
+        """ In the following three condition, 
+        the first two are for VQG_v0; the last is for VQG_v1
+        In VQG_v0 and v1, n_sample is the amounts of left or right.
+        """
+        std_list = list(range(-(self.n_sample), self.n_sample+1, 1))
+        dec_inputt_list = []
+
+        if self.kwargs['positive']:
+            mean = self.model.hidden2pmean(self.embeds)
+            std = self.model.hidden2plogv(self.embeds)
+            dec_input_list += [mean+(std*n) for n in std_list]
+
+        if self.kwargs['negative']:
+            mean = self.model.hidden2nmean(self.embeds)
+            std = self.model.hidden2nlogv(self.embeds)
+            dec_input_list += [mean+(std*n) for n in std_list]
+
+        if self.kwargs['polarity']:
+            mean = self.model.hidden2mean(self.embeds)
+            std = self.model.hidden2logv(self.embeds)
+            dec_input_list += [mean+(std*n) for n in std_list]
+
+        return torch.cat(dec_input_list, 0)
+
+    def _interploate_encoding(self):
+        pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -105,11 +104,10 @@ if __name__ == "__main__":
     parser.add_argument("--device", default='cuda', type=str)
     parser.add_argument("--batch_size", default=2, type=int)
     parser.add_argument("--flags", nargs='+', type=str)
-    parser.add_argument("--debug", default=0, type=int)
 
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=256, type=int)
-    parser.add_argument("--sampling", default='gaussian', type=str)
+    parser.add_argument("--decoding_type", default='gaussian', type=str)
 
     ## the unused parameters
     parser.add_argument("--k", default=0.0025, type=float) 
@@ -135,15 +133,13 @@ if __name__ == "__main__":
         x0: int = field(default=2500)
 
     vae_config = VaeConfig(args.latent_size)
-
     config = AutoConfig.from_pretrained(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     model = T5VQG.from_pretrained(
             pretrained_model_name_or_path=args.model_path,
             config=config,
             vae_config=vae_config,
-            tokenizer=tokenizer,
-            debug=args.debug
+            tokenizer=tokenizer
     ).to(args.device).eval()
 
     # load dataset
@@ -192,13 +188,13 @@ if __name__ == "__main__":
             N = len(std_list) if args.n_samples == 0 else args.n_samples
 
             if 'positive' in args.flags:
-                if args.sampling == 'gaussian':
+                if args.decoding_type == 'gaussian':
                     enc_output.last_hidden_state = parameterized_generation(
-                            True, model, hidden_states, std_list, args.debug
+                            True, model, hidden_states, std_list
                     )
-                if args.sampling == 'interpolate_none':
+                if args.decoding_type == 'interpolate_none':
                     enc_output.last_hidden_state = interpolated_generation(
-                            True, None, model, hidden_states, tokenizer, args.n_samples, args.debug
+                            True, None, model, hidden_states, tokenizer, args.n_samples
                     )
                 outputs = model.generate(
                         encoder_outputs=enc_output, 
@@ -216,13 +212,13 @@ if __name__ == "__main__":
 
                 # making sure that the hidden states are copied not in reference.
             if 'negative' in args.flags:
-                if args.sampling == 'gaussian':
+                if args.decoding_type == 'gaussian':
                     enc_output.last_hidden_state = parameterized_generation(
-                            False, model, hidden_states, std_list, args.debug
+                            False, model, hidden_states, std_list
                     )
-                if args.sampling == 'interpolate_none':
+                if args.decoding_type == 'interpolate_none':
                     enc_output.last_hidden_state = interpolated_generation(
-                            None, True, model, hidden_states, tokenizer, args.n_samples, args.debug
+                            None, True, model, hidden_states, tokenizer, args.n_samples
                     )
 
                 outputs = model.generate(
@@ -249,3 +245,41 @@ if __name__ == "__main__":
     transform_pred_to_good_read(
             args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt')
     )
+
+# def interpolated_generation(
+#         positive,
+#         negative,
+#         model, 
+#         hidden_states, 
+#         tokenizer,
+#         interpolate_n=None, 
+#     ):
+#     e_embed = hidden_states[:, :1, :]
+#     N = interpolate_n
+#
+#     # reparameterize with none token
+#     none_ = tokenizer('<extra_id_10>', return_tensors='pt').to(e_embed.device)
+#     none_ = model.encoder(**none_)[0][:, :1, :]
+#
+#     # reparameterize
+#     if positive:
+#         A = model.hidden2pmean(none_)
+#         B = model.hidden2pmean(e_embed)
+#     if negative:
+#         A = model.hidden2nmean(none_)
+#         B = model.hidden2nmean(e_embed)
+#
+#     # decoding 1: interpolation with one endpoints
+#     zs = interpolate(A, B, N)
+#
+#     ### So far, arranging the first dimension (batch) as batch x len(std_list)
+#     z = torch.cat(zs, 0)
+#     e_embed_new = model.latent2hidden(z) 
+#     zeros = torch.zeros(
+#             hidden_states.size(0) * N,
+#             hidden_states.size(1)-1, 
+#             hidden_states.size(2)
+#     ).to(e_embed.device)
+#     resid = torch.cat((e_embed_new, zeros), 1)
+#     print(e_embed_new[:, 0, 2])
+#     return resid + hidden_states.repeat((N, 1, 1))

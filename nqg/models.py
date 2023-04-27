@@ -22,7 +22,7 @@ class T5VQG(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-    def __init__(self, config: T5Config, vae_config, tokenizer=None):
+    def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=0):
         super().__init__(config)
         self.model_dim = config.d_model
 
@@ -50,6 +50,9 @@ class T5VQG(T5ForConditionalGeneration):
         # Model parallel
         self.model_parallel = False
         self.device_map = None
+
+        # Debugging
+        self.debug = debug
 
     def _initialize_variational_modules(self, t5_config, config, tokenizer):
         """ [TODO] add docstringss """
@@ -145,7 +148,7 @@ class T5VQG(T5ForConditionalGeneration):
             inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=attention_mask,
+            encoder_attention_mask=attention_mask if self.debug != 2 else None,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,
@@ -192,7 +195,7 @@ class T5VQG(T5ForConditionalGeneration):
             if steps % 50 == 0:
                 print(f"\nNLL: (positive) {loss_ce_pos}\t(negative) {loss_ce_neg}\nKLD: {loss_reparam}\tCOS: {loss_discr}")
                 # inferece during training
-                if steps % 200 == 0:
+                if steps % 50 == 0:
                     with torch.no_grad():
                         temp=self.generate(input_ids)
 
@@ -238,28 +241,56 @@ class T5VQG(T5ForConditionalGeneration):
         # Transform it into a single vector (i.e., d dimensions x 1 tokens) with mask
         # Thinking of adopting a single random vector to align two distribution.
         """
+        if steps is None: # i.e. evaluation
+            return hidden_states, (0, 0)
+
         batch_size, seq_length, d_model = hidden_states.shape
         pn_boundary = batch_size // 2
 
-        # Positive 
-        r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        pmean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
-        plogv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
-        pstd = torch.exp(0.5 * plogv)
-        z = r * pstd + pmean
-        positive = self.latent2hidden(z)
+        if self.debug == 0 or self.debug == 2:
+            # Positive 
+            r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
+            pmean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
+            plogv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
+            pstd = torch.exp(0.5 * plogv)
+            z = r * pstd + pmean
+            positive = self.latent2hidden(z)
 
-        # Negative 
-        r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        nmean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
-        nlogv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
-        nstd = torch.exp(0.5 * nlogv)
-        z = r * nstd + nmean
-        negative = self.latent2hidden(z)
+            # Negative 
+            r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
+            nmean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
+            nlogv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
+            nstd = torch.exp(0.5 * nlogv)
+            z = r * nstd + nmean
+            negative = self.latent2hidden(z)
 
-        zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
-        residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
-        hidden_states = hidden_states + residuals
+            # residual learning
+            zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
+            residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
+            hidden_states = hidden_states + residuals
+
+        if self.debug == 1:
+            ## [DEBUG1] directly change all tokens (loss is huge)
+            r = torch.randn([pn_boundary, seq_length, self.latent_size]).to(hidden_states.device)
+            pmean = self.hidden2pmean(hidden_states[:pn_boundary, :, :])
+            plogv = self.hidden2plogv(hidden_states[:pn_boundary, :, :])
+            pstd = torch.exp(0.5 * plogv)
+            z = r * pstd + pmean
+            positive = self.latent2hidden(z)
+
+            r = torch.randn([pn_boundary, seq_length, self.latent_size]).to(hidden_states.device)
+            nmean = self.hidden2nmean(hidden_states[pn_boundary:, :, :])
+            nlogv = self.hidden2nlogv(hidden_states[pn_boundary:, :, :])
+            nstd = torch.exp(0.5 * nlogv)
+            z = r * nstd + nmean
+            negative = self.latent2hidden(z)
+
+            hidden_states = torch.cat((positive, negative), 0)
+
+        if self.debug == 2:
+            ## [DEBUG2] directly append one additional token (failed)
+            conditions = torch.cat((positive, negative), 0)
+            hidden_states = torch.cat((conditions, hidden_states), 1)
 
         # Compute variational losses
         loss_reparam = self.compute_loss_reparam(pmean, plogv, nmean, nlogv, steps)
@@ -270,9 +301,10 @@ class T5VQG(T5ForConditionalGeneration):
     def compute_loss_discrepancy(self, pmean, nmean):
         # cosine similarity loss
         loss_fct = CosineEmbeddingLoss()
+        labels = [-1] * pmean.size(0) * pmean.size(1)
         loss = loss_fct(pmean.view(-1, self.latent_size),
                         nmean.view(-1, self.latent_size),
-                        torch.tensor([-1] * pmean.shape[0]).to(pmean.device))
+                        torch.tensor(labels).to(pmean.device))
 
         # [TODO] MSE loss
         return loss

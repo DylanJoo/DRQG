@@ -61,9 +61,9 @@ def transform_pred_to_good_read(path_jsonl, path_txt):
         qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data['positive'])]
         fw.write("\n".join(qlist))
 
+        fw.write("\nnegative:\n")
+        fw.write(f"*\t{data['negative_truth']}\n")
         try:
-            fw.write("\nnegative:\n")
-            fw.write(f"*\t{data['negative_truth']}\n")
             qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data['negative'])]
             fw.write("\n".join(qlist))
             fw.write("\n\n")

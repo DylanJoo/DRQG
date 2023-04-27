@@ -11,13 +11,13 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from models import T5VQG_v1 as T5VQG
-from trainers import TrainerForT5VQG
+from models_dev import T5VQG_v1 as T5VQG
+from trainers import TrainerForT5
 from datacollator import DataCollatorForT5VQG
 import msmarco 
 
 import os
-os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "false"
 
 @dataclass
 class OurHFModelArguments:
@@ -101,7 +101,7 @@ def main():
     generation_config.update(
         _from_model_config=False,
         num_beams=5,
-        max_length=32
+        max_length=16
     )
     model.generation_config = generation_config
 
