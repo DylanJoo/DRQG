@@ -1,13 +1,14 @@
-import json
-import copy
+0mport json
+0mport copy
 import torch
 import argparse
+import collections
 from tqdm import tqdm
 from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from datacollator import DataCollatorForT5VQG
-from models import T5VQG
+from models2 import T5VQG
 from utils import interpolate
 
 class QuestionGenerator:
@@ -15,36 +16,50 @@ class QuestionGenerator:
     def __init__(self, 
                  model, 
                  tokenizer, 
-                 sampling, 
-                 **kwargs):
+                 n_samples, 
+                 generation_type, 
+                 generation_config):
 
         self.model = model
         self.model.eval()
         self.tokenizer = tokenizer
-        self.sampling = sampling
-        self.kwargs = kwargs
+        self.n_samples = n_samples
+        self.generation_type = generation_type
+        self.flags = generation_config.pop('flags', [])
+        self.generation_config = generation_config
         #`num_beams`, `do_sample`, `top_k`
 
-    def generate(self, batch):
-        """This generation is for variational inference."""
+    def __call__(self, **batch):
+        """
+        This generation is for variational inference.
+
+        Returns
+        -------
+        Each return object is a dictionary of prediction;
+        The key(index) represents the batch examples.
+        """
         enc_output = self.model.encoder(**batch)
         hidden_states = enc_output[0]
         bs = hidden_states.size(0)
-
-        # Extract the to-reparam embeddings (the first token)
         self.embeds = copy.deepcopy(hidden_states[:, :1, :])
 
         # Encode the input sequence 
         ## sample with gaussian or interpolation
-        zs = self._gaussian_encoding(type=?)
-        zs = self._interpolate_encoding(type=?)
+        if self.generation_type == 'gaussian':
+            zs = self._gaussian_encoding()
+        elif self.generation_type == 'interpolation':
+            zs = self._interpolate_encoding(type=0)
 
         ## recontruct decoder input
-        dec_inputs = self._reconstruct_z(hidden_states, zs)
+        hidden_states_prime = self._reconstruct_z(
+                hidden_states, zs, 'residual_z'
+        )
+        enc_output.last_hidden_state = hidden_states_prime
 
         # Decode from the input seqneces (and its variants)
         outputs = self.model.generate(
-                encoder_outputs=dec_inputs, **self.kwargs
+                encoder_outputs=enc_output,
+                **self.generation_config
         )
 
         ## Convert token to texts
@@ -54,40 +69,55 @@ class QuestionGenerator:
         ## Collect outputs
         output_dict = collections.defaultdict(list)
         for i in range(len(texts)):
-            output_dict[i % bs].append(text[i])
+            output_dict[i % bs].append(texts[i])
 
         return output_dict
 
-    def _reconstruct_z(self, h, zs):
-        zeros = torch.zeros(
-                zs.size(0), h.size(1)-1, zs.size(2)
-        ).to(hidden_states.device)
-        resid = torch.cat((zs, zeros), 1)
+    def _reconstruct_z(self, h, zs, concat_type):
+        """
+        h: hidden states; zs: reparemterized latent vector.
+        concat_type: 
+          - residual_z
+            Reparameterized the dummy token and add to original token embeddings. 
+            This reconstruction is performed at single layer, 
+            which means enc's last or dec's first
 
-        return h.repeat((h.size, 1, 1)) + resid
+        [TODO] All layers
+        [TODO] Replace the dummy token (but it lost gradient)
+        """
+        hz_prime = self.model.latent2hidden(zs)
+        if concat_type == 'residual_z':
+            zeros = torch.zeros(
+                    hz_prime.size(0), h.size(1)-1, hz_prime.size(2)
+            ).to(h.device)
+            resid = torch.cat((hz_prime, zeros), 1)
 
-    def _gaussian_encoding(self, type):
+            return h.repeat((self.total_n_samples, 1, 1)) + resid
+
+    def _gaussian_encoding(self):
         """ In the following three condition, 
         the first two are for VQG_v0; the last is for VQG_v1
         In VQG_v0 and v1, n_sample is the amounts of left or right.
         """
-        std_list = list(range(-(self.n_sample), self.n_sample+1, 1))
-        dec_inputt_list = []
+        std_list = list(range(-(self.n_samples), self.n_samples+1, 1))
+        self.total_n_samples = len(self.flags) * len(std_list)
+        dec_input_list = []
 
-        if self.kwargs['positive']:
-            mean = self.model.hidden2pmean(self.embeds)
-            std = self.model.hidden2plogv(self.embeds)
-            dec_input_list += [mean+(std*n) for n in std_list]
-
-        if self.kwargs['negative']:
-            mean = self.model.hidden2nmean(self.embeds)
-            std = self.model.hidden2nlogv(self.embeds)
-            dec_input_list += [mean+(std*n) for n in std_list]
-
-        if self.kwargs['polarity']:
-            mean = self.model.hidden2mean(self.embeds)
-            std = self.model.hidden2logv(self.embeds)
-            dec_input_list += [mean+(std*n) for n in std_list]
+        for flag in self.flags:
+            if flag == 'positive':
+                mean = self.model.hidden2pmean(self.embeds)
+                std = self.model.hidden2plogv(self.embeds)
+                dec_input_list += [mean+(std*n) for n in std_list]
+            elif flag == 'negative':
+                mean = self.model.hidden2nmean(self.embeds)
+                std = self.model.hidden2nlogv(self.embeds)
+                dec_input_list += [mean+(std*n) for n in std_list]
+            elif flag == 'polarity':
+                mean = self.model.hidden2mean(self.embeds)
+                std = self.model.hidden2logv(self.embeds)
+                dec_input_list += [mean+(std*n) for n in std_list]
+            else:
+                raise ValueError(f"The value flag, {flag} is invalid.")
 
         return torch.cat(dec_input_list, 0)
 
@@ -107,12 +137,14 @@ if __name__ == "__main__":
 
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=256, type=int)
-    parser.add_argument("--decoding_type", default='gaussian', type=str)
 
     ## the unused parameters
     parser.add_argument("--k", default=0.0025, type=float) 
     parser.add_argument("--x0", default=2500, type=int)
     parser.add_argument("--annealing_fn", default='logistic')
+
+    # generation type
+    parser.add_argument("--generation_type", default='gaussian', type=str)
 
     # generation config
     parser.add_argument("--n_samples", default=0, type=int)
@@ -142,6 +174,7 @@ if __name__ == "__main__":
             tokenizer=tokenizer
     ).to(args.device).eval()
 
+
     # load dataset
     dataset = load_dataset("json", data_files=args.input_jsonl)['train']
 
@@ -166,10 +199,33 @@ if __name__ == "__main__":
     # new a writer
     f = open(args.output_jsonl, 'w')
 
+    # new a generator 
+    ## generation config
+    generator_config = {
+            'num_beams': args.beam_size,
+            'max_length': args.max_q_length,
+            'do_sample': args.do_sample,
+            'top_k': args.top_k,
+    }
+    generator_config['flags'] = args.flags
+
+    generator = QuestionGenerator(
+            model=model, 
+            tokenizer=tokenizer, 
+            n_samples=args.n_samples, 
+            generation_type=args.generation_type, 
+            generation_config=generator_config
+    )
+
     # prediction
     for batch in tqdm(dataloader):
-        output_dict = {i: {"passage": p, "positive_truth": pq, "negative_truth": nq} \
-                for i, (p, pq, nq) in enumerate(zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative')))
+        output_dict = {i: 
+                {"passage": p, 
+                 "positive_truth": pq, 
+                 "negative_truth": nq} \
+                for i, (p, pq, nq) in enumerate(
+                    zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative'))
+                )
         }
 
         for k in batch:
@@ -177,66 +233,13 @@ if __name__ == "__main__":
 
         # forward and generate
         with torch.no_grad():
-            ## encode 
-            enc_output = model.encoder(**batch)
-            bs = enc_output[0].size(0)
-            hidden_states = copy.deepcopy(enc_output[0])
-
-            ## Setting1: parameterized generation
-            std_list = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
-            # std_list = [-2, -1, 0, 1, 2]
-            N = len(std_list) if args.n_samples == 0 else args.n_samples
-
-            if 'positive' in args.flags:
-                if args.decoding_type == 'gaussian':
-                    enc_output.last_hidden_state = parameterized_generation(
-                            True, model, hidden_states, std_list
-                    )
-                if args.decoding_type == 'interpolate_none':
-                    enc_output.last_hidden_state = interpolated_generation(
-                            True, None, model, hidden_states, tokenizer, args.n_samples
-                    )
-                outputs = model.generate(
-                        encoder_outputs=enc_output, 
-                        num_beams=args.beam_size,
-                        max_length=args.max_q_length,
-                        do_sample=args.do_sample,
-                        top_k=args.top_k
+            predictions = generator(**batch)
+            for i, output in output_dict.items():
+                # for flag in args.flags:
+                output.update(
+                        {'prediction': predictions[i]}
                 )
-                for i in range(bs):
-                    output_dict[i]['positive'] = [\
-                            tokenizer.decode(
-                                outputs[i+(j*bs)], skip_special_tokens=True
-                            ) for j in range(N)
-                    ]
-
-                # making sure that the hidden states are copied not in reference.
-            if 'negative' in args.flags:
-                if args.decoding_type == 'gaussian':
-                    enc_output.last_hidden_state = parameterized_generation(
-                            False, model, hidden_states, std_list
-                    )
-                if args.decoding_type == 'interpolate_none':
-                    enc_output.last_hidden_state = interpolated_generation(
-                            None, True, model, hidden_states, tokenizer, args.n_samples
-                    )
-
-                outputs = model.generate(
-                        encoder_outputs=enc_output, 
-                        num_beams=args.beam_size,
-                        max_length=args.max_q_length,
-                        do_sample=args.do_sample,
-                        top_k=args.top_k
-                )
-                for i in range(len(output_dict)):
-                    output_dict[i]['negative'] = [\
-                            tokenizer.decode(
-                                outputs[i+(j*bs)], skip_special_tokens=True
-                            ) for j in range(N)
-                    ]
-
-            for k, v in output_dict.items():
-                f.write(json.dumps(v)+'\n')
+                f.write(json.dumps(output)+'\n')
     f.close()
 
 
@@ -246,40 +249,3 @@ if __name__ == "__main__":
             args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt')
     )
 
-# def interpolated_generation(
-#         positive,
-#         negative,
-#         model, 
-#         hidden_states, 
-#         tokenizer,
-#         interpolate_n=None, 
-#     ):
-#     e_embed = hidden_states[:, :1, :]
-#     N = interpolate_n
-#
-#     # reparameterize with none token
-#     none_ = tokenizer('<extra_id_10>', return_tensors='pt').to(e_embed.device)
-#     none_ = model.encoder(**none_)[0][:, :1, :]
-#
-#     # reparameterize
-#     if positive:
-#         A = model.hidden2pmean(none_)
-#         B = model.hidden2pmean(e_embed)
-#     if negative:
-#         A = model.hidden2nmean(none_)
-#         B = model.hidden2nmean(e_embed)
-#
-#     # decoding 1: interpolation with one endpoints
-#     zs = interpolate(A, B, N)
-#
-#     ### So far, arranging the first dimension (batch) as batch x len(std_list)
-#     z = torch.cat(zs, 0)
-#     e_embed_new = model.latent2hidden(z) 
-#     zeros = torch.zeros(
-#             hidden_states.size(0) * N,
-#             hidden_states.size(1)-1, 
-#             hidden_states.size(2)
-#     ).to(e_embed.device)
-#     resid = torch.cat((e_embed_new, zeros), 1)
-#     print(e_embed_new[:, 0, 2])
-#     return resid + hidden_states.repeat((N, 1, 1))

@@ -55,19 +55,15 @@ def transform_pred_to_good_read(path_jsonl, path_txt):
 
     for line in tqdm(fr):
         data = json.loads(line.strip())
-        fw.write(f"passage: {data['passage']}\n")
-        fw.write("positive:\n")
-        fw.write(f"*\t{data['positive_truth']}\n")
-        qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data['positive'])]
-        fw.write("\n".join(qlist))
+        fw.write(f"passage:\n{data.pop('passage')}\n")
+        fw.write(f"groun truth: \n")
+        fw.write(f"+\t{data.pop('positive_truth')}\n")
+        fw.write(f"-\t{data.pop('negative_truth')}\n")
 
-        fw.write("\nnegative:\n")
-        fw.write(f"*\t{data['negative_truth']}\n")
-        try:
-            qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data['negative'])]
+        for key in data:
+            fw.write(f"{key}:\n")
+            qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data[key])]
             fw.write("\n".join(qlist))
-            fw.write("\n\n")
-        except:
             fw.write("\n\n")
 
     fr.close()
