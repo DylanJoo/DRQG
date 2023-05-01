@@ -11,13 +11,15 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from models import T5VQG
 from trainers import TrainerForT5
 from datacollator import DataCollatorForT5VQG
 import msmarco 
 
 import os
 os.environ["WANDB_DISABLED"] = "false"
+
+from models import T5VQGV0, T5VQGV1, T5PQG
+MODELS = {'vqgv0': T5VQGV0, 'vqgv1': T5VQGV1, 'pqg': T5PQG}
 
 @dataclass
 class OurHFModelArguments:
@@ -73,6 +75,7 @@ class OurTrainingArguments(TrainingArguments):
     resume_from_checkpoint: Optional[str] = field(default=None)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
+    debug_mode: int = field(default=None)
 
 def main():
 
@@ -89,12 +92,15 @@ def main():
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
-    model = T5VQG.from_pretrained(
-            pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
-            config=config, 
-            vae_config=model_args,
-            tokenizer=tokenizer
-    )
+    for key in MODELS:
+        if key in training_args.output_dir:
+            model = MODELS[key].from_pretrained(
+                    pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
+                    config=config, 
+                    vae_config=model_args,
+                    tokenizer=tokenizer,
+                    debug=training_args.debug_mode
+            )
     
     ## add generation config
     generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)

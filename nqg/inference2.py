@@ -1,5 +1,5 @@
-0mport json
-0mport copy
+import json
+import copy
 import torch
 import argparse
 import collections
@@ -8,8 +8,10 @@ from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from datacollator import DataCollatorForT5VQG
-from models2 import T5VQG
 from utils import interpolate
+
+from models import T5VQGV0, T5VQGV1, T5PQG
+MODELS = {'vqgv0': T5VQGV0, 'vqgv1': T5VQGV1, 'pqg': T5PQG}
 
 class QuestionGenerator:
 
@@ -92,6 +94,7 @@ class QuestionGenerator:
             ).to(h.device)
             resid = torch.cat((hz_prime, zeros), 1)
 
+            h_prime = h.repeat((self.total_n_samples, 1, 1)) + resid
             return h.repeat((self.total_n_samples, 1, 1)) + resid
 
     def _gaussian_encoding(self):
@@ -167,12 +170,15 @@ if __name__ == "__main__":
     vae_config = VaeConfig(args.latent_size)
     config = AutoConfig.from_pretrained(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    model = T5VQG.from_pretrained(
-            pretrained_model_name_or_path=args.model_path,
-            config=config,
-            vae_config=vae_config,
-            tokenizer=tokenizer
-    ).to(args.device).eval()
+
+    for key in MODELS:
+        if key in args.model_path:
+            model = MODELS[key].from_pretrained(
+                    pretrained_model_name_or_path=args.model_path,
+                    config=config,
+                    vae_config=vae_config,
+                    tokenizer=tokenizer, 
+            ).to(args.device).eval()
 
 
     # load dataset
@@ -234,11 +240,13 @@ if __name__ == "__main__":
         # forward and generate
         with torch.no_grad():
             predictions = generator(**batch)
+            N = generator.total_n_samples // len(args.flags)
             for i, output in output_dict.items():
-                # for flag in args.flags:
-                output.update(
-                        {'prediction': predictions[i]}
-                )
+                # append queries with diff modes of this passage
+                for flag in args.flags:
+                    output.update({f"{flag}": predictions[i][:N]})
+                    del predictions[i][:N]
+
                 f.write(json.dumps(output)+'\n')
     f.close()
 

@@ -22,10 +22,12 @@ class T5VQG(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-    def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=0):
+    def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=0, mode='cosine'):
         super().__init__(config)
         # Debugging
-        self.debug = debug
+        self.debug = debug # model_args.mode
+        self.mode = mode   # training_args.loss_mode
+
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
 
@@ -56,14 +58,16 @@ class T5VQG(T5ForConditionalGeneration):
         """ [TODO] add docstringss """
         self.latent_size = config.latent_size
         latent_size = config.latent_size
-        if self.debug == 0:
+        if self.debug >= 0:
             self.hidden2pmean = nn.Linear(t5_config.d_model, latent_size)
             self.hidden2plogv = nn.Linear(t5_config.d_model, latent_size)
             self.hidden2nmean = nn.Linear(t5_config.d_model, latent_size)
             self.hidden2nlogv = nn.Linear(t5_config.d_model, latent_size)
-        elif self.debug != 0:
+        elif self.debug == -1:
             self.hidden2mean = nn.Linear(t5_config.d_model, latent_size)
             self.hidden2logv = nn.Linear(t5_config.d_model, latent_size)
+        else:
+            raise ValueError('Invalid mode')
 
         self.latent2hidden = nn.Linear(latent_size, t5_config.d_model)
 
@@ -161,11 +165,11 @@ class T5VQG(T5ForConditionalGeneration):
             inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=attention_mask if self.debug != 2 else None,
+            encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,
-            output_attentions=output_attentions,
+            output_attentions=output_attentions if steps else True,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
@@ -189,9 +193,6 @@ class T5VQG(T5ForConditionalGeneration):
 
         if labels is not None:
             loss_fct = CrossEntropyLoss(ignore_index=-100)
-            # Separate losses into the positive one and negative one
-            # loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-
             labels_pos = copy.deepcopy(labels)
             labels_neg = copy.deepcopy(labels)
 
@@ -260,80 +261,106 @@ class T5VQG(T5ForConditionalGeneration):
         batch_size, seq_length, d_model = hidden_states.shape
         pn_boundary = batch_size // 2
 
-        if self.debug == 99:
-            mean = self.hidden2pmean(hidden_states[:, :1, :])
-            logv = self.hidden2plogv(hidden_states[:, :1, :])
+        if self.debug >= 0:
+            embeds = hidden_states[:, :1, :]
 
-        if self.debug == 0 or self.debug == 2:
             # Positive 
-            r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-            pmean = self.hidden2pmean(hidden_states[:pn_boundary, :1, :])
-            plogv = self.hidden2plogv(hidden_states[:pn_boundary, :1, :])
+            pmean = self.hidden2pmean(embeds[:pn_boundary, :, :])
+            plogv = self.hidden2plogv(embeds[:pn_boundary, :, :])
+            # r = torch.randn([pn_boundary, 1, self.latent_size], device=hidden_states.device)
+            r = torch.normal(
+                    mean=torch.zeros(pmean.size(), device=hidden_states.device), 
+                    std=torch.pow(plogv.detach(), 2)
+            ).to(hidden_states.device)
             pstd = torch.exp(0.5 * plogv)
-            z = r * pstd + pmean
+            z = r * pstd + pmean if steps is not None else pmean
+            # Revised
             positive = self.latent2hidden(z)
 
             # Negative 
-            r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-            nmean = self.hidden2nmean(hidden_states[pn_boundary:, :1, :])
-            nlogv = self.hidden2nlogv(hidden_states[pn_boundary:, :1, :])
+            nmean = self.hidden2nmean(embeds[pn_boundary:, :, :])
+            nlogv = self.hidden2nlogv(embeds[pn_boundary:, :, :])
+            # r = torch.randn([pn_boundary, 1, self.latent_size], device=hidden_states.device)
+            r = torch.normal(
+                    mean=torch.zeros(nmean.size(), device=hidden_states.device), 
+                    std=torch.pow(nlogv.detach(), 2)
+            ).to(hidden_states.device)
             nstd = torch.exp(0.5 * nlogv)
-            z = r * nstd + nmean
+            z = r * pstd + nmean if steps is not None else nmean
             negative = self.latent2hidden(z)
+
+            if self.debug == 0:
+                # residual learning
+                zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
+                residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
+                hidden_states = hidden_states + residuals
+
+            if self.debug == 1:
+                # residual learning with all tokens
+                hidden_states = hidden_states + torch.cat((positive, negative), 0)
+
+        if self.debug < 0:
+            embeds = hidden_states[:, :1, :]
+
+            # Positive 
+            pmean = self.hidden2mean(embeds[pn_boundary:, :, :])
+            plogv = self.hidden2logv(embeds[pn_boundary:, :, :])
+            r = torch.normal(
+                    mean=torch.zeros(pmean.size(), device=hidden_states.device), 
+                    std=torch.pow(plogv.detach(), 2)
+            ).to(hidden_states.device)
+            std = torch.exp(0.5 * plogv)
+            z = r * std + pmean if steps is not None else pmean
+            positive = self.latent2hidden(pmean)
+            negative = self.latent2hidden(z)
+
+            # add
+            nmean, nlogv = None, None
 
             # residual learning
             zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
             residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
             hidden_states = hidden_states + residuals
 
-        if self.debug == 1:
-            ## [DEBUG1] directly change all tokens (loss is huge)
-            r = torch.randn([pn_boundary, seq_length, self.latent_size]).to(hidden_states.device)
-            pmean = self.hidden2pmean(hidden_states[:pn_boundary, :, :])
-            plogv = self.hidden2plogv(hidden_states[:pn_boundary, :, :])
-            pstd = torch.exp(0.5 * plogv)
-            z = r * pstd + pmean
-            positive = self.latent2hidden(z)
-
-            r = torch.randn([pn_boundary, seq_length, self.latent_size]).to(hidden_states.device)
-            nmean = self.hidden2nmean(hidden_states[pn_boundary:, :, :])
-            nlogv = self.hidden2nlogv(hidden_states[pn_boundary:, :, :])
-            nstd = torch.exp(0.5 * nlogv)
-            z = r * nstd + nmean
-            negative = self.latent2hidden(z)
-
-            hidden_states = torch.cat((positive, negative), 0)
-
-        if self.debug == 2:
-            ## [DEBUG2] directly append one additional token (failed)
-            conditions = torch.cat((positive, negative), 0)
-            hidden_states = torch.cat((conditions, hidden_states), 1)
-
         # Compute variational losses
         loss_reparam = self.compute_loss_reparam(pmean, plogv, nmean, nlogv, steps)
-        loss_discr = self.compute_loss_discrepancy(pmean, nmean)
+        loss_discr = self.compute_loss_discrepancy(pmean, nmean, mode=self.mode)
 
         return hidden_states, (loss_reparam, loss_discr)
     
-    @staticmethod
-    def compute_loss_discrepancy(pmean, nmean):
+    def compute_loss_discrepancy(self, pmean, nmean, mode='cosine'):
         # cosine similarity loss
-        loss_fct = CosineEmbeddingLoss()
-        labels = [-1] * pmean.size(0) * pmean.size(1)
-        loss = loss_fct(pmean.view(-1, self.latent_size),
-                        nmean.view(-1, self.latent_size),
-                        torch.tensor(labels).to(pmean.device))
+        loss = 0
+        if nmean is None:
+            return loss
+        if mode == 'cosine':
+            loss_fct = CosineEmbeddingLoss()
+            labels = [-1] * pmean.size(0) * pmean.size(1)
+            loss = loss_fct(pmean.view(-1, self.latent_size),
+                            nmean.view(-1, self.latent_size),
+                            torch.tensor(labels).to(pmean.device))
 
         # [TODO] MSE loss
+        if mode == 'contrastive': 
+            # B x 1 x H --> B x H --> B x B
+            loss_fct = nn.CrossEntropyLoss()
+            logits_matrix  = pmean.squeeze(1) @ nmean.squeeze(1).T
+            labels = torch.zeros(pmean.size(0), dtype=torch.long, device=pmean.device)
+            # labels = torch.arange(0, logits_matrix.size(0), device=logits.device)
+            loss = loss_fct(logits_matrix, labels)
         return loss
 
-    @staticmethod
-    def compute_loss_reparam(pmean, plogv, nmean, nlogv, steps):
+    def compute_loss_reparam(self, pmean, plogv, nmean, nlogv, steps):
         loss_kl_w = 1
+
         loss_kl_pos = kl_loss(plogv.view(-1, self.latent_size), 
                               pmean.view(-1, self.latent_size)) 
-        loss_kl_neg = kl_loss(nlogv.view(-1, self.latent_size), 
-                              nmean.view(-1, self.latent_size))
+        try:
+            loss_kl_neg = kl_loss(nlogv.view(-1, self.latent_size), 
+                                  nmean.view(-1, self.latent_size))
+        except:
+            loss_kl_neg = 0
+
         # calcuate the weighted losses
         if steps:
             loss_kl_w = kl_weight(

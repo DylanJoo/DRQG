@@ -6,6 +6,10 @@ wandb/
 
 # checkpoints
 checkpoints/
+t5vqgv1*/
+t5vqgv0*/
+t5pqg*/
+
 t5vqg_v1*/
 t5vqg_v0*/
 t5pqg*/
