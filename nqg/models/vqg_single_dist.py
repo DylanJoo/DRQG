@@ -62,13 +62,6 @@ class T5VQG(T5ForConditionalGeneration):
         self.hidden2logv = nn.Linear(t5_config.d_model, latent_size, bias=False)
         self.latent2hidden = nn.Linear(latent_size, t5_config.d_model, bias=False)
         self.vae_config = config
-        if self.debug == 3: 
-            self.memory_projection = nn.Linear(
-                    latent_size, 
-                    self.config.num_decoder_layers * t5_config.d_model,
-                    bias=False,
-            )
-            self.embed_size_per_head = t5_config.d_model // t5_config.num_heads
 
     def forward(
         self,
@@ -157,9 +150,9 @@ class T5VQG(T5ForConditionalGeneration):
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
             inputs_embeds=decoder_inputs_embeds,
-            past_key_values=past_key_values if self.debug !=3 else hidden_states,
-            encoder_hidden_states=hidden_states if self.debug != 3 else None, 
-            encoder_attention_mask=attention_mask if self.debug !=3 else None,
+            past_key_values=past_key_values,
+            encoder_hidden_states=hidden_states,
+            encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,
@@ -252,13 +245,8 @@ class T5VQG(T5ForConditionalGeneration):
         embeds = hidden_states[:, :1, :]
         
         # Polarity
-        if self.debug == 3:
-            embeds = torch.mean(hidden_states, 1).unsqueeze(1)
-            mean = self.hidden2mean(embeds[pn_boundary:, :, :])
-            logv = self.hidden2logv(embeds[pn_boundary:, :, :])
-        else:
-            mean = self.hidden2mean(embeds[pn_boundary:, :, :])
-            logv = self.hidden2logv(embeds[pn_boundary:, :, :])
+        mean = self.hidden2mean(embeds[pn_boundary:, :, :])
+        logv = self.hidden2logv(embeds[pn_boundary:, :, :])
         std = torch.exp(0.5 * logv)
         r = torch.randn([pn_boundary, 1, self.latent_size], device=hidden_states.device)
         z = r * std + mean
@@ -271,29 +259,6 @@ class T5VQG(T5ForConditionalGeneration):
             residuals = torch.cat((positive, negative), 0)
             hidden_states = hidden_states[:, 1:, :]
             hidden_states = torch.cat((residuals, hidden_states), 1)
-        elif self.debug == 3:
-            residuals = torch.cat((mean, z), 0)
-            projection_sa = self.memory_projection(residuals)
-            self_attn = projection_sa.reshape(
-                    self.config.num_decoder_layers,
-                    projection_sa.shape[0],
-                    self.config.num_heads,
-                    1,
-                    self.embed_size_per_head
-            )
-            # projection_ca = self.latent2hidden(residuals)
-            # projection_ca = torch.cat((projection_ca, hidden_states[:, 1:, :]), 1)
-            # cross_attn = projection_ca.view(
-            #         projection_ca.shape[0],
-            #         -1,
-            #         self.config.num_heads,
-            #         self.embed_size_per_head
-            # ).permute([0, 2, 1, 3])
-            # Ly B Nhead 1 Dim
-            hidden_states = tuple(
-                    (self_attn[i], self_attn[i])
-                            for i in range(self.config.num_decoder_layers)
-            )
         else:
             # residual learning
             # [h_prime (single) + h (single)] with h

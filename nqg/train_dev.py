@@ -11,9 +11,7 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from models_dev import T5VQG_v1 as T5VQG
 from trainers import TrainerForT5
-from datacollator import DataCollatorForT5VQG
 import msmarco 
 
 import os
@@ -32,6 +30,7 @@ class OurHFModelArguments:
 
 @dataclass
 class OurModelArguments:
+    n_soft_prompts: int = field(default=1)
     latent_size: int = field(default=128)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
@@ -89,24 +88,28 @@ def main():
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
-    model = T5VQG.from_pretrained(
+
+    from models import T5VQGDEV
+    model = T5VQGDEV.from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             vae_config=model_args,
             tokenizer=tokenizer
     )
+    model.set_prompt_input_embeddings()
     
     ## add generation config
     generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
-    generation_config.update(
-        _from_model_config=False,
-        num_beams=5,
-        max_length=16
-    )
+    # generation_config.update(
+    #     _from_model_config=False,
+    #     num_beams=5,
+    #     max_length=16
+    # )
     model.generation_config = generation_config
 
     ## data collator
-    data_collator = DataCollatorForT5VQG(
+    from datacollator import DataCollatorForT5Dev
+    data_collator = DataCollatorForT5Dev(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',

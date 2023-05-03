@@ -20,5 +20,4 @@ python3 train.py \
   --x0 1000 \
   --annealing logistic \
   --do_train \
-  --do_eval  \
-  --debug_mode 3
+  --do_eval 

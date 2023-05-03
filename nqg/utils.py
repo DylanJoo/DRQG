@@ -8,11 +8,11 @@ import numpy as np
 def interpolate(A, B, n):
     return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
 
-def kl_weight(anneal_fn, step, k, x0):
-    if anneal_fn == 'logistic':
-        return float(1/(1+np.exp(-k*(step-x0))))
-    elif anneal_function == 'linear':
-        return min(1, step/x0)
+def kl_weight(annealing_fn, steps, k, x0):
+    if annealing_fn == 'logistic':
+        return float(1/(1+np.exp(-k*(steps-x0))))
+    elif annealiing_function == 'linear':
+        return min(1, steps/x0)
 
 def kl_loss(logv, mean):
     return -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
