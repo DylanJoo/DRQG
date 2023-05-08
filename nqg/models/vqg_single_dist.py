@@ -54,6 +54,10 @@ class T5VQG(T5ForConditionalGeneration):
 
         self.tokenizer = tokenizer
 
+    def set_gaussian_n_samples_for_generation(self, n_side: int):
+        self.std_list = list(range(-n_side, n_side+1, 1))
+        self.n_samples = 1 + 2*n_side
+
     def _initialize_variational_modules(self, t5_config, config):
         """ [TODO] Inheritance"""
         self.latent_size = config.latent_size

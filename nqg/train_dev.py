@@ -46,7 +46,8 @@ class OurDataArguments:
     # Customized arguments
     train_file: Optional[str] = field(default=None)
     eval_file: Optional[str] = field(default=None)
-    max_length: int = field(default=5)
+    max_p_length: int = field(default=256)
+    max_q_length: int = field(default=16)
     triplet: Optional[str] = field(default=None)
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
@@ -70,6 +71,8 @@ class OurTrainingArguments(TrainingArguments):
     per_device_eval_batch_size: int = field(default=2)
     logging_dir: Optional[str] = field(default='./logs')
     resume_from_checkpoint: Optional[str] = field(default=None)
+    save_total_limit: Optional[int] = field(default=5)
+    learning_rate: Optional[float] = field(default=5e-5)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
 
@@ -96,15 +99,14 @@ def main():
             vae_config=model_args,
             tokenizer=tokenizer
     )
-    model.set_prompt_input_embeddings()
     
     ## add generation config
     generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
-    # generation_config.update(
-    #     _from_model_config=False,
-    #     num_beams=5,
-    #     max_length=16
-    # )
+    generation_config.update(
+        _from_model_config=False,
+        num_beams=2,
+        max_length=data_args.max_q_length
+    )
     model.generation_config = generation_config
 
     ## data collator
@@ -112,9 +114,20 @@ def main():
     data_collator = DataCollatorForT5Dev(
             tokenizer=tokenizer, 
             padding=True,
+            max_length=data_args.max_p_length,
             return_tensors='pt',
             is_train=True
     )
+
+    for name, param in model.named_parameters():
+        if "hidden2" in name:
+            print('\nparam {}: {}'.format(name, param.grad))
+        if "latent" in name:
+            print('param {}: {}'.format(name, param.grad))
+        if "soft" in name:
+            print('param {}: {}'.format(name, param.grad))
+        if "prompt" in name:
+            print('param {}: {}'.format(name, param.grad))
 
     # Trainer
     dataset = msmarco.passage_centric_triplet_dataset(data_args)
@@ -131,13 +144,15 @@ def main():
             args=training_args,
             train_dataset=dataset['train'],
             eval_dataset=dataset['test'],
-            data_collator=data_collator
+            data_collator=data_collator,
     )
+            # optimizers=(optimizer, lr_scheduler)
     
     # ***** strat training *****
     results = trainer.train(
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )
+    trainer.save_model()
 
     return results
 

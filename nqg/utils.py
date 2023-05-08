@@ -4,6 +4,7 @@ import torch
 from tqdm import tqdm
 import math
 import numpy as np
+from torch.nn import CosineEmbeddingLoss
 
 def interpolate(A, B, n):
     return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
@@ -11,8 +12,18 @@ def interpolate(A, B, n):
 def kl_weight(annealing_fn, steps, k, x0):
     if annealing_fn == 'logistic':
         return float(1/(1+np.exp(-k*(steps-x0))))
-    elif annealiing_function == 'linear':
+    elif annealing_fn == 'linear':
         return min(1, steps/x0)
+    else:
+        return 1
+
+def sim_loss(a, b, metric='cosine'):
+    loss_fct = CosineEmbeddingLoss()
+    labels = [-1] * a.size(0) * a.size(1)
+    loss = loss_fct(a.view(-1, a.size(-1)),
+                    b.view(-1, b.size(-1)),
+                    torch.tensor(labels).to(a.device))
+    return loss
 
 def kl_loss(logv, mean):
     return -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
