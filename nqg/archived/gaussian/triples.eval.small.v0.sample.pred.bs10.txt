@@ -1,0 +1,2400 @@
+passage: We donât know a lot about the effects of caffeine during pregnancy on you and your baby. So itâs best to limit the amount you get each day. If youâre pregnant, limit caffeine to 200 milligrams each day. This is about the amount in 1Â½ 8-ounce cups of coffee or one 12-ounce cup of coffee.
+positive:
+*	is a little caffeine ok during pregnancy
+1	s s     
+2	what is the difference between a cup of
+3	how much caffeine should i drink during pregnancy
+4	how many milligrams of caffeine should
+5	how many milligrams of caffeine should
+6	how much caffeine should i drink during pregnancy
+7	how many calories in a cup of coffee
+8	,  t, T 
+9	do on, on 2  IT 
+negative:
+*	amount of caffeine in caramel macchiato
+1	the e ifs if 
+2	what is a cup of coffee
+3	how much caffeine is in a cup of
+4	how much caffeine should i drink during pregnancy
+5	how many milligrams of caffeine should
+6	how much caffeine should i drink during pregnancy
+7	how do you limit coffee for pregnancy
+8	how howadi erraso
+9	on on on on on on on on on
+
+passage: Passiflora herbertiana. A rare passion fruit native to Australia. Fruits are green-skinned, white fleshed, with an unknown edible rating. Some sources list the fruit as edible, sweet and tasty, while others list the fruits as being bitter and inedible.assiflora herbertiana. A rare passion fruit native to Australia. Fruits are green-skinned, white fleshed, with an unknown edible rating. Some sources list the fruit as edible, sweet and tasty, while others list the fruits as being bitter and inedible.
+positive:
+*	what fruit is native to australia
+1	
+2	what is an inedible fruit
+3	what is a passion fruit
+4	what is a passion fruit
+5	what is a passion fruit
+6	what is a passion fruit
+7	what is a passion fruit
+8	T  stea on  
+9	Op T'   
+negative:
+*	explain why some people are lighter skinned and why others are dark skinned
+1	what  is g wplins
+2	what is a passion fruit
+3	what is passiflora herbertiana
+4	what is a passion fruit
+5	what is a passion fruit
+6	what is a passion fruit
+7	what is passiflora herbertiana
+8	what what is a,s 
+9	steVR  environ,T TUR
+
+passage: The Canadian Physician Health Institute (CPHI) is a national program created in 2012 as a collaboration between the Canadian Medical Association (CMA), the Canadian Medical Foundation (CMF) and the Provincial and Territorial Medical Associations (PTMAs).
+positive:
+*	institute for physician wellness cme
+1	, s s s d
+2	what is cpi
+3	what is cphi
+4	what is cphi
+5	what is cphi
+6	what is cphi
+7	what is cphi a
+8	 ê a a o
+9	VEVEVEVEVEVEVEVE
+negative:
+*	is the canadian open on tv
+1	c s n c 
+2	what is a cphin
+3	what is a cph in
+4	what is cphi
+5	what is cphi
+6	what is cphi
+7	what is cphi
+8	3environs, onenvironurenviron,
+9	experienceT TW onT, on
+
+passage: Cherry. Cherry trees are found throughout the world. There are 40 or more varieties, ranging from bing cherry to black cherry. Along with the fruit, cherry trees produce light and delicate pinkish-white blossoms that are highly fragrant.omments. Submit. Planting fruit trees on your property not only provides you with a steady supply of organic fruit, it also allows you to beautify your yard and give oxygen back to the environment.
+positive:
+*	types of fruit trees
+1	the fi 
+2	what is a berry
+3	what is a cherry tree
+4	what is a cherry tree
+5	what is a cherry tree
+6	what is a cherry tree
+7	what is a bing cherry tree
+8	onT a' on' on'
+9	ECT steurVEVEVEVETUR
+negative:
+*	at what height do loquat trees give fruit
+1	n       
+2	what is a bing s
+3	what is a cherry tree
+4	what is a cherry tree
+5	what is a cherry tree
+6	what is a cherry tree
+7	what are cherry trees
+8	where are cherry trees located
+9	T re,steTT t
+
+passage: Not only is breastfeeding better for the baby, however, research also says itâs better for the mother. Breastfeeding burns an average of 500 calories a day, with the typical range from 200 to 600 calories burned a day. Itâs estimated that the production of 1 oz. of breast milk burns 20 calories. The amount of calories burned depending on how much the baby eats. Breastfeeding twins burn twice as much as feeding only one baby. With twins their mom burns 1000 calories a day. Burning an extra 500 calories a day will result in one pound of weekly weight loss.
+positive:
+*	how many calories a day are lost breastfeeding
+1	the average   'the  
+2	what are the calories burned a day 
+3	how many calories are burnt a day
+4	how many calories does breastfeeding burn
+5	how many calories does breastfeeding burn
+6	how many calories does breastfeeding burn
+7	how to how many calories are burnt in
+8	aenvirons ” with as with
+9	 on  3  on 3 3 3
+negative:
+*	benefits for breastfeeding
+1	
+2	what is the adsorption of 
+3	how many calories in a day of breastfeeding
+4	how many calories does breastfeeding burn
+5	how many calories does breastfeeding burn
+6	how many calories does breastfeeding burn
+7	how many calories can you feed a baby
+8	how to ostestests
+9	can,,(,, ECT on
+
+passage: Harrison City is a census-designated place (CDP) in Westmoreland County, Pennsylvania, United States. The population was 155 at the 2000 census.
+positive:
+*	where is harrison city pa
+1	
+2	what county is charson
+3	what county is harrison city pa in
+4	what county is harrison pa in
+5	what county is harrison pa in
+6	what county is harrison pa in
+7	where is harrison city pn
+8	VE- rees a
+9	an on on K  T 
+negative:
+*	where is harrison county tn
+1	. s g s and-
+2	what county is cdp
+3	what county is charlotte city pa in
+4	what county is harrison pa in
+5	what county is harrison pa in
+6	what county is harrison pa in
+7	what county is harrison pa in
+8	otu ott'
+9	T ARI tre ver,
+
+passage: Representatives. The United States is divided into 435 congressional districts â 36 in Texas â each with a population of about 710,000 individuals. Each district elects a representative to the House for a two-year term.Representatives are also called congressmen/congresswomen.1 st District.he United States is divided into 435 congressional districts â 36 in Texas â each with a population of about 710,000 individuals. Each district elects a representative to the House for a two-year term. Representatives are also called congressmen/congresswomen. 1 st District.
+positive:
+*	how many representatives does texas have
+1	  -   ifs
+2	what is a congressional district
+3	how many congressional districts in texas
+4	how many congressional districts in texas
+5	how many congressional districts in texas
+6	how many congressional districts in texas
+7	what are the congressional districts in texa
+8	treeeeeeee
+9	'experienceTDRDR 3ERTT
+negative:
+*	what towns are in the 11 pa. congressional district
+1	if the sseps
+2	what is st sv 
+3	how many congressmen are in texa
+4	how many congressional districts in texas
+5	how many congressional districts in texas
+6	how many congressional districts in texas
+7	what is the difference between texas
+8	how many i st district
+9	public,artander,,   
+
+passage: Description [edit]. Tropical rainforests have a type of tropical climate in which there is no dry season â all months have an average precipitation value of at least 60 mm. Tropical rainforests have no summer or winter; it is typically hot and wet throughout the year and rainfall is both heavy and frequent.escription [edit]. Tropical rainforests have a type of tropical climate in which there is no dry season â all months have an average precipitation value of at least 60 mm. Tropical rainforests have no summer or winter; it is typically hot and wet throughout the year and rainfall is both heavy and frequent.
+positive:
+*	major climate characteristics of tropical rainforests
+1	tropical tropical
+2	what is a tropicalcatan s
+3	what is the average rainfall in tropical rainforests
+4	what is the average rainfall in tropical rainforests
+5	what is the average rainfall in tropical rainforests
+6	what is the average rainfall in tropical rainforests
+7	what is a tropical rainforest
+8	whatT, S, 
+9	ur,s a for for
+negative:
+*	where are tropical rainforests found
+1	s re f s 
+2	what is a tropical rainforest
+3	what is the average rainfall in tropical rainforests
+4	what is the average rainfall in tropical rainforests
+5	what is the average rainfall in tropical rainforests
+6	what is the average rainfall in tropical rainforests
+7	what is a tropical rainforest
+8	what tropical tropical rainforests is  for 
+9	T'VERERTRTVERVER
+
+passage: Symptoms of Pancreatic Cancer. Pancreatic cancer may cause only vague unexplained symptoms. Pain (usually in the abdomen or back), weight loss, jaundice (yellowing of the skin and/or eyes) with or without itching, loss of appetite, nausea, change in stool, pancreatitis and recent-onset diabetes are symptoms that may indicate pancreatic cancer.
+positive:
+*	cancer of the pancreas symptoms
+1	?????????
+2	what symptom sharcons 
+3	what are the symptoms of pancreatic cancer
+4	what are the symptoms of pancreatic cancer
+5	what are the symptoms of pancreatic cancer
+6	what are the symptoms of pancreatic cancer
+7	what are the symptoms of a pancre
+8	when pancre ac with, 
+9	,, T with' on',
+negative:
+*	pancreatic islets definition
+1	
+2	symptoms of panp s fullss
+3	what are the symptoms of pancreatic cancer
+4	what are the symptoms of pancreatic cancer
+5	what are the symptoms of pancreatic cancer
+6	what are the symptoms of pancreatic cancer
+7	what are the symptoms of pancreatic cancer
+8	what ist u ander a
+9	F  in, onEn onenviron
+
+passage: Lemons are rich in Vitamin C and their acidity helps to lower other foods' glycemic indexes. Oat and rice bran crackers make healthy snacks. Complement with organic nut butter or cheese. Other foods that stabilize blood sugar are cheese, egg yolks, berries and brewer's yeast.
+positive:
+*	foods that will help lower blood sugar
+1	
+2	what is the difference between a  and
+3	what foods stabilize blood sugar
+4	what foods stabilize blood sugar
+5	what foods stabilize blood sugar
+6	what foods are rich in vitamin c
+7	what is a glycemic
+8	(, VETT with with with
+9	an, UST T withT with
+negative:
+*	is string cheese healthy snack
+1	?????????
+2	what is a good food to eat
+3	what foods stabilize blood sugar
+4	what foods stabilize blood sugar
+5	what foods stabilize blood sugar
+6	what foods stabilize blood sugar
+7	what is a glycemic
+8	how on uren   on 
+9	environ the dron eDRDR
+
+passage: Williamsport Sheriff. Find Williamsport Pennsylvania sheriff's office, department, headquarters, jail and detention center. Sheriffs provide information on records, arrests, inmates, warrants, and mugshots. Name. Lycoming County Sheriff's Office.
+positive:
+*	what county is williamsport, pa
+1	
+2	what county is the county of wil
+3	what county is lycoming pa in
+4	what county is williamsburg pa in
+5	what county is williamsburg pa in
+6	what county is williamsburg pa in
+7	where is the sheriff's office in
+8	on, on,TD'
+9	D  on onTOR  on on
+negative:
+*	where is williamsport pa located
+1	
+2	what county is the sl s
+3	what county is the sheriff's office
+4	what county is williamsburg pa in
+5	what county is williamsburg pa in
+6	what county is williamsburg pa in
+7	what county is williamsburg p
+8	ontanderander s oander
+9	TMURSURSURSURSVEURSWVE
+
+passage: To minimize the risk of infections, pregnant women are advised to consume only pasteurized milk, cheese and fruit juice. Bottom Line: Pregnant women should not consume unpasteurized milk, cheese or fruit juice, as these foods increase the risk of bacterial infections.
+positive:
+*	what are some foods pregnant women avoid
+1	what you g s   
+2	what to eat in a pregnancy 
+3	what is the difference between pasteurized milk
+4	what is the difference between pasteurized milk
+5	what is the difference between pasteurized milk
+6	what foods are good for pregnant women
+7	what are the benefits of pasteurized or
+8	enurur, , 
+9	thePLTT T T 
+negative:
+*	foods to eat to increase milk production
+1	.sssssnss
+2	the  h flights 
+3	what to eat if you are pregnant
+4	what is the difference between pasteurized milk
+5	what is the difference between pasteurized milk
+6	what is the difference between pasteurized milk
+7	what foods are good for a pregnant woman
+8	industriali i ti fi
+9	DR public,T, T
+
+passage: The blood levels will replenish within four or five hours. However the white blood cells take 12 hours to replenish. The red blood cells take about 4 to 6 weeks to regenerate, so you need to maintain and live healthy lifestyle as well.ere are some ways on how to: The best and natural way to replenish blood is to drink plenty of water. Drink 8-12 glasses of water a day. Vegetable juices and fruit juices can also help.
+positive:
+*	how long does blood take to replenish afet lossof blood
+1	to        
+2	how long does it take to renum
+3	how long does it take for blood to replenish
+4	how long does it take for blood to replenish
+5	how long does it take for blood to replenish
+6	how long does it take for blood to replenish
+7	how to replenish blood
+8	what what what what
+9	D  environ'  water air
+negative:
+*	time for sperm to replenish
+1	in sssssss
+2	how long does it take to re 
+3	how long does it take for blood to replenish
+4	how long does it take for blood to replenish
+5	how long does it take for blood to replenish
+6	how long does it take for blood to replenish
+7	how do you replenish your blood
+8	howes B swa
+9	DR inVEVETT withT with
+
+passage: The weeping willow belongs to the Salix genus. A member of the willow family (Salicaceae), the willow genus (Salix spp.) is a cosmopolitan genus that consists of approximately 300 species of deciduous trees and shrubs.
+positive:
+*	what is the genus of the weeping willow tree
+1	,,,,,,,,,
+2	what is a gen gen 
+3	what is a weeping willow
+4	what is the genus of willow
+5	what is the genus of willow
+6	what is a weeping willow
+7	what genus is salix
+8	' t withsteT a
+9	 on on on on on on on on
+negative:
+*	what is genus
+1	p e ten   
+2	what is a gencata 
+3	what is a weeping willow
+4	what is the genus of willow
+5	what is the genus of willow
+6	what is a weeping willow
+7	what is a weeping willow
+8	i o''  as 
+9	onsteenvironstestecred e 
+
+passage: Rudolf Virchow, a German medical officer specializing in cellular pathology, first expressed the fundamental dictum regarding cells in his phrase omnis cellula e cellula (all cells from cells). For cellular reproduction is the ultimate basis of the continuity of life; the cell is not onlyâ¦
+positive:
+*	what did rudolf virchow do for the cells
+1	
+2	what is a cellular dictum
+3	what is the fundamental dictum of 
+4	who is rudolf vir
+5	who is rudolf vir
+6	who is rudolf vir
+7	when did rudolf vir
+8	  anders  anders
+9	VirT T urT 
+negative:
+*	what happened to rudolf abel
+1	nig snig
+2	what is cellular pathpo
+3	what did rudolf vir
+4	who is rudolf vir
+5	who is rudolf vir
+6	who is rudolf vir
+7	who is rudolf vir
+8	t oeic ot
+9	o  and s eT
+
+passage: Not all cholesterol is bad for the body. There are two types of cholesterol-HDL (High Density Lipoprotein or good cholesterol) and LDL (Low Density Lipoprotein or bad cholesterol).While LDL causes blockage in arteries, HDL helps transport triglycerides to the liver for excretion.ecommended level of good cholesterol is 1.55 mmol/L and above. The recommended level of LDL (bad cholesterol) is 2.6 mmol/L or lower. Sources. Sources of HDL include onions and Omega-3 fatty acids like flax oil, fish, foods rich in fibre like grains, oats, bran etc.
+positive:
+*	chart of good and bad cholesterol
+1	what is the  S  s 
+2	what is good hd
+3	what is the difference between hdl
+4	what type of cholesterol is good for the body
+5	what type of cholesterol is good for the body
+6	what type of cholesterol is good for the body
+7	what are good sources of hdl
+8	what types of cholesterol
+9	T K2VIHIHIHI
+negative:
+*	foods to increase hdl
+1	what is good cholesterol s bad s
+2	what is the difference between good and bad
+3	what is the recommended level of hd
+4	what type of cholesterol is good for the body
+5	what type of cholesterol is good for the body
+6	what type of cholesterol is good for the body
+7	what is hdl cholesterol
+8	what flax o oats
+9	T, t withT with
+
+passage: The modern English alphabet is a Latin alphabet consisting of 26 letters (each having an uppercase and a lowercase form) â the same letters that are found in the ISO basic Latin alphabet: The exact shape of printed letters varies depending on the typeface.
+positive:
+*	numbers to letters in the alphabet
+1	what is the s.sss
+2	what are the letters in the latinlatin
+3	how many letters in the latin alphabet
+4	what are the letters in the latin alphabet
+5	what are the letters in the latin alphabet
+6	how many letters are in the latin alphabet
+7	what are the letters in the latin alphabet
+8	what how whatl steven a
+9	the public(, the T 
+negative:
+*	latin modern math font
+1	
+2	what is the sle
+3	what is the latin in the latin
+4	what are the letters in the latin alphabet
+5	what are the letters in the latin alphabet
+6	how many letters are in the latin alphabet
+7	what is the name of the latin alphabet
+8	T  't 
+9	 a,, for for 
+
+passage: Your cholesterol levels are an important measure of heart health. For HDL cholesterol, or good cholesterol, higher levels are better. By Mayo Clinic Staff. High-density lipoprotein (HDL) is known as the good cholesterol because it helps remove other forms of cholesterol from your bloodstream.
+positive:
+*	is good cholesterol really good
+1	
+2	what is a good h d
+3	what is the difference between good and bad cholesterol
+4	what is hdl cholesterol
+5	what is hdl cholesterol
+6	what is hdl cholesterol
+7	what does hdl cholesterol mean
+8	what is, e cardiovascularc 
+9	doTTTTTTTT
+negative:
+*	remove cholesterol from meat
+1	s s  s  
+2	what is the difference between hd and
+3	what is the difference between good and bad cholesterol
+4	what is hdl cholesterol
+5	what is hdl cholesterol
+6	what is hdl cholesterol
+7	what is hdl
+8	how much do, c on on on
+9	aninter  on on on on,,
+
+passage: If youâre trying to get pregnant (or trying not to get pregnant), tracking your cycle is important. It will help you keep track of the most fertile days when you can more easily conceive. A common fertility myth is that a woman canât get pregnant when sheâs on her period. While the odds for pregnancy are lower on the days youâre on your period, they arenât zero.
+positive:
+*	can you get pregnant day one of your period
+1	n f ssss
+2	when can i get pregnant pregnant
+3	can you get pregnant when you are on period
+4	can you get pregnant when you are on period
+5	can you get pregnant when you are on period
+6	can you get pregnant when you are on period
+7	when can i get pregnant
+8	how to are are are 
+9	LT environe on environ
+negative:
+*	when can you become pregnant
+1	the s s  sbal
+2	how to get pregnant
+3	can you get pregnant when you are on period
+4	can you get pregnant when you are on period
+5	can you get pregnant when you are on period
+6	can you get pregnant when you are on period
+7	what is the most fertile day of pregnancy
+8	intr  o in s 
+9	 for on on on on on on on
+
+passage: StingerÂ® herbicide provides superior control of Canada thistle in sugarbeets, corn and other crops. And, unlike other herbicides, it can significantly reduce thistle populations next season. Benefits. Excellent tank-mix compatibility. Critical component of micro-rate tank mix for broad-spectrum weed control.
+positive:
+*	what chemicals to use on canadian thistle
+1	 in s   s 
+2	what is a singer if
+3	what is stinger herbicide
+4	what is stinger herbicide
+5	what is stinger herbicide
+6	what is stinger herbicide
+7	what is a stinger herb
+8	3 K  WR herb' in
+9	T T VE onTTT
+negative:
+*	what kind of major crops are there in canada
+1	sspscol col 
+2	what is a herbicide
+3	what is stinger herbicide
+4	what is stinger herbicide
+5	what is stinger herbicide
+6	what is stinger herbicide
+7	what is the difference between herbicide and herb
+8	what,d o i 
+9	anSTIDAIDAIDATêIDAIDA
+
+passage: Commas and periods are the most frequently used punctuation marks. Commas customarily indicate a brief pause; they're not as final as periods. Rule 1. Use commas to separate words and word groups in a simple series of three or more items. Example: My estate goes to my husband, son, daughter-in-law, and nephew. Note: When the last comma in a series comes before and or or (after daughter-in-law in the above example), it is known as the Oxford comma. Most newspapers and magazines drop the Oxford comma in a simple series, apparently feeling it's unnecessary.
+positive:
+*	using commas correctly in sentences
+1	sco      
+2	commas
+3	what is a comma in
+4	what is a comma in
+5	what is a comma in
+6	what is a comma in
+7	what is a comma
+8	what if comma' 
+9	, on on on on  dernier VE
+negative:
+*	commas how to use
+1	 sos d pens  
+2	what is the o comma
+3	what is a comma in
+4	what is a comma in
+5	what is a comma in
+6	what is a comma
+7	what is a comma
+8	when is a coma a
+9	T T  Zê'
+
+passage: Commas and periods are the most frequently used punctuation marks. Commas customarily indicate a brief pause; they're not as final as periods. Rule 1. Use commas to separate words and word groups in a simple series of three or more items. Example: My estate goes to my husband, son, daughter-in-law, and nephew. Note: When the last comma in a series comes before and or or (after daughter-in-law in the above example), it is known as the Oxford comma. Most newspapers and magazines drop the Oxford comma in a simple series, apparently feeling it's unnecessary.
+positive:
+*	what commas are
+1	t   t   
+2	what is the difference between a com
+3	what is a comma in
+4	what is a comma in
+5	what is a comma in
+6	what is a comma in
+7	what is a comma in
+8	i a a a 
+9	
+negative:
+*	when to put commas around something
+1	n sin e s
+2	what is a comma
+3	what is a comma in
+4	what is a comma in
+5	what is a comma in
+6	what is a comma in
+7	what is a comma
+8	en tretre  ,
+9	steT  on, T
+
+passage: The defining invention of the Industrial Revolution was most definitely the steam engine. The steam engine was the energy behind the most advanced textile inventions, such as the spinning mule and the power loom.orld Trade gradually increased in the centuries before the Industrial Revolution and provided European countries access to raw materials and a market for goods. It also increased wealth that could then be loaned by banks to finance more industrial expansion in an upward spiral of economic growth.
+positive:
+*	what drove the industrial revolution
+1	as a      
+2	what was the defining invention of the industrial
+3	what was the defining invention of the industrial
+4	what was the defining invention of the industrial
+5	what was the defining invention of the industrial
+6	what was the defining invention of the industrial
+7	what was the defining invention of the industrial
+8	in what industrial economic to the industrial by an
+9	T T  T,
+negative:
+*	why were canals needed in the industrial revolution
+1	
+2	what were the defining invention of the 
+3	what was the defining invention of the industrial
+4	what was the defining invention of the industrial
+5	what was the defining invention of the industrial
+6	what was the defining invention of the industrial
+7	what was the defining invention of the industrial
+8	DR inte i with  
+9	, F, T 
+
+passage: Most favored nation clause. Definition. A most favored nation clause (also called a most favored customer clause or most favored licensee clause) is a contract provision in which a seller (or licensor) agrees to give the buyer (or licensee) the best terms it makes available to any other buyer (or licensee). Sample clause.
+positive:
+*	are most favored nation clauses legal
+1	most hood -  pens 
+2	what is a most favored nation clause
+3	what is a most favored nation clause
+4	most favored nation clause definition
+5	most favored nation clause definition
+6	most favored nation clause definition
+7	what is a most favored nation clause
+8	tretretre  a on 
+9	the' ''
+negative:
+*	what is a net contribution clause
+1	most pn—ssss
+2	what is a favored clauses so
+3	most favored nation clause definition
+4	most favored nation clause definition
+5	what is a most favored nation clause
+6	most favored nation clause definition
+7	what are a favored nation clause
+8	i,2T,ander,
+9	an  TM ste for the the
+
+passage: No, it is not safe to eat uncooked pepperoni if you are pregnant. Raw food contains harmful bacteria called as listeria. The listeria bacteria can cause listeriosis in pregnant women which can lead to brain infection and even death.
+positive:
+*	is it safe for pregnant women to eat pepperoni
+1	
+2	is it safe to eat pepper in 
+3	can you eat uncooked pepperoni
+4	is it safe to eat uncooked pepper
+5	is it safe to eat uncooked pepper
+6	is it safe to eat uncooked pepper
+7	is pepperoni safe for pregnant women
+8	whatc to    a 
+9	inVE tre T T 
+negative:
+*	is permethrin safe for pregnant women
+1	s       
+2	what is listerias
+3	can you eat uncooked pepperoni
+4	is it safe to eat uncooked pepper
+5	is it safe to eat uncooked pepper
+6	is it safe to eat uncooked pepper
+7	is it safe to eat pepperoni
+8	whatst a s a
+9	with s' ', with
+
+passage: Aluminium carbide, chemical formula Al 4 C 3, is a carbide of aluminium.
+positive:
+*	what is the formula of aluminum carbide
+1	
+2	what is the c
+3	what is the chemical formula for aluminium
+4	what is the chemical formula for aluminium
+5	what is the chemical formula for aluminium
+6	what is the chemical formula for aluminium
+7	what is the chemical formula for aluminium
+8	, eneste e
+9	the   the in  art 
+negative:
+*	what is the chemical formula for aspirin
+1	
+2	what is the definition of a s
+3	what is the chemical formula of aluminium
+4	what is the chemical formula for aluminium
+5	what is the chemical formula for aluminium
+6	what is the chemical formula for aluminium
+7	what is a carbide
+8	in what is a c a
+9	VE on,, on on, on
+
+passage: The PPACAâs requirement for employers to offer health care coverage to employees working 30 or more hours per week to avoid penalties may result in some employers hiring more part-time employees who work less than 30 hours per week.
+positive:
+*	how many hours can someone work before you have to offer them health insurance
+1	f  sbriballss
+2	how many hours does it take to be 
+3	how many hours do i need to work
+4	how many hours do you have to work to
+5	how many hours do you have to work to
+6	how many hours do you have to work to
+7	what is ppaa
+8	e,,s,,re 
+9	IDAIDAê, IDAIDA
+negative:
+*	how many years of work history do most employers want
+1	        
+2	what is pcaa
+3	what is ppaa
+4	how many hours do you have to work to
+5	how many hours do you have to work to
+6	how many hours do you have to work to
+7	how many do ppac's
+8	i t o tt
+9	,environ, en,  
+
+passage: Typical Working Conditions for CNAs. Typical Working Conditions for CNAs. While working conditions for certified nurse aides vary depending on the facilities where they choose to work, some of the most common working conditions they encounter are briefly described below. Common Work Schedules. Although nurse aides can choose to work part- or full-time, most facilities are in need of those who are able to work full-time hours. This typically means 40 hours or more per week and can include overtime, weekend, and holiday hours.
+positive:
+*	what are typical cna working hours
+1	what is a cs  
+2	what is the working hours of a 
+3	what is a cna
+4	how many hours do cnas
+5	how many hours do cnas
+6	how many hours do cnas
+7	what is a cna 
+8	intre,,a o on
+9	cautafirfir T withT withT
+negative:
+*	what are cna's qualified to do
+1	what s f/socirs
+2	what is cn
+3	what are the working conditions for cn
+4	how many hours do cnas
+5	how many hours do cnas
+6	what is a cna
+7	how do cnas work
+8	 4 o ostesteste
+9	inur,,ECO tre 
+
+passage: It usually takes about 6 to 8 weeks for a proximal humerus fracture to unite. But, this is only the take for bony union, it does not take into account the time that will be needed for full recovery.
+positive:
+*	how long is recovery from a broken humerus
+1	, s     
+2	what is a bonyfff
+3	how long does it take for a 
+4	how long does it take for a 
+5	how long does it take for a 
+6	how long does it take for a 
+7	how long does it take for a 
+8	T i i t 
+9	on environmental   and in, with
+negative:
+*	what is the full name of hancock, the union general at gettysburg?
+1	enompsss to 
+2	what is a proxigable
+3	how long does it take for a 
+4	how long does it take for a 
+5	how long does it take for a 
+6	how long does it take for a 
+7	how long do the proximal 
+8	how how, s hume
+9	experience experience to on on on onur 
+
+passage: Carolina Panthers running back Jonathan Stewart tumbles in for a 2-yard TD run. Jonathan Stewart takes the zone read for 20 yards. Published: Dec. 24, 2016 at 01:46 p.m. Carolina Panthers running back Jonathan Stewart finds space on the onside and runs for 20 yards. Jonathan Stewart breaks free for 34 yards on the run. Published: Dec. 19, 2016 at 11:51 p.m. Carolina Panthers running back Jonathan Stewart breaks free for 34 yards on the run.
+positive:
+*	who does jonathan stewart play for
+1	p s s,ss
+2	what is a td run
+3	how many yards does jonathan 
+4	how many yards does jonathan stew
+5	how many yards does jonathan stew
+6	how many yards does jonathan stew
+7	who is jonathan steven
+8	t stevens, s
+9	s s, on ons on
+negative:
+*	who is bill stewart
+1	security s s  s 
+2	what heffcsts
+3	how many yards does jonathan 
+4	how many yards does jonathan stew
+5	how many yards does jonathan stew
+6	how many yards does jonathan stew
+7	who is jonathan steven
+8	what a's a''
+9	VE on on on on on on on
+
+passage: The non-cooperation movement was significant phase of the Indian independence movement from British rule. It was led by Mahatma Gandhi and was supported by the Indian National Congress. Gandhi started the non-cooperation movement in January 1921 after the Jallianwala Bagh Massacre.It aimed to resist British rule in India through nonviolent means.e did not want the movement to degenerate into a contest of violence, with police and angry mobs attacking each other back and forth, victimizing civilians in between. Gandhi appealed to the Indian public for all resistance to end, went on a fast lasting 3 weeks, and called off the non-cooperation movement.
+positive:
+*	what did the non-cooperation movement call upon indians to do
+1	
+2	what was the non-cooperation movement
+3	what was the non cooperation movement
+4	what was the non-cooperation movement
+5	what was the non-cooperation movement
+6	what did mahatma gand
+7	what did mahatma gand
+8	, Ké ))
+9	do on on hands on,   
+negative:
+*	who was mahatma gandhi married to
+1	the  if     
+2	what was the non cooperation movement s
+3	what was the non-cooperation movement
+4	what did mahatma gand
+5	what was the non-cooperation movement
+6	what was gandhi's
+7	what did mahatma gand
+8	thesanderssatretree
+9	ê, ê  on on 
+
+passage: To calculate square meters in a given space, you can measure the number of meters on each side and multiply them. Alternatively, if you know the number of square feet, you can convert that figure into square meters. You may want to use a calculator to do the math involved.
+positive:
+*	how to measure a square meters
+1	
+2	
+3	how to calculate square meters in a given
+4	how to calculate square meters in a given
+5	how to calculate square meters in a given
+6	how to calculate square meters in a given
+7	how to calculate square meters
+8	how for m square meters in mathin
+9	''  
+negative:
+*	how many meters one yard
+1	  num num he 
+2	a a a a 
+3	how to calculate square meters in a given
+4	how to calculate square meters in a given
+5	how to calculate square meters in a given
+6	how to calculate square meters in a given
+7	how to calculate square meters in a given
+8	how do s, T 
+9	T  public,urCu 
+
+passage: PGA Canadian Open 2015: Golf Tee Times, TV Channel & Odds. Bubba Watson headlines the field in the Canadian Open. After a delayed ending to the British Open, the PGA Tour gets back to its regular schedule with the RBC Canadian Open from Glen Abbey Golf Club in Ontario. The tournament gets underway Thursday.
+positive:
+*	is the canadian open on tv
+1	
+2	what is the pffff
+3	when is the pga open
+4	who is bubba watson
+5	who is bubba watson
+6	who is bubba watson
+7	what is the name that bubba
+8	,,co,,Canada 
+9	experience the''s
+negative:
+*	is wintergreen golf pga rated
+1	the verada plinsins
+2	what is the teess
+3	who is bubba wann
+4	who is bubba watson
+5	who is bubba watson
+6	who is bubba watson
+7	what is the name of bubba
+8	anders  en treander
+9	TURTUR' with'  withT with
+
+passage: Victoria Falls Bridge is the location for a 111 meters (364 ft) bungee jump. The Victoria Falls Bridge crosses the Zambezi River just below the Victoria Falls. The bungee jump operates off the Victoria Falls Bridge and has a 100% safety record. Over 50,000 people have bungee jumped from this location.
+positive:
+*	how long is the typical bungee jump
+1	l s to s s
+2	what is the val d buried
+3	where is the victoria falls bridge
+4	where is the victoria falls bridge
+5	where is the victoria falls bridge
+6	where is the victoria falls bridge
+7	where is the victoria falls bridge
+8	 Victoria'd s with, with
+9	T T ander,  
+negative:
+*	weather in victoria canada
+1	        
+2	what is the cost of a bung
+3	where is the victoria falls bridge
+4	where is the victoria falls bridge
+5	where is the victoria falls bridge
+6	where is the victoria falls bridge
+7	where is victoria falls
+8	an on,   on on on
+9	TUR o inter  the theste
+
+passage: Mercury /mer-cury/ [3 sylls.] as a boys' name is of Latin origin, and the meaning of Mercury is commerce. In modern usage, the name is sometimes a nickname for fleet-footed runners. Mythology: the messenger of the Gods who corresponds to the Greek Hermes.
+positive:
+*	name of origin for mercury
+1	
+2	what is the definition of the name of 
+3	what does the name mercury mean
+4	what does the name mercury mean
+5	what does the name mercury mean
+6	what does the name mercury mean
+7	meaning of the name mercury
+8	hand'''''
+9	
+negative:
+*	what is hermes purpose
+1	thepfss sbals
+2	merpshessnomous
+3	what is the meaning of mercury
+4	what does the name mercury mean
+5	what does the name mercury mean
+6	what does the name mercury mean
+7	what is the name mercury
+8	where is the city of a a
+9	inTTT F T 
+
+passage: Vitamin B3 is one of 8 B vitamins. It is also known as niacin (nicotinic acid) and has 2 other forms, niacinamide (nicotinamide) and inositol hexanicotinate, which have different effects from niacin. All B vitamins help the body convert food (carbohydrates) into fuel (glucose), which the body uses to produce energy.
+positive:
+*	cortana what vitamin is niacin.
+1	s p p  — 
+2	what is vitamin b
+3	what is vitamin b3
+4	what is vitamin b3
+5	what is vitamin b3
+6	what is vitamin b3
+7	what is vitamin b3
+8	, so is Ni s
+9	withenviron,,environenvironenviron withenviron
+negative:
+*	what is niacinamide for skin
+1	-     s 
+2	what is vitamin b
+3	what is niacin
+4	what is vitamin b3
+5	what is vitamin b3
+6	what is vitamin b3
+7	what are the benefits of vitamin b3
+8	,environ,s) co a
+9	        
+
+passage: Vitamin B3 is one of 8 B vitamins. It is also known as niacin (nicotinic acid) and has 2 other forms, niacinamide (nicotinamide) and inositol hexanicotinate, which have different effects from niacin. All B vitamins help the body convert food (carbohydrates) into fuel (glucose), which the body uses to produce energy.
+positive:
+*	what is in niacin
+1	sine ca with srada s
+2	what is the bg vitamin
+3	what is vitamin b3
+4	what is vitamin b3
+5	what is vitamin b3
+6	what is vitamin b3
+7	is niacin a vitamin
+8	T B   om
+9	stetreT re,ECO 
+negative:
+*	what vitamins are good for energy when tired
+1	
+2	what is the difference between a vitamin 
+3	what is vitamin b3
+4	what is vitamin b3
+5	what is vitamin b3
+6	what is vitamin b3
+7	what are the benefits of vitamin b3
+8	vitamin, o   t 
+9	an,  experience T onT with
+
+passage: Turkish Mosaic LAMP swanneck table Lamp type Large size, Lampshades, dream model from ottoman time %100 handmade.urkish Mosaic LAMP swanneck table Lamp type Large size, Lampshades, dream model from ottoman time %100 handmade.
+positive:
+*	what is turkish mosaic lamps
+1	
+2	what is the difference between a s
+3	what is a swanneck lamp
+4	what is a swanneck lamp
+5	what is a swanneck lamp
+6	what is a swanneck lamp
+7	what is a swanneck lamp
+8	steees, ander,
+9	as T with   on on on
+negative:
+*	how long does projector lamp last
+1	
+2	s ifs s if
+3	what is a swanneck lamp
+4	what is a swanneck lamp
+5	what is a swanneck lamp
+6	what is a swanneck lamp
+7	what type of lamp is swanneck
+8	t,enTURuranderar
+9	public,environenviron, environenvironenviron
+
+passage: Polycythemia Vera Complications. If you have PV, the thickness of your blood and the slowed blood flow can cause serious health problems. Blood clots are the most serious complication of PV. Blood clots can cause a heart attack or stroke. They also can cause your liver and spleen to enlarge.
+positive:
+*	can polycythemia cause stroke
+1	
+2	what is a splekek
+3	what is the most serious complication of
+4	what is the most serious complication of
+5	what is the most serious complication of
+6	what is the most serious complication of
+7	polycythemia vera com
+8	an public on on on en a
+9	TORIDATtouchTTTTUR
+negative:
+*	how to remove clots behind the heart
+1	
+2	
+3	what is a pv com
+4	what is the most serious complication of
+5	what is the most serious complication of
+6	what is the most serious complication of
+7	what is a pv com
+8	es energic,P
+9	, environ environ, 
+
+passage: Polycythemia Vera Complications. If you have PV, the thickness of your blood and the slowed blood flow can cause serious health problems. Blood clots are the most serious complication of PV. Blood clots can cause a heart attack or stroke. They also can cause your liver and spleen to enlarge.
+positive:
+*	which organ is enlarged after polycythemia vera
+1	with s s s solv
+2	what is a spss
+3	what causes blood clots in 
+4	what is the most serious complication of
+5	what is the most serious complication of
+6	what is the most serious complication of
+7	what are the symptoms of pv
+8	        
+9	T tre s on, 
+negative:
+*	are blood clots after a period normal
+1	s nig he s 
+2	what is the difference between a s
+3	what is the most serious complication of
+4	what is the most serious complication of
+5	what is the most serious complication of
+6	what is the most serious complication of
+7	what does pv mean
+8	d,, e p 
+9	WR    on VE
+
+passage: Adrenaline is one of the body's most important stress chemicals. It is secreted from the adrenal glands, which sit atop each kidney. Adrenaline also plays a key role as a neurotransmitter that facilitates communication between brain cells, or neurons, and other cells. An adrenaline rush is a sudden increased secretion of adrenaline from the adrenal glands. It causes an increase in heart rate and respiration. Adrenaline rushes can be healthy responses to actual threats to a person's well-being or symptoms of an underlying mental disorder.
+positive:
+*	what is causing my adrenal rushes and brain fog
+1	i sine s pens Ifbal
+2	what is a adrenaline rush
+3	what is the secretion of adrenaline
+4	what is the function of the adrenal glands
+5	what is the function of the adrenal glands
+6	what is the function of the adrenal glands
+7	what is the role of adrenal glands in
+8	,, ,'
+9	doT hoste, T 
+negative:
+*	_____ is a protein secreted by fat cells and, when abundant, causes the brain to increase metabolism and decrease hunger.
+1	
+2	what is the role of the a 
+3	what is the function of the adrenal glands
+4	what is the function of the adrenal glands
+5	what is the function of the adrenal glands
+6	what is the function of the adrenal glands
+7	what are adrenal glands
+8	dotreTD   with   
+9	W,TRA hand e
+
+passage: A healthy cell has high magnesium and low calcium levels. Calcium can lodge anywhere in your body and cause serious harm if not balanced with magnesium, which regulates the action of calcium. For instance, excess calcium buildup around your bones and joints mimics arthritis.ear juls, High calcium levels in the blood can be very damaging and parathyroid tumors generally cause loss of magnesium. Treatment for the parathyroid tumors is necessary and magnesium may help as well as the other cancer protocol items of iodine and sodcium bicarbonate.
+positive:
+*	can you have a high magnesium with high calcium
+1	i a tsss
+2	apgngsss
+3	what is the difference between calcium and magnesium
+4	what is the difference between magnesium and calcium
+5	what is the difference between magnesium and calcium
+6	what is the difference between magnesium and calcium
+7	what does parathyroid cancer mean
+8	onuroVERERT  T 
+9	zi  , En 
+negative:
+*	what foods are high in magnesium and potassium and calcium
+1	—
+2	what can cause parathyroid tumors
+3	what is the difference between magnesium and calcium
+4	what is the difference between magnesium and calcium
+5	what is the difference between magnesium and calcium
+6	what is a parathyroid tumor
+7	what does magnesium do to your body
+8	T cardio' 
+9	êT' VER S tre
+
+passage: Compulsive overeating disorder is frequently called a âfood addictionâ because eating can cause biological changes in your body that are similar to those caused by addictive substances. Studies have found that foods, particularly high-fat foods, affect the areas of your brain associated with pleasure.
+positive:
+*	is overeating an eating disorder?
+1	
+2	what is a food addiction
+3	what is compulsive overeating
+4	what is compulsive overeating
+5	what is compulsive overeating
+6	what is compulsive overeating
+7	what is a compulsive eating
+8	what can onen, T 
+9	ê s re inVER,
+negative:
+*	what is compulsive
+1	s      
+2	what is a food addiction
+3	what is compulsive overeating
+4	what is compulsive overeating
+5	what is compulsive overeating
+6	what is compulsive overeating
+7	what is compulsive overes
+8	what what i t i'
+9	TM IDAIDAIDAIDAIDAIDA
+
+passage: The skin tightening from the laser liposuction will begin several weeks after the procedure and continue for months. So it is about at the 3-4 week time period where we will know where you will settle down. However, final liposuction recovery can take 3-6 months.
+positive:
+*	what is the recovery time for liposuction
+1	
+2	k il s and f
+3	how long does it take for lipos
+4	how long does it take for lipos
+5	how long does it take for lipos
+6	how long does it take for lipos
+7	what is a laser liposu
+8	,a,WTDR,
+9	T T'  
+negative:
+*	recovery period definition
+1	        
+2	what can you expect after a lipo
+3	how long does it take for lipos
+4	how long does it take for lipos
+5	how long does it take for lipos
+6	how long does it take for lipos
+7	how long does the liposucer
+8	on,,,,,,,,
+9	TIDIDIDIDIDIDIDID
+
+passage: Tumors that lie along, or compress, the optic path may cause visual hallucinations. In one case series, 13 of 59 patients with temporal lobe tumors experienced visual hallucinations. These hallucinations are described as complex and may involve vivid scenes (including people carrying out mundane tasks).
+positive:
+*	causes of complex visual hallucinations
+1	they they s ch f 
+2	nigsssssss
+3	what causes visual hallucinations
+4	what causes visual hallucinations
+5	what causes visual hallucinations
+6	what causes visual hallucinations
+7	what causes of hallucinations
+8	what ir a tres
+9	on 3 W onur C 
+negative:
+*	what are hallucinations
+1	"dsssssss
+2	what can cause visual hallssands
+3	what causes visual hallucinations
+4	what causes visual hallucinations
+5	what causes visual hallucinations
+6	what causes visual hallucinations
+7	temporal hallucination
+8	theen ott sy
+9	cauta inste, theste inSTE
+
+passage: Electron Groups. In determining the geometry of molecules, the valence shell electron pair repulsion model, or VSEPR, assumes that repulsions between electron pairs causes them to remain as far apart as possible. The geometry that the molecule ultimately adopts minimizes the repulsion between electron pairs.n determining the geometry of molecules, the valence shell electron pair repulsion model, or VSEPR, assumes that repulsions between electron pairs causes them to remain as far apart as possible. The geometry that the molecule ultimately adopts minimizes the repulsion between electron pairs.
+positive:
+*	an electron group is defined as
+1	e re he sphi
+2	what is the val re molecule
+3	what is a valence shell electron
+4	what is the valence shell electron pair
+5	what is the valence shell electron pair
+6	what is the valence shell electron pair
+7	what is the valence shell electron pair
+8	u, or or, 
+9	Co art ar onTURTUR
+negative:
+*	what does the electron cloud model describe?
+1	 and bene s s-
+2	what is a repulsion model
+3	what is valence shell repulsion
+4	what is the valence shell electron pair
+5	what is the valence shell electron pair
+6	what is the valence shell electron pair
+7	valence shell electron pair repulsion
+8	,fir oooo 
+9	ste the HI, '
+
+passage: Electron carriers are reduced during glycolysis and the citric acid cycle to NADH + H+ and FADH2. These carriers then donate electrons and protons to the electron carrier proteins of the electron transport chain. The final electron acceptor is oxygen.Together with oxygen, electrons and protons form molecules of water.our protein complexes in the inner mitochondrial membrane form the electron transport chain. These complexes exist in a descending order of energy. Here the electron carriers come along to drop off all their electron and proton cargo that they picked up during the glycolysis and citric acid cycle stages.
+positive:
+*	which proteins function as electron carriers in respiration
+1	     s  
+2	what is a electron transporter
+3	what are electron carriers
+4	what is an electron transport chain
+5	what is an electron transport chain
+6	what is an electron transport chain
+7	what is the electron transport chain
+8	what is  on electron transport are, 
+9	,ECO, sTURT 
+negative:
+*	what is an auger electron
+1	
+2	what is a electron transporter
+3	what is an electron transporter
+4	what is an electron transport chain
+5	what is an electron transport chain
+6	what is the role of electron carriers in the
+7	what are electron carriers in the mitochondrial membrane
+8	tre dereeee e
+9	onT   or  or or 
+
+passage: Fungal Leaf & Fruit Spots of Tomato I. There are many fungi that cause leaf and fruit spots on tomatoes. The ones described here are similar in that they do not have obvious fungal growth on either the leaf or the fruit spots.
+positive:
+*	what causes dark spots around the stem of tomatoes
+1	s nig nig—s 
+2	what are the symptoms of fa 
+3	what are the fungi on tomatoes
+4	what is the difference between a leaf and
+5	what is the difference between a leaf and
+6	what is the difference between a leaf and
+7	what is the name of the fungi
+8	 what en eco oen public
+9	VER environ
+negative:
+*	what causes yellow spots on tomato leaves
+1	what can fungion/ fruit fruit
+2	
+3	what is the difference between a leaf and
+4	what is the difference between a leaf and
+5	what is the difference between a leaf and
+6	what is the difference between a leaf and
+7	what is the difference between a leaf and
+8	,  a TM re
+9	what a  'o s
+
+passage: There are 435 voting members in the House of Representatives.
+positive:
+*	how many voting member are in the house of representatives
+1	s s s s 
+2	a f s s 
+3	how many people in the u.s
+4	how many members of the house of representatives
+5	how many members of the house of representatives
+6	how many members of the house of representatives
+7	who is the house of representatives in a
+8	e,i  en 
+9	TUR DR ,T TUR
+negative:
+*	how many representatives does florida have in the house of representatives washington dc
+1	
+2	the dogsppa sc
+3	what is the difference between a house and
+4	how many members of the house of representatives
+5	how many members of the house of representatives
+6	how many members of the house of representatives
+7	what is the name of the house of representatives
+8	art en en. 
+9	T VERERTTIDAIDAHIHI
+
+passage: Green Ribbon : Meaning: This color is a symbol of childhood depression, missing children, open records for adoptees, environmental concerns, kidney cancer, tissue/organ donation, homeopathy, and worker and driving safety.
+positive:
+*	what cancer is symbolized by a green ribbon?
+1	the zessthssers
+2	g a a a 
+3	what is a green ribbon
+4	what is a green ribbon
+5	what is a green ribbon
+6	what is a green ribbon
+7	what is the meaning of a green ribbon
+8	VE a, TT
+9	ar eKs, STE
+negative:
+*	types of kidney donation
+1	sss     
+2	what is blue ribbon
+3	what is a green ribbon
+4	what is a green ribbon
+5	what is a green ribbon
+6	what is a green ribbon
+7	what is a green ribbon
+8	saurfir stor('
+9	onur ::...u  
+
+passage: The definition of amnesty is the act of releasing or protecting a person or persons from prosecution for wrongdoings. An example of amnesty is when the US government lets in a foreign citizen to help protect that citizen from being killed in his own country.
+positive:
+*	amnesty definition
+1	p s brinomps
+2	what is the definition of amneste
+3	what is amnesty
+4	what is amnesty
+5	what is amnesty
+6	what is amnesty
+7	what is amnesty
+8	steeda steee
+9	T TUR TURVERVERERT
+negative:
+*	what citizen mean
+1	,s il ifs 
+2	what is the definition of amnesty
+3	what is amnesty
+4	what is amnesty
+5	what is amnesty
+6	what is amnesty
+7	what is the definition of amesmer
+8	'' stewardios
+9	sur  onERT  on on on on
+
+passage: We Happy Few release date for PC (Early Access), Xbox One (Game Preview) July 26, 2016 8 Months Ago (US) ! We Happy Few was released on PC (Early Access) and Xbox One (Game Preview) 261d ago in the US and the UK.
+positive:
+*	we happy few final release date
+1	,kskyktffif
+2	wesk skk x
+3	when was we happy few released
+4	when was we happy few released
+5	when was we happy few released
+6	when was we happy few released
+7	what is the release date of we happy few
+8	with, R, in 
+9	let, D onVEVE, on
+negative:
+*	most anticipated game release
+1	e spscrecrecre
+2	what is the release date for the x
+3	what is the release date of we happy few
+4	when was we happy few released
+5	when was we happy few released
+6	when was we happy few released
+7	when is xbox one released
+8	the ende sa's
+9	, W environT, 
+
+passage: Synonyms for impressed on in Free Thesaurus. Antonyms for impressed on. 62 synonyms for impress: excite, move, strike, touch, affect, influence, inspire, grab, amaze, overcome, stir, overwhelm, astonish, dazzle, sway, awe, overawe. What are synonyms for impressed on?
+positive:
+*	synonyms of impress
+1	what s   s  
+2	what does it mean to be impressed on
+3	what is impressed on
+4	what are the synonyms for impressed on
+5	what are the synonyms for impressed on
+6	what are the synonyms for impressed on
+7	what is the meaning of the word impressed on
+8	in public relations,oWs, 
+9	IDA tre  onVE STEVE
+negative:
+*	what are synonyms for brain
+1	 zessssss
+2	what is impressed on
+3	what is impressed on
+4	what are the synonyms for impressed on
+5	what are the synonyms for impressed on
+6	what are the synonyms for impressed on
+7	what is antonyms in the dictionary
+8	 t, with T
+9	3 on' on on on on on'
+
+passage: Make an effort synonyms. Top make an effort synonyms (idioms only) are have a crack, chip away at and give a go.
+positive:
+*	make an effort synonym
+1	 waki s s 
+2	the keypppsepp
+3	what is make an effort synonyms
+4	what is make an effort synonyms
+5	what is make an effort synonyms
+6	what is make an effort synonyms
+7	a adobes
+8	what,, a time 
+9	T eT 3 en,
+negative:
+*	obesity synonyms
+1	f  s  s 
+2	he s  s s
+3	what is make an effort synonyms
+4	what is make an effort synonyms
+5	what is make an effort synonyms
+6	what is make an effort synonyms
+7	what is a symbiotic
+8	t oo t e
+9	anTM   onT   
+
+passage: Endoplasmic reticulum is a network of tubules, vesicles and sacs that are interconnected. They may serve specialized functions in the cell including protein synthesis, sequestration of calcium, production of steroids, storage and production of glycogen, and insertion of membrane proteins.he endoplasmic reticulum (ER) is an organelle that appears in all eukaryotic cells, usually surrounding the nucleus. The ER is made of a series of membranes that extend throu â¦ ghout the jelly-like cytoplasm and kind of form a maze.
+positive:
+*	what do the endoplasmic reticulum do
+1	nig-s backed by -
+2	the ad s s 
+3	what is endoplasmic reticul
+4	what is endoplasmic reticul
+5	what is endoplasmic reticul
+6	what is endoplasmic reticul
+7	what is the function of the euk
+8	which isotope isotope
+9	TRA  or eco environ TUR 
+negative:
+*	what is the endoplasmic reticulum
+1	the        
+2	what is the function of the epoc
+3	what is endoplasmic reticul
+4	what is endoplasmic reticul
+5	what is endoplasmic reticul
+6	what is endoplasmic reticul
+7	what is endoplasmic reticul
+8	where is the enduroERTs 
+9	ret stesteander on on
+
+passage: A chemical symbol is an abbreviation or shortened version of the name of a chemical element, generally assigned in relation to its Latin name. Natural elements all have symbols of one or two letters; some man-made elements have temporary symbols of three letters.
+positive:
+*	what are chemical symbols used for
+1	  --    - 
+2	what is a chemical symbol
+3	what is a chemical symbol
+4	what is a chemical symbol
+5	what is a chemical symbol
+6	what is a chemical symbol
+7	what is a chemical symbol
+8	,    on on  
+9	:  :::::
+negative:
+*	what is the abbreviation for symbol
+1	the s ifs  s
+2	what is a chemical
+3	what is a chemical symbol
+4	what is a chemical symbol
+5	what is a chemical symbol
+6	what is a chemical symbol
+7	what is the meaning of a chemical symbol
+8	chemical,so turiasa
+9	an on on onsteT  on on
+
+passage: Algebra is one of the broad parts of mathematics, together with number theory, geometry and analysis. In its most general form, algebra is the study of mathematical symbols and the rules for manipulating these symbols; it is a unifying thread of almost all of mathematics. As such, it includes everything from elementary equation solving to the study of abstractions such as groups, rings, and fields. The more basic parts of algebra are called elementary algebra; the more abstract parts are called
+positive:
+*	what is algebra really about
+1	
+2	what is the definition of algebra if with
+3	what is algebra
+4	what is algebra
+5	what is algebra
+6	what is algebra
+7	what is algebra
+8	tre ’     
+9	as DETRA desAGIDIDID
+negative:
+*	how many questions do i need to get right to pass the algebra regents
+1	s s s   
+2	what is algebra theory
+3	what is algebra
+4	what is algebra
+5	what is algebra
+6	what is algebra
+7	what is algebra in mathematics
+8	algebra for algebra es,,
+9	an,environ,environenvironenvironenvironenviron
+
+passage: Aluminum hydroxide gel is an antacid medication that can be used to treat heartburn and indigestion. Drinking plenty of water may help minimize constipation.
+positive:
+*	what is aluminum hydroxide gel
+1	
+2	what is the side and s s
+3	what is aluminum hydroxide gel used for
+4	what is aluminum hydroxide gel used for
+5	what is aluminum hydroxide gel used for
+6	what is aluminum hydroxide gel used for
+7	what is an antacid
+8	 an  on,  an  
+9	withEn public on, ste ste
+negative:
+*	can drinking cumin water cause gas indigestion
+1	id ifs s 
+2	heheppspsp
+3	what is aluminum hydroxide gel used for
+4	what is aluminum hydroxide gel used for
+5	what is aluminum hydroxide gel used for
+6	what is aluminum hydroxide gel used for
+7	what is a antacid
+8	what is an tretre tretre
+9	with'' "" T 
+
+passage: By Kathee Mierzejewski. Eggplant (Solanum melongena) is one of the vegetables you can grow in your garden but is very sensitive to cold. When deciding to grow eggplants, remember that they are similar to peppers and tomatoes.In fact, theyâre in the same family. They should be planted after the chance of any sort of frost.ow to Plant Eggplant. When growing eggplant, you want to remember that planting eggplant from seed should be done indoors or in a greenhouse setting. This protects the new little seedlings from any sort of frost. When planting eggplant, if you plant them too early, you will risk hurting the plant.
+positive:
+*	where does eggplant grow
+1	        
+2	what is the sophistics of
+3	how to grow eggplant in a greenhouse
+4	can you grow eggplant in a greenhouse
+5	can you grow eggplant in a greenhouse
+6	can you grow eggplant in a greenhouse
+7	how to plant eggplant in a greenhouse
+8	re,,, 
+9	cut,eê eTT 
+negative:
+*	how to grow eggplant from seedlings
+1	k comss s 
+2	what does it cost to grow eggplants
+3	can you grow eggplant in a greenhouse
+4	can you grow eggplant in a greenhouse
+5	can you grow eggplant in a greenhouse
+6	can you grow eggplant in a greenhouse
+7	can you grow eggplant in a greenhouse
+8	what what eggplants
+9	IT', in or do with'VE
+
+passage: A chemical equation is used in the means of writing out and describing a chemical reaction, such as the reactants and the substance that forms after the reaction (called the p â¦ roduct)   P.S: it took me a little to find out the question since i had it too.he reactions in which heat is given out are called exothermic reactions. This information is provided by adding a heat term only the product-side (right hand side) of the chemical equation. For example, (a) When carbon is burnt in air (or oxygen) heat is evolved.
+positive:
+*	what information does a chemical equation contain
+1	a       
+2	what is a chemical reaction
+3	what is a chemical equation
+4	what is a chemical equation
+5	what is a chemical equation
+6	what is a chemical equation
+7	what is a chemical equation
+8	ERTisii, i
+9	,, UK B in
+negative:
+*	what is the chemical equation for photosynthesis yahoo
+1	what is the side p daily e
+2	what is a chemical if a
+3	what is a chemical equation
+4	what is a chemical equation
+5	what is a chemical equation
+6	what is a chemical equation
+7	what is a chemical equation
+8	what is known as " ,
+9	,DR,T T 
+
+passage: Source: Ferdinand Movie Style: Original Motion Picture Soundtrack Music by Various Artists Label: Island Records Format: Digital, CD Release Date: December 1, 2017. Ferdinand is a 2017 American 3D computer-animated comedy-drama film, based on Munro Leafâs childrenâs
+positive:
+*	ferdinand digital release date
+1	e bri ssas
+2	what was fiferevole
+3	what is the soundtrack for fé
+4	what is the soundtrack for fred
+5	what is the soundtrack for fred
+6	what is the soundtrack for fred
+7	who is frederick
+8	VE t i arar
+9	VEIDAIDAIDAIDAIDAIDAIDA
+negative:
+*	which of these films was the first animated movie to ever receive a best picture nomination?
+1	
+2	
+3	what is the soundtrack of fred
+4	what is the soundtrack for fred
+5	what is the soundtrack for fred
+6	what is the soundtrack for fred
+7	what is the name of the movie f
+8	,  is,,,
+9	T VETVERSVERVERVER
+
+passage: Generally, amnesty is defined as any governmental pardon for past offenses or crimes, especially political ones. Granting amnesty goes beyond a pardon, in that it forgives the said offense completely, and typically without consequences. For purposes of conservative politics, amnesty is a political term typically associated with two major issues -- immigration and capital punishment. As it relates to immigration, amnesty is the term used for granting automatic citizenship to resident aliens, who are in the United States illegally. Amnesty for illegal immigrants is the subject of tremendous controversy since it essentially bypasses the citizenship and assimilation process essential to all legal immigration into the United States.
+positive:
+*	amnesty define
+1	a       
+2	what is am amnenter cip
+3	what is amnesty
+4	what is amnesty
+5	what is amnesty
+6	what is amnesty
+7	what is amninessii?
+8	 t t t t
+9	orenvironenvironECO TURenviron global water
+negative:
+*	difference between amnesty and pardon
+1	sbalss, s 
+2	what is a d nec s
+3	what is amnesty
+4	what is amnesty
+5	what is amnesty
+6	what is amnesty
+7	what is amnesty
+8	what am IisosteeTUR
+9	withste ste' ''ste
+
+passage: Algebra is a branch of mathematics that substitutes letters for numbers, and an algebraic equation represents a scale where what is done on one side of the scale is also done to the other side of the scale and the numbers act as constants.
+positive:
+*	what is algebra and why is it important
+1	e  s  s 
+2	what is algebra
+3	what is an algebraic equation
+4	what is an algebraic equation
+5	what is an algebraic equation
+6	what is an algebraic equation
+7	what is algebraic arithmetic
+8	 or,,'‘
+9	intr o'sa  
+negative:
+*	what is theory in algebra
+1	what e a note balbal
+2	what is an algebraic equation
+3	what is an algebraic equation
+4	what is an algebraic equation
+5	what is an algebraic equation
+6	what is an algebraic equation
+7	what is an algebra in mathematics
+8	ver TTT with on s
+9	 on  T ’’ with
+
+passage: WoW: Legion release date. Legion's release date is now past - it's out. It was released on August 30, 2016. Both the standard digital and physical versions will set you back Â£34.99/$49.99. WoW: Legion collector's edition. Blizzard CEs come in two forms - a digital deluxe and the standard big box o' stuff. The digital deluxe edition, sitting at Â£49.99/$69.99, comes with these things: Reins of the Illidari Felstalker mount. Nibbles (a Felstalker mini-pet) Felstalker mount for Heroes of the Storm.
+positive:
+*	wow release date
+1	 e ledge si 
+2	wwplagskss
+3	how much does blizzard cost
+4	how much does a blizzar
+5	how much does a blizzar
+6	how much does a blizzar
+7	what is the release date of legi
+8	Wow’ on on on on on
+9	, I VET ERT
+negative:
+*	ferdinand digital release date
+1	 s ware  ss
+2	what is the cost of a p
+3	how much does blizzard cost
+4	how much does a blizzar
+5	how much does a blizzar
+6	how much does a blizzar
+7	what is a blizzard
+8	 3T end o ende with
+9	, on onen, on on 
+
+passage: Once you have these you can then put them back into the Crafting Box and make them into Sticks. Place all items like how it is displayed below into the table: Now that you have learned how to make a fence in Minecraft, they are 1.5 blocks tall so nothing is able to jump over them.You are able to place blocks on top of the fence that will sit on the fence like it is one block. Fences can be used as a Fuel Source in Furnaces.A Fence Gate is commonly used with fences so a player easily go through a wall of fences.ow To Make A Fence In Minecraft. Crafting is the way to make a cake in Minecraft. The player will first need one crafting table. It can be made by opening your inventory box and placing 4 Wooden Planks into the 2Ã2 grid. If you just made the crafting table then you will need to equip it and place it on the ground.
+positive:
+*	minecraft 1.9.2 how to make fences
+1	the ksess s
+2	how to make a fence in mine
+3	how to make a fence in minecraft
+4	how to make a fence in minecraft
+5	how to make a fence in minecraft
+6	how to make a fence in minecraft
+7	how to make a fence in minecraft
+8	what what how to onsteer  on
+9	or ER, VE  
+negative:
+*	common wood used for fences
+1	
+2	how to make a fence fence in mine
+3	how to make a fence in minecraft
+4	how to make a fence in minecraft
+5	how to make a fence in minecraft
+6	how to make a fence in minecraft
+7	how to build a fence in minecraft
+8	what how to Minecraft end with  with
+9	an, on T in,  on
+
+passage: The average cost for a basic two-stop home elevator in a new home is $21,000 to $25,000, experts say. Three stops run from $28,000 to $30,000 and costs increase for customized cabs, as the residential cars are called. Adding an elevator within an existing home can easily double the expense.
+positive:
+*	how much does a residential elevator cost
+1	what is the ps s 
+2	what is the cost of a cab
+3	how much does it cost to install a
+4	how much does it cost to install a
+5	how much does it cost to install a
+6	how much does it cost to install a
+7	what is the cost of a home elevator
+8	ena tre W tre
+9	in a  s for, 
+negative:
+*	how much does installing a home elevator cost
+1	h l ssss
+2	what is the cost of a home 
+3	how much does it cost to install a
+4	how much does it cost to install a
+5	how much does it cost to install a
+6	how much does it cost to install a
+7	cost of a home elevator
+8	'2'' elevator is::
+9	TIT T  an forDR
+
+passage: Contempt of Court, Indirect. âIndirect contempt of courtâ is the violation of a court order outside the immediate presence of the court. It may be either civil, or criminal. A charge of Criminal Indirect Contempt of Court is a criminal charge. Defendants charged in this manner are afforded all the usual privileges of other criminal defendants, like the right to a trial by jury, to examine, and to call, witnesses, and to testify on one's own behalf.
+positive:
+*	what does indirect contempt of court mean
+1	
+2	what is in a musicals a
+3	what is indirect contempt of court
+4	what is indirect contempt of court
+5	what is indirect contempt of court
+6	what is indirect contempt of court
+7	what is contempt of court
+8	court,sC.in a
+9	T  environ TUR, on,
+negative:
+*	is a disorderly conduct violation a criminal record
+1	security s s nes, 
+2	what is indirect cont ifs
+3	what is a contempt of court charge
+4	what is indirect contempt of court
+5	what is indirect contempt of court
+6	what is indirect contempt of court
+7	what is indirect contempt of court
+8	what kool ol
+9	TDRDRDRDRDRDRDRDR
+
+passage: The organisms at the beginning of the food chain are called producers or autotrophs, such as plants and algae. Some make their own food using the sun's energy through photosynthesis and some producers use chemosynthesis to make their own food. Above them would be 1st level consumers, then 2nd level consumers and so on.
+positive:
+*	which types of organisms are always located at the beginning of the food chain
+1	e i  s  
+2	
+3	what is a chemosynthesis
+4	what is chemosynthesis
+5	what is chemosynthesis
+6	what is chemosynthesis
+7	what are autotrophs
+8	what d w, ê
+9	 VER  WAIDAIDAIDA
+negative:
+*	what is an energy level
+1	s sssa s
+2	
+3	what is a chemosynthesis
+4	what is chemosynthesis
+5	what is chemosynthesis
+6	what is the difference between producers and consumers
+7	what is the name of the organisms that
+8	un t  stear 
+9	environ,,, with’ with with with
+
+passage: This was one of the locations used for the Hogwarts library along with Harrow Boarding School's library and Alnwick Castle's Guest Hall. Christ Church, Oxford, Oxfordshire. Some of the interior shots at Hogwarts were filmed in the Great Hall.his was one of the locations used for the Hogwarts library along with Harrow Boarding School's library and Alnwick Castle's Guest Hall. Christ Church, Oxford, Oxfordshire. Some of the interior shots at Hogwarts were filmed in the Great Hall.
+positive:
+*	where were the scenes from hogwarts filmed
+1	com       
+2	where was hops filmed in 
+3	where was hogwarts filmed
+4	where is hogwarts filmed
+5	where is hogwarts filmed
+6	where is hogwarts filmed
+7	where is the hogwarts library
+8	where is hog? s 
+9	e a, STE 
+negative:
+*	largest great white ever filmed
+1	the fif ss,s
+2	what is the great gwss
+3	where was hogwarts filmed
+4	where is hogwarts filmed
+5	where is hogwarts filmed
+6	where is hogwarts filmed
+7	where is hogwarts filmed
+8	Toostesees
+9	ER environablabliTT
+
+passage: The average cost of a low-back associated workers compensation claim is nearly $8,500. This is double the cost of the average injury claim. The total estimate for the United States ranges between $50 and $100 billion per year. A large portion of this cost is directly workers compensation related.
+positive:
+*	what is the average cost of a work related back injury
+1	s sund sund 
+2	what is the average cost of a workers
+3	what is the average cost of a workers
+4	how much does a workers compensation claim cost
+5	what is the average cost of a workers
+6	what is the average cost of a workers
+7	what is the average cost of a workers
+8	are  il   
+9	" W, T s
+negative:
+*	how much does workers comp insurance cost
+1	what is the s s s
+2	what is the average cost of a 
+3	what is the average cost of a workers
+4	what is the average cost of a workers
+5	what is the average cost of a workers
+6	what is the average cost of a workers
+7	what is the average cost of a workers
+8	ECO o environ, on
+9	anK D onT Dander
+
+passage: The U.S. House of Representatives and the U.S. Senate make up the two chambers of Congress. The House has 435 members, the number representing each state is determined by population. 1  U.S. House of Representatives.  House Committees.
+positive:
+*	number of us house of representatives
+1	
+2	what is the number of members in the 
+3	what are the two chambers of congress
+4	how many members are in the house of representatives
+5	how many members are in the house of representatives
+6	how many members are in the house of representatives
+7	how many members of the u.s
+8	what abo are-intr  
+9	, environ, environo 
+negative:
+*	which is a difference between house and senate procedures?
+1	de s      
+2	what is the size of the u.
+3	how many members of the u.s
+4	how many members are in the house of representatives
+5	how many members are in the house of representatives
+6	what are the two chambers of congress
+7	how many members are in the house of representatives
+8	i d  '
+9	TOR T ''  with'
+
+passage: In the best theaters of the country will premiere a new cartoon called Sausage Party. Premiere date has been set. The worldwide box office the film will be shown June 10, 2016. This comedy filmed the famous director Greg Tirnanom. His assistant is the director Conrad Vernon.
+positive:
+*	sausage party release date
+1	 g sifsss
+2	what he s a little bit
+3	what day of the sass
+4	who is greg tirn
+5	who is greg tirn
+6	who is greg tirn
+7	sausage party is a comedy
+8	  in t,  
+9	T steste T ,
+negative:
+*	where was the film the help filmed
+1	ssssssss
+2	what is the difference between a &
+3	what is a sausage party
+4	who is greg tirn
+5	who is greg tirn
+6	who is greg tirn
+7	what is a sausage party
+8	VETTTTTTT
+9	STE TUR'entre,,PER
+
+passage: CASA (Court Appointed Special Advocates) was started in Seattle, WA in 1977 when a juvenile court judge expressed concern that the courts were deciding the fate of children removed from their homes without having sufficient information.
+positive:
+*	when was casa started
+1	'cres s s 
+2	s,.,.
+3	what is a casa
+4	what is a casa
+5	what is a casa
+6	what is casa
+7	what is a casa
+8	a       
+9	 TUR, T  
+negative:
+*	what county is fate in
+1	in e ifs  s
+2	 if gifs
+3	what is a casa
+4	what is a casa
+5	what is a casa
+6	what is a casa
+7	what is a casa
+8	C tis s  
+9	ar,environ,environ,environenviron
+
+passage: development | definition: act of improving by expanding or enlarging or refining | synonyms: broadening, elaboration, product development, advancement, improvement, working out, progress Working on a longer text?
+positive:
+*	synonyms of development
+1	p s p ss
+2	what is esapss
+3	what is the definition of elaboration
+4	definition of elaboration
+5	definition of elaboration
+6	definition of elaboration
+7	definition of elaboration
+8	,,i  trei
+9	on the,,  STE US
+negative:
+*	what is cognitive elaboration
+1	        
+2	what is the difference between e &
+3	what is elaboration
+4	definition of elaboration
+5	definition of elaboration
+6	definition of elaboration
+7	definition of elaboration
+8	ent a a  ste
+9	T environ'' eur public
+
+passage: Ancient synonyms and Ancient antonyms. Top synonym for ancient (another word for ancient) is old.
+positive:
+*	synonyms for ancient
+1	p s s s 
+2	a a a a 
+3	what is the meaning of the word s
+4	what is the meaning of the word ant
+5	what is a synonym for ancient
+6	what is an antonym
+7	what is an antonym
+8	cratander, to s on
+9	2urur c t dron
+negative:
+*	synonym for embody
+1	s ps s s
+2	s a s s 
+3	what is the meaning of the word of the
+4	what is a synonym for ancient
+5	what is a synonym for ancient
+6	what is a synonym for ancient
+7	what is a renewal of
+8	        
+9	TURIDAIDAIDAIDAIDA' 
+
+passage: California's Central Valley is a large, flat valley that dominates the geographical center of the U.S. state of California.It is 40 to 60 miles (60 to 100 km) wide and stretches approximately 450 miles (720 km) from north-northwest to south-southeast, inland from and parallel to the Pacific Ocean coast.alifornia's Central Valley is a large, flat valley that dominates the geographical center of the U.S. state of California.
+positive:
+*	major geographical features of california
+1	- s  
+2	what state is s little little cali
+3	what is the geographical center of califor
+4	what is the geographical center of califor
+5	what is california'
+6	what is california'
+7	what is california'
+8	what central valley
+9	deal ende, end' public,
+negative:
+*	is apple valley, california a city
+1	the nes e zi s 
+2	what is central valley
+3	what is the geographical center of califor
+4	what is california'
+5	what is california'
+6	what is california'
+7	what is california'
+8	what central valley
+9	t, t, T 
+
+passage: Cocoa, in whatever form, isnât likely to cause constipation. The darker the chocolate, the higher the amount of natural cocoa fat it contains, and the less likely it is to cause constipation. Yes, you can eat rich, bittersweet dark chocolate without a fear of constipation. The lighter a chocolate, the more milk and sugar it will contain, making it more likely to cause constipation. A perfect answer for chocolate lovers
+positive:
+*	what causes severe constipation after eating dark chocolate
+1	?
+2	what is the difference between chocolate and s
+3	can chocolate cause constiping
+4	can dark chocolate cause constipation
+5	can dark chocolate cause constipation
+6	can dark chocolate cause constipation
+7	how much cocoa can cause constipation
+8	the dark chocolate is, ot,
+9	,  on onenviron, 
+negative:
+*	does instant oatmeal cause constipation
+1	the d  -ng s
+2	what is the difference between sca and
+3	does chocolate cause constip ain'
+4	can dark chocolate cause constipation
+5	can dark chocolate cause constipation
+6	can dark chocolate cause constipation
+7	can chocolate cause constipation
+8	oozingssa ECO
+9	 ont environ on, 3 on
+
+passage: Magnesium Rich Food Sources. Green vegetables such as spinach are good sources of magnesium because the center of the chlorophyll molecule (which gives green vegetables their color) contains magnesium.Some beans, peas, nuts, seeds, and whole, unrefined grains are also good sources of magnesium.You should note that refined grains are generally low in magnesium. When white flour is processed, the magnesium rich germ and bran are removed.agnesium Rich Food Sources. Green vegetables such as spinach are good sources of magnesium because the center of the chlorophyll molecule (which gives green vegetables their color) contains magnesium.
+positive:
+*	what are good food sources for magnesium
+1	they little littlepssundundund
+2	what are some foods that are good sources of
+3	what foods are good sources of magnesium
+4	what foods are good sources of magnesium
+5	what foods are good sources of magnesium
+6	what foods are good sources of magnesium
+7	what are good sources of magnesium
+8	chloroplasts is,,:
+9	hand inter en  
+negative:
+*	what are some good food sources for riboflavin
+1	
+2	what foods are good sources of magnesium
+3	what foods are good sources of magnesium
+4	what foods are good sources of magnesium
+5	what foods are good sources of magnesium
+6	what foods are good sources of magnesium
+7	what are good sources of magnesium
+8	tretrep for,en'
+9	an on' on in on in on in
+
+passage: Gal Gadot as Wonder Woman. The legendary Amazonian princess of DC Comics will finally get her own movie. Wonder Woman, the movie will start filming in the fall of 2015. DC Comics and Warner Brothers already announced a release date for the movie on June 23, 2017. Gal Gadot, an Israeli model and actress who also starred in the last three Fast & Furious movies, has long been cast to play the superhero and warrior princess.
+positive:
+*	what is the release date for the wonder movie
+1	the  a  ß  
+2	what is galsss alum
+3	who is gal gadot
+4	who is gal gadot
+5	who is gal gadot
+6	who is gal gadot
+7	who plays gal gadot in wonder
+8	what s a superheros s
+9	VESTE ECOECOECOe s
+negative:
+*	cast of movie powder
+1	case spnig ss
+2	who l s s s
+3	who is gal gadot
+4	who is gal gadot
+5	who is gal gadot
+6	who is gal gadot
+7	where is gal gadot from
+8	
+9	T onstesteT  on on
+
+passage: Trap (computing) In computing and operating systems, a trap, also known as an exception or a fault, is typically[NB 1][1] a type of synchronous interrupt typically caused by an exceptional condition (e.g., breakpoint, division by zero, invalid memory access).
+positive:
+*	what is trap it term
+1	
+2	what is a s s 
+3	what is a trap
+4	what is a trap
+5	what is a trap
+6	what is a trap
+7	what is a trap
+8	what is systemT  with to  with
+9	, on for for for eco  
+negative:
+*	what is a trap song
+1	what is a trap
+2	what is a trap
+3	what is a trap
+4	what is a trap
+5	what is a trap
+6	what is a trap
+7	what is the difference between a synchronous
+8	what what iso a a 
+9	au ”D ander, T
+
+passage: Several bacterial infections can be treated with ciprofloxacin, such as bladder infections, pneumonia, and sinus infections. Off-label uses for ciprofloxacin include treating other types of infections caused by susceptible bacteria. This drug is not appropriate for all bacterial infections, and it will not treat viral infections. Children can use many of the ciprofloxacin products; however, they may have an increased risk for tendon problems.
+positive:
+*	can ciprofloxacin be used to treat pneumonia
+1	,ssiptss
+2	what is ciprofloxaci 
+3	what is ciprofloxacin
+4	what is ciprofloxacin
+5	what is ciprofloxacin
+6	what is ciprofloxacin
+7	what is ciprofloxacin
+8	environ,,co ,
+9	withste enururururur
+negative:
+*	what causes bacterial pneumonia in children
+1	 Andsps nigss
+2	ciprofloxacin
+3	what is ciprofloxacin
+4	what is ciprofloxacin
+5	what is ciprofloxacin
+6	what is ciprofloxacin
+7	what is ciprofloxacin
+8	it o ae to do
+9	 on on on on on on on on
+
+passage: The normal birth weight for a Wistar rat is between 5-6 grams. Birth weight of less than 5grams can therefore be regarded as low birth weight in Wistar rats. This study; which was conducted in Bowen University, Iwo, Osun state, Nigeria, in 2013, was carried out to ascertain the effect of maternal ingestion of aspirin on the outcome of pregnancy in Wistar rats, with special reference to newborn birth weight.
+positive:
+*	weight of wistar rat
+1	a 
+2	what is the normal weight of a 
+3	what is the normal birth weight of a
+4	what is the normal birth weight of a
+5	what is the normal birth weight of a
+6	what is the normal birth weight of a
+7	how much does a wistar rat
+8	howsuoo a o
+9	eco ECO onTUR  onenviron 
+negative:
+*	birth weight percentile
+1	
+2	what is the normal birth weight andse
+3	what is the normal birth weight of a
+4	what is the normal birth weight of a
+5	what is the normal birth weight of a
+6	what is the normal birth weight of a
+7	what is the normal birth weight for a
+8	ss s )  
+9	on on on on on on on on on
+
+passage: Synonyms for eruption hematoma in Free Thesaurus. Antonyms for eruption hematoma. 33 synonyms for eruption: explosion, discharge, outburst, venting, ejection, flare-up, outbreak, sally, inflammation, outbreak, rash, flare-up, explosion.... What are synonyms for eruption hematoma? Eruption hematoma synonyms, eruption hematoma antonyms - FreeThesaurus.com https://www.freethesaurus.com/eruption+hematoma
+positive:
+*	synonyms for eruption
+1	in    s s'
+2	what is eruption s synonyms synonyms
+3	what is eruption hematoma
+4	eruption hematoma synonyms
+5	eruption hematoma synonyms
+6	eruption hematoma synonyms
+7	eruption hematoma synonyms
+8	on on on on on on on on on
+9	»IDAIDAIDAIDAIDAIDAIDAIDA
+negative:
+*	how does an eruption from the mauna loa look like
+1	in's ch  
+2	eruption a little dal d
+3	what is eruption hematoma
+4	eruption hematoma synonyms
+5	eruption hematoma synonyms
+6	eruption hematoma synonyms
+7	what is eruption hematoma
+8	how eruptionses ezone'
+9	ECO' ste,
+
+passage: The average cost to install a sump pump ranges from $550 to $1,100 depending on the size of the pump. How do you build a sump pit? A sump pit is literally a hole just large enough to hold the pump with a plastic lining.
+positive:
+*	cost to install a sump pump
+1	        
+2	how much does it cost to build a
+3	how much does it cost to build a
+4	how much does it cost to build a
+5	how much does it cost to build a
+6	how much does it cost to build a
+7	how much does it cost to build a
+8	how dos septic, in 
+9	do eco TUR  water  on'
+negative:
+*	cost of new heat pump
+1	the a a a a
+2	how much does it cost to build a
+3	how much does it cost to build a
+4	how much does it cost to build a
+5	how much does it cost to build a
+6	how much does it cost to build a
+7	how to build a sump pit
+8	ostestestesteHIs sum
+9	tre tretretretretretretre
+
+passage: Usually takes two days. For ex: if a debit memo shows on Wednesday evening, your deposit should post to your WalMart Moneycard early Friday ... read more. Hi! According to University of Phoenix website, refunds are processed within TEN business days and refunds are issued by University of Phoen ...
+positive:
+*	how long it takes to get a debit memo at uop
+1	d d d d 
+2	what day hehe iff 
+3	how long does it take to get a
+4	how long does it take to get a
+5	how long does it take to get a
+6	how long does it take to get a
+7	how long to university of phoenin
+8	, a,, for
+9	an on  Rt UK 
+negative:
+*	university of phoenix cost per credit online
+1	if       
+2	
+3	how long does it take to get a
+4	how long does it take to get a
+5	how long does it take to get a
+6	how long does it take to get a
+7	how many days do university of phoen
+8	
+9	on on on on' on' on'
+
+passage: The textile industry significantly grew during the Industrial Revolution. The demand for cloth grew, so merchants had to compete with others for the supplies to make it.
+positive:
+*	what did textiles do in the industrial revolution
+1	
+2	what was the purpose of the industrial era
+3	what was the purpose of the industrial revolution
+4	what was the purpose of the industrial revolution
+5	what was the purpose of the industrial revolution
+6	what was the purpose of the industrial revolution
+7	what was involved in the industrial revolution
+8	how to do with
+9	 ur      
+negative:
+*	why were canals needed in the industrial revolution
+1	spsspss s
+2	when did the irrations 
+3	what was the purpose of the industrial revolution
+4	what was the purpose of the industrial revolution
+5	what was the purpose of the industrial revolution
+6	what was the purpose of the industrial revolution
+7	what is a textile industry
+8	which, is what t '
+9	3 on on the  on on  
+
+passage: Rattus rattus redirects here. For the album by Merzbow, see Rattus Rattus (album). The black rat (Rattus rattus), also known as the ship rat, roof rat, house rat, is a common long-tailed rodent of the genus Rattus (rats) in the subfamily Murinae. The species originated in tropical Asia and spread through the Near East in Roman times before reaching Europe by the 1st century and spreading with Europeans across the world.
+positive:
+*	what are roof rats
+1	 s      
+2	what is a rat rat
+3	what is rattus ratt
+4	what is rattus ratt
+5	what is rattus ratt
+6	what is rattus ratt
+7	what is a rattus 
+8	, , , 
+9	ste T T ) 
+negative:
+*	how long does a rat snake grow to be
+1	-       
+2	what is a rat rat
+3	what is a rattus
+4	what is a rattus
+5	what is rattus ratt
+6	what is rattus ratt
+7	what is a rattus
+8	an o o o o
+9	TMTTTTTTTT
+
+passage: Fast Food Pizza is Unhealthy. Fast food pizza is unhealthy because of its ingredients. Fast food pizza is made on a white crust that is filled with refined carbs. These refined or processed grains are stripped of most of the healthy nutrients in the name of taste.
+positive:
+*	is pizza considered fast food
+1	the zbals sas
+2	what is fast food
+3	what is fast food pizza
+4	what is fast food pizza
+5	what is fast food pizza
+6	what is fast food pizza
+7	what does fast food pizza cost
+8	pizzasa  food
+9	 3TTTTTTT
+negative:
+*	how fast is the iss
+1	- s     
+2	what is fast food pizza
+3	what is fast food pizza
+4	what is fast food pizza
+5	what is fast food pizza
+6	what is fast food pizza
+7	what is fast food
+8	T T environoUN 
+9	STEIDAIDAIDAIDAIDAIDAIDA
+
+passage: English Collins Dictionary - English synonyms & Thesaurus. ( hobbies plural ) A hobby is an activity that you enjoy doing in your spare time. n-count (=pastime) My hobbies are letter writing, football, music, photography, and tennis.
+positive:
+*	what is  the synonyms  of  hobby
+1	
+2	what is a hobby
+3	what is a hobby
+4	what is a hobby
+5	what is a hobby
+6	what is a hobby
+7	what is a hobby
+8	t stee's ste
+9	endeT ste e.,
+negative:
+*	what time do hobby lobby close
+1	s infsseur s
+2	what is a hobbies
+3	what is a hobby
+4	what is a hobby
+5	what is a hobby
+6	what is a hobby
+7	what are hobbies in england
+8	D UST end with with with with
+9	experience tre  as Ste  
+
+passage: They hear McDonalds franchise earnings and profits are substantial and the cost to buy a McDonalds franchise is $45,000 - an investment that's within their franchise affordability range. As with most things in life, a little information is a dangerous thing.
+positive:
+*	how to buy a mcdonald's franchise cost
+1	s uk ss s
+2	what is the cost of a m
+3	how much does it cost to buy a
+4	how much does it cost to buy a
+5	how much does it cost to buy a
+6	how much does it cost to buy a
+7	how much did mcdonald
+8	a    i  
+9	on 3 as 3  onenviron onenviron
+negative:
+*	cost of McDonalds franchise
+1	        
+2	what is the cost of a m
+3	how much does it cost to buy a
+4	how much does it cost to buy a
+5	how much does it cost to buy a
+6	how much does it cost to buy a
+7	how much is amcd
+8	stewardesssss
+9	W , W  
+
+passage: Synonyms for Clogs: hindrances (noun) barriers, blockades, blockages, complications, constraints, cul-de-sacs, dampers, deterrents,
+positive:
+*	synonyms of clogs
+1	 p psrada s
+2	what is clogs
+3	what are clogs
+4	what are clogs
+5	what are clogs
+6	what are clogs
+7	clogs
+8	a e,IT  
+9	with''end publicT withT
+negative:
+*	what are duct dampers for?
+1	    s s 
+2	what is a clog
+3	what is a clog
+4	what are clogs
+5	what are clogs
+6	what are clogs
+7	what is clogs
+8	are ei a for 
+9	tourT  or, T 
+
+passage: 3. Tax software and service-Tax preparation companies are already trying to grab your attention. They do that by offering services and software at a discount, or special promotions. 4. Computers-Historically, February is a good month for buying computers.
+positive:
+*	what month do computers go on sale
+1	?       
+2	what can i expect insquap
+3	what is a good month for a
+4	when is the best time to buy a
+5	when is the best time to buy a
+6	when is the best time to buy a
+7	what is a tax software
+8	T s, T 
+9	T dernier, environ, 
+negative:
+*	limitation of liability software as a service
+1	the ampssdspss
+2	what is the fables of the
+3	what is the difference between a computer and
+4	when is the best time to buy a
+5	when is the best time to buy a
+6	when is the best time to buy a
+7	when is the best time in apri
+8	,ur s, 
+9	cauta T  VE  re
+
+passage: Leptospirosis. Leptospirosis, also called Weil's disease, is a bacteria that many rats carry without showing symptoms of infection. Humans become infected when contaminated rat urine or feces comes in contact with mucous membranes. Symptoms in people include headache, fever, vomiting, rash and muscle aches.hile they can carry and spread the disease, fleas on the rat are more often to blame. Fleas spread plague between animals and from animals to humans. Rats will die if they become infected with plague. Humans can also die without treatment, but antibiotics can are usually effective.
+positive:
+*	what diseases do rats carry
+1	what s f    
+2	f s s s 
+3	what is leptospirosis
+4	what is leptospirosis
+5	what is leptospirosis
+6	what is leptospirosis
+7	what is leptospirosis
+8	how do on virus,,  s
+9	, IDAIDAIDAIDAIDAIDA
+negative:
+*	what is bubonic plague symptoms
+1	plagues ffs.ss
+2	what are the symptoms of a rat
+3	what are the symptoms of leptospi
+4	what is leptospirosis
+5	what is leptospirosis
+6	what is leptospirosis
+7	what does leptospirosis mean
+8	, Z e s 
+9	urIDAIDAIDAIDAIDAIDAIDAIDA
+
+passage: midway definition: 1. Obs. 2. the middle of the way or distance 3. a middle way or course 4. Origin of midwayorig. short for Midway Plaisance, the amusement area of the Columbian Exposition (1893), in Chicago that part of a fair or exposition where c...
+positive:
+*	midway definition
+1	
+2	what is a expositionalea
+3	what is a midwayway
+4	what is midway
+5	midway definition
+6	what is midway
+7	what is a midway
+8	s as of other on on
+9	,,tre ', 
+negative:
+*	what wars was the uss midway inn
+1	
+2	what is a midwayway s
+3	midway definition definition definition
+4	midway definition
+5	midway definition
+6	what is midway
+7	what is midway
+8	mid mid in a s 
+9	physical on, onECT 3'TT
+
+passage: Dexilant (Dexlansoprazole) is an effective medicine to treat heartburn and ulcers, but can be expensive. Price and discounts. (30) 60mg capsule. Cost for (30) 60mg capsules of Dexilant (Dexlansoprazole) at pharmacies. Kroger Pharmacy $292.85New price:$257.71Save:12%. $303.59New price:$258.05Save:15%.
+positive:
+*	cost of dexlansoprazole
+1	
+2	what is dexilla l 
+3	how much does dexilant cost
+4	how much does dexilant cost
+5	how much does dexilant cost
+6	how much does dexilant cost
+7	what is the cost of dexilant
+8	T aander,s,
+9	Tbudbudbudbudbudbudbud
+negative:
+*	when will generic dexilant be available
+1	ss      
+2	what is the cost of dna
+3	how much does dexilant cost
+4	how much does dexilant cost
+5	how much does dexilant cost
+6	how much does dexilant cost
+7	cost dexilant cost
+8	dexensoprazole,
+9	T marin''''
+
+passage: Combined with other minerals, aluminum is found in the kitchen of almost every home. All the cans that contain your sodas and juices are made of aluminum, so are a few of the TV trays used for frozen meals. You may use aluminum to cook your food, since there are pots and pans made from aluminum. In addition, do not forget the easiest and most used thing in your kitchen that is made of aluminum, foil. Foil used to be made out of tin, but tin leaves a metal taste on food, so aluminum replaced tin as the household foil in 1910.
+positive:
+*	what is made of aluminum
+1	ifs  ssaults
+2	what is the difference between tin and
+3	what is aluminum used for
+4	what is aluminum used for
+5	what is aluminum used for
+6	what is aluminum used for
+7	what is aluminum used for
+8	what what aluminum aluminum aluminum aluminum aluminum aluminum aluminum
+9	or, T with’'
+negative:
+*	what's the price for aluminum cans
+1	 very—  sin s
+2	what is the difference between aluminum and t
+3	what is aluminum used for
+4	what is aluminum used for
+5	what is aluminum used for
+6	what is aluminum used for
+7	what is made of aluminum
+8	how is aluminum it I 
+9	can,,T T F 
+
+passage: noun display, show, parade, boasting, flourish, showing off (informal), pretension, flaunting, vaunting, pomp, window-dressing, flamboyance, affectation, swank (informal), pageantry, exhibitionism, pretentiousness, flashiness, showiness Despite her wealth, she lived with a notable lack of ostentation.
+positive:
+*	ostentation synonyms
+1	s s a s
+2	what is a -events
+3	what is a swank
+4	what is a swank
+5	what is a swank
+6	what is a swank
+7	what is a swank
+8	art,is  on by 
+9	an ondé en' K 
+negative:
+*	discuss the needs of an informal carer
+1	
+2	what is a parade
+3	what is a display
+4	what is a swank
+5	what is a swank
+6	what is a swank
+7	what is the word for swank
+8	what isoVEVEVEVEVEVE
+9	anVE TURêê   
+
+passage: Maximum size for a carry on is 45 linear inches meaning length + height + depth. Your bag would be 65 linear inches, so no you cannot carry your bag. You can check that bag though. It doesn't matter if it is a dufflebag, but it should be under 70 lbs. I traveled to Hawaii with a duffle bag and I had no problems.
+positive:
+*	what size can a carry on duffle bag be when flying
+1	
+2	what is the maximum size of a blue
+3	what is the maximum size of a du
+4	what is the maximum size of a carry
+5	what is the maximum size of a carry
+6	what is the maximum size of a du
+7	how much does a duffle bag cost
+8	howuuuuas on 
+9	TUR TUR'    B
+negative:
+*	what is bag
+1	ffnigspsps
+2	what is the s in a du
+3	how much does it cost to carry a
+4	what is the maximum size of a carry
+5	what is the maximum size of a carry
+6	what is the maximum size of a carry
+7	what is the length of a duffle
+8	how to peoples s   on
+9	 '' co, 
+
+passage: Cipro (ciprofloxacin hydrochloride) is an antibiotic used to treat bacterial infections in many different parts of the body. It does not work for viral infections (for example, the common cold). Back to top.
+positive:
+*	what does ciprofloxacin hcl treat
+1	? ifs     
+2	the s s s  
+3	what is ciprofloxacin
+4	what is ciprofloxacin
+5	what is ciprofloxacin
+6	what is ciprofloxacin
+7	what is ciprofloxacin
+8	, T, onur'
+9	, inter environ  on
+negative:
+*	can valacyclovir be used to treat other infections
+1	c pens uber if 
+2	what is cipr s a
+3	what is ciprofloxacin
+4	what is ciprofloxacin
+5	what is ciprofloxacin
+6	what is ciprofloxacin
+7	what is ciprofloxacin
+8	,IT a  infection,
+9	TURêTUR on on on onur with
+
+passage: Pan Card Details. Pan Card stands for Permanent Account Number Card used in India. Pan Card is required for any kind of financial transaction in India. Pan Card includes Photo and 10 digit unique alphanumeric numbers for every individual. This Pan Card is issued by Govt. of India (through Tax Department or Ministry of Finance).
+positive:
+*	pan details by pan number
+1	panp  e ifs 
+2	what is panpa  card
+3	what is a pan card
+4	what is a pan card
+5	what is a pan card
+6	what is a pan card
+7	what is a pan card
+8	with' in steu steste
+9	TORs ) ( ander,
+negative:
+*	calories in one pan dulce
+1	? s s  s
+2	what is a panp
+3	what is a pancard
+4	what is a pan card
+5	what is a pan card
+6	what is a pan card
+7	what is a pan card
+8	es es es
+9	,D  by s for 
+

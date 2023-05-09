@@ -98,11 +98,9 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens) 
         # e_prompt = self.soft_prompt_embeds.unsqueeze(0) # 1, n_prompt, hidden
-        e_prompt_1 = torch.mean(e_source, dim=1).unsqueeze(1).repeat(
+        e_prompt = torch.mean(e_source, dim=1).unsqueeze(1).repeat(
                 1, self.n_prompts, 1
         ) # bs, 1, hidden
-        e_prompt_0 = self.soft_prompt_embeds.unsqueeze(0).repeat(batch_size, 1, 1)
-        e_prompt = e_prompt_0 + e_prompt_1
 
         # Reparameterize
         if is_train: # variational with gaussian noises

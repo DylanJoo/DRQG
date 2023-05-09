@@ -50,12 +50,10 @@ class OurDataArguments:
     train_file: Optional[str] = field(default=None)
     eval_file: Optional[str] = field(default=None)
     max_length: int = field(default=5)
-    triplet: Optional[str] = field(default=None)
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
-    joinbynegative: bool = field(default=False)
-    p_centric_triplet: Optional[str] = field(default='triples.train.small.v1.sample.jsonl')
+    p_centric_triplet: Optional[str] = field(default='triples.train.small.v0.sample.jsonl')
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):

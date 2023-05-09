@@ -159,16 +159,16 @@ class T5VQG(T5ForConditionalGeneration):
         if labels is not None:
             if steps % 50 == 0:
                 self.eval()
-                # for m in self.modules():
-                #     if m.__class__.__name__.startswith('Dropout'):
-                #         m.train()
                 print(f"\nNLL: {outputs['loss']}\
                         \nKLD: {self.encoder.embed_tokens.loss_KL}")
                 with torch.no_grad():
                     n = input_ids.size(0)//2
                     input_ids = input_ids[:n, :]
                     attention_mask = attention_mask[:n, :]
-                    temp = self.generate(input_ids, attention_mask=attention_mask)
+                    temp = self.generate(
+                            input_ids, attention_mask=attention_mask, 
+                            do_sample=True, top_k=3
+                    )
                     labels_reformulate = [l for l in labels[0] if l != -100]
                     print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
                     for i in range(self.n_samples):
