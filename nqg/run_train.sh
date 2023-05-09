@@ -12,7 +12,8 @@ python3 train.py \
   --max_length 128 \
   --per_device_train_batch_size 4 \
   --evaluation_strategy 'steps' \
-  --train_file /home/jhju/datasets/triples.train.small/triples.train.small.v0.jsonl \
+  --pooling 'adaptive' \
+  --train_file /home/jhju/datasets/triples.train.small/triples.train.small.v1.jsonl \
   --max_steps 5000 \
   --save_steps 2500 \
   --latent_size 128 \

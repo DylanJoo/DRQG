@@ -1,4 +1,4 @@
-from transformers import Trainer
+from transformers import Trainer, Seq2SeqTrainer
 import torch
 import copy
 
@@ -31,16 +31,9 @@ class TrainerForT5(Trainer):
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
         # test gradient
-        # if training_steps % 10 == 0:
-        #     loss.backward(retain_graph=True)
-        #     print()
-        #     print(model.encoder.embed_tokens.soft_prompt_embeds.abs().sum())
+        # if training_steps % 100 == 0:
         #     print(model.encoder.embed_tokens.hidden2mean.weight.abs().sum())
-        #     print(model.encoder.embed_tokens.latent2hidden.weight.abs().sum())
-        #     self.optimizer.step()
-        #     print(model.encoder.embed_tokens.soft_prompt_embeds.abs().sum())
-        #     print(model.encoder.embed_tokens.hidden2mean.weight.abs().sum())
-        #     print(model.encoder.embed_tokens.latent2hidden.weight.abs().sum())
+        #     print(model.encoder.embed_tokens.hidden2logv.weight.abs().sum())
 
         return (loss, outputs) if return_outputs else loss
 

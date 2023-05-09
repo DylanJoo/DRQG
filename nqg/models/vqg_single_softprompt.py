@@ -9,9 +9,9 @@ from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 from torch import nn
 from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
-from utils import kl_weight, kl_loss, sim_loss
+from utils import kl_weight, kl_loss
 import copy
-from .prompt import SoftEmbedding
+from .prompt import SoftEmbedding, SoftAdaptiveEmbedding
 
 class T5VQG(T5ForConditionalGeneration):
     _keys_to_ignore_on_load_missing = [
@@ -58,12 +58,21 @@ class T5VQG(T5ForConditionalGeneration):
                 'k': vae_config.k, 'x0': vae_config.x0
         }
 
-        self.prompts = SoftEmbedding(
-                wte=self.shared, 
-                n_prompts=vae_config.n_soft_prompts,
-                hidden_size=config.d_model,
-                latent_size=vae_config.latent_size
-        )
+        if vae_config.pooling == 'static':
+            self.prompts = SoftEmbedding(
+                    wte=self.shared, 
+                    n_prompts=vae_config.n_soft_prompts,
+                    hidden_size=config.d_model,
+                    latent_size=vae_config.latent_size
+            )
+        elif vae_config.pooling == 'adaptive':
+            self.prompts = SoftAdaptiveEmbedding(
+                    wte=self.shared, 
+                    n_prompts=vae_config.n_soft_prompts,
+                    hidden_size=config.d_model,
+                    latent_size=vae_config.latent_size
+            )
+
         self.prompts.set_gaussian_n_samples_for_generation(5)
         self.n_samples = self.prompts.n_samples
         self.samples_mapping = {i: std for i, std in enumerate(self.prompts.std_list)}
@@ -71,8 +80,6 @@ class T5VQG(T5ForConditionalGeneration):
         self.encoder.set_input_embeddings(self.prompts)
         self.decoder.set_input_embeddings(self.shared)
         print('Prompt embedding set finished.')
-
-        self.test = nn.Linear(config.d_model, config.d_model)
 
     def _reparam_inputs(self, input_ids, attn_mask, steps=None):
         """
@@ -151,9 +158,12 @@ class T5VQG(T5ForConditionalGeneration):
         # Loss
         if labels is not None:
             if steps % 50 == 0:
+                self.eval()
+                # for m in self.modules():
+                #     if m.__class__.__name__.startswith('Dropout'):
+                #         m.train()
                 print(f"\nNLL: {outputs['loss']}\
-                        \nKLD: {self.encoder.embed_tokens.loss_KL}\
-                        \nCOSINE: {self.encoder.embed_tokens.loss_COSINE}")
+                        \nKLD: {self.encoder.embed_tokens.loss_KL}")
                 with torch.no_grad():
                     n = input_ids.size(0)//2
                     input_ids = input_ids[:n, :]
@@ -162,10 +172,12 @@ class T5VQG(T5ForConditionalGeneration):
                     labels_reformulate = [l for l in labels[0] if l != -100]
                     print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
                     for i in range(self.n_samples):
-                        print(f"D2Q ({self.samples_mapping[i]}):", self.tokenizer.decode(temp[i*n], skip_special_tokens=True))
+                        print(f"D2Q ({self.samples_mapping[i]:<3}):", self.tokenizer.decode(temp[i*n], skip_special_tokens=True))
                     labels_reformulate = [l for l in labels[n] if l != -100]
                     print("D2Q- *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+                self.train()
 
+            # add reparameterize
             outputs.loss += self.encoder.embed_tokens.loss_KL
 
         return outputs

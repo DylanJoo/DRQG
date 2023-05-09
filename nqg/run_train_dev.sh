@@ -1,25 +1,30 @@
-export CUDA_VISIBLE_DEVICES=2
-rm -rvf t5vqgspt/BM25-0_P-1_Z-128_BS-4-NONE/
+export CUDA_VISIBLE_DEVICES=0
+rm -rvf t5vqgspt/test
+MODEL=test
+PRT_MODEL=google/t5-v1_1-small
 
 python3 train_dev.py \
-  --model_name_or_path t5-base \
-  --tokenizer_name t5-base \
-  --config_name t5-base \
-  --output_dir t5vqgspt/BM25-0_P-20_Z-128_BS-4  \
+  --model_name_or_path $PRT_MODEL \
+  --tokenizer_name $PRT_MODEL \
+  --config_name $PRT_MODEL \
+  --output_dir t5vqgspt/$MODEL \
   --max_p_length 256 \
   --max_q_length 16 \
-  --per_device_train_batch_size 4 \
+  --per_device_train_batch_size 8 \
   --evaluation_strategy 'steps' \
+  --learning_rate 1e-3 \
   --optim adafactor \
-  --learning_rate 3e-3 \
+  --lr_scheduler_type constant \
   --train_file /home/jhju/datasets/triples.train.small/triples.train.small.v0.jsonl \
-  --max_steps 10000 \
+  --max_steps 5000 \
   --save_steps 1000 \
-  --eval_steps 1000 \
-  --n_soft_prompts 20 \
+  --eval_steps 500 \
+  --freeze_t5 true \
+  --pooling adaptive \
+  --n_soft_prompts 1 \
   --latent_size 128 \
-  --k 0.0025 \
+  --k 0.025 \
   --x0 1000 \
-  --annealing 'logistic' \
+  --annealing logistic \
   --do_train \
   --do_eval 

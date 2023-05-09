@@ -1,7 +1,7 @@
 import sys
 import multiprocessing
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 from transformers import (
     AutoConfig,
@@ -13,6 +13,7 @@ from transformers import (
 )
 from trainers import TrainerForT5
 import msmarco 
+from datasets import load_dataset
 
 import os
 os.environ["WANDB_DISABLED"] = "false"
@@ -30,11 +31,13 @@ class OurHFModelArguments:
 
 @dataclass
 class OurModelArguments:
+    pooling: str = field(default='static')
     n_soft_prompts: int = field(default=1)
     latent_size: int = field(default=128)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
+    freeze_t5: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
@@ -73,6 +76,7 @@ class OurTrainingArguments(TrainingArguments):
     resume_from_checkpoint: Optional[str] = field(default=None)
     save_total_limit: Optional[int] = field(default=5)
     learning_rate: Optional[float] = field(default=5e-5)
+    lr_scheduler_type: Union[str] = field(default='linear')
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
 
@@ -104,7 +108,7 @@ def main():
     generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
     generation_config.update(
         _from_model_config=False,
-        num_beams=2,
+        num_beams=1,
         max_length=data_args.max_q_length
     )
     model.generation_config = generation_config
@@ -119,15 +123,15 @@ def main():
             is_train=True
     )
 
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'encoder']
+
     for name, param in model.named_parameters():
-        if "hidden2" in name:
+        if any([p in name for p in optimized_prefix]):
             print('\nparam {}: {}'.format(name, param.grad))
-        if "latent" in name:
-            print('param {}: {}'.format(name, param.grad))
-        if "soft" in name:
-            print('param {}: {}'.format(name, param.grad))
-        if "prompt" in name:
-            print('param {}: {}'.format(name, param.grad))
+            param.requires_grad = True
+        else:
+            if model_args.freeze_t5:
+                param.requires_grad = False
 
     # Trainer
     dataset = msmarco.passage_centric_triplet_dataset(data_args)
@@ -146,7 +150,6 @@ def main():
             eval_dataset=dataset['test'],
             data_collator=data_collator,
     )
-            # optimizers=(optimizer, lr_scheduler)
     
     # ***** strat training *****
     results = trainer.train(

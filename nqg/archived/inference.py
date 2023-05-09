@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from datacollator import DataCollatorForT5VQG
-from models import T5VQG
+from models2 import T5VQG
 from utils import interpolate
 
 def interpolated_generation(

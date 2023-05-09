@@ -42,6 +42,7 @@ class DataCollatorForT5VQG:
                     padding=True,
                     return_tensors=self.return_tensors
             ).input_ids
+            targets[targets == self.tokenizer.pad_token_id] = -100
             inputs['labels'] = targets
 
         else:
@@ -97,6 +98,7 @@ class DataCollatorForT5PQG: # prompt-T5 generation
                     padding=True,
                     return_tensors=self.return_tensors
             ).input_ids
+            targets[targets == self.tokenizer.pad_token_id] = -100
             inputs['labels'] = targets
             return inputs
 
@@ -156,15 +158,20 @@ class DataCollatorForT5Dev:
                     texts_pq+texts_nq,
                     padding=True,
                     return_tensors=self.return_tensors
-            ).input_ids
-            inputs['labels'] = targets
+            )
+
+            target_ids = targets['input_ids']
+            target_mask = targets['attention_mask'].bool()
+            target_ids = target_ids.masked_fill(~target_mask, -100)
+
+            inputs['labels'] = target_ids
+            inputs['decoder_attention_mask'] = target_mask
 
         else:
             inputs = self.tokenizer(
                     [p for p in texts_p],
                     max_length=self.max_length,
                     truncation=True,
-                    padding=True,
                     return_tensors=self.return_tensors
             )
             inputs['passage'] = texts_p
