@@ -133,7 +133,7 @@ def main():
     # Dataset
     from data import msmarco 
     dataset = msmarco.passage_centric_dataset(data_args.train_file)
-    if training_args.do_eval:
+    if training_args.do_eval is True:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(test_size=0.001)
         else:
@@ -141,7 +141,6 @@ def main():
                     load_dataset('json', data_files=data_args.eval_file)['train']
     else:
         dataset['test'] = None
-
 
     # Trainer
     trainer = TrainerForT5(

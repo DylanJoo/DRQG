@@ -16,9 +16,10 @@ python3 train_t5vqg.py \
   --optim adafactor \
   --lr_scheduler_type constant \
   --train_file /home/jhju/datasets/dragon.pseudo_datasets/dragon.colbertv2.pcentric.train.jsonl \
+  --train_file /home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.sample.jsonl \
   --max_steps 5000 \
   --save_steps 1000 \
-  --eval_steps 500 \
+  --eval_steps 1000 \
   --freeze_t5 false \
   --pooling static \
   --n_soft_prompts 10 \
