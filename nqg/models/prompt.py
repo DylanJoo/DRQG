@@ -28,9 +28,14 @@ class SoftEmbedding(nn.Module):
                     self.orig_embeds.weight[-n_prompts:].clone().detach()
             )
         else:
+            # random with uniform
             self.soft_prompt_embeds = nn.Parameter(
-                    torch.rand((n_prompts, hidden_size), device=wte.weight.device)-0.5
+                    torch.zeros((n_prompts, hidden_size), device=wte.weight.device)-0.5
             )
+            # random with uniform
+            # self.soft_prompt_embeds = nn.Parameter(
+            #         torch.rand((n_prompts, hidden_size), device=wte.weight.device)-0.5
+            # )
         self.hidden2mean = nn.Linear(hidden_size, latent_size, bias=False)
         self.hidden2logv = nn.Linear(hidden_size, latent_size, bias=False)
         self.latent2hidden = nn.Linear(latent_size, hidden_size, bias=False)
@@ -61,7 +66,8 @@ class SoftEmbedding(nn.Module):
 
             # Concat z to original embeddings
             e_input = torch.cat([
-                e_prompt_prime.repeat(batch_size//2, 1, 1), e_source 
+                torch.repeat_interleave(e_prompt_prime, batch_size//2, dim=0),
+                e_source 
             ], 1)
 
             # compute loss

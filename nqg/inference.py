@@ -13,14 +13,6 @@ from utils import interpolate
 
 from models import T5VQGV0, T5VQGV1, T5PQG, T5VQGSPT, T5VQGDEV
 from models import VAE_CONFIG
-MODELS = {
-        'vqgv0': T5VQGV0, 
-        'vqgv1': T5VQGV1, 
-        'pqg': T5PQG, 
-        'vqgspt': T5VQGSPT,
-        'vqgdev': T5VQGDEV
-}
-
 class QuestionGenerator:
 
     def __init__(self, 
@@ -168,7 +160,14 @@ if __name__ == "__main__":
     config = AutoConfig.from_pretrained(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
-    model = None
+    MODELS = {
+            'vqgv0': T5VQGV0, 
+            'vqgv1': T5VQGV1, 
+            'pqg': T5PQG, 
+            'vqgspt': T5VQGSPT,
+            'vqgdev': T5VQGDEV
+    }
+
     for key in MODELS:
         if key in args.model_path.lower():
             model = MODELS[key].from_pretrained(

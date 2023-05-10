@@ -158,27 +158,36 @@ class T5VQG(T5ForConditionalGeneration):
         # Loss
         if labels is not None:
             if steps % 50 == 0:
-                self.eval()
+                # self.eval()
                 print(f"\nNLL: {outputs['loss']}\
                         \nKLD: {self.encoder.embed_tokens.loss_KL}")
                 with torch.no_grad():
                     n = input_ids.size(0)//2
                     input_ids = input_ids[:n, :]
                     attention_mask = attention_mask[:n, :]
-                    temp = self.generate(
+                    out = self.generate(
                             input_ids, attention_mask=attention_mask, 
-                            do_sample=True, top_k=3
+                            return_dict_in_generate=True,
+                            output_scores=True
                     )
+                    temp = out.sequences
+                    logits = out.scores
                     labels_reformulate = [l for l in labels[0] if l != -100]
                     print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
                     for i in range(self.n_samples):
                         print(f"D2Q ({self.samples_mapping[i]:<3}):", self.tokenizer.decode(temp[i*n], skip_special_tokens=True))
+                        p=[]
+                        for j in range(len(logits)):
+                            p.append(round(torch.nn.functional.softmax(logits[j][i]).max().item(), 2))
+                        print("------->:", p)
                     labels_reformulate = [l for l in labels[n] if l != -100]
                     print("D2Q- *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
                 self.train()
 
             # add reparameterize
             outputs.loss += self.encoder.embed_tokens.loss_KL
+
+            # [DEBUG] output the probs
 
         return outputs
 

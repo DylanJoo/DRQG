@@ -1,3 +1,4 @@
+import random
 import torch
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, Tuple, Any
@@ -142,20 +143,85 @@ class DataCollatorForT5Dev:
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         # text and id info 
-        texts_p = [batch['passage'] for batch in features]
+        texts_p1 = [batch['passage'] for batch in features]
+        texts_p0 = [batch['passage'] for batch in features]
 
         if self.is_train:
             texts_pq = [batch['positive'] for batch in features]
             texts_nq = [batch['negative'] for batch in features]
+
             inputs = self.tokenizer(
-                    [p for p in texts_p] * 2 ,
+                    texts_p1 + texts_p0,
                     max_length=self.max_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
             )
+
             targets = self.tokenizer(
-                    texts_pq+texts_nq,
+                    texts_pq + texts_nq,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
+
+            target_ids = targets['input_ids']
+            target_mask = targets['attention_mask'].bool()
+            target_ids = target_ids.masked_fill(~target_mask, -100)
+
+            inputs['labels'] = target_ids
+            inputs['decoder_attention_mask'] = target_mask
+
+        else:
+            inputs = self.tokenizer(
+                    [p for p in texts_p],
+                    max_length=self.max_length,
+                    truncation=True,
+                    return_tensors=self.return_tensors
+            )
+            inputs['passage'] = texts_p
+
+            if self.is_eval:
+                inputs['positive'] = [batch['positive'] for batch in features]
+                inputs['negative'] = [batch['negative'] for batch in features]
+        return inputs
+
+@dataclass
+class DataCollatorForT5vL:
+    tokenizer: Union[PreTrainedTokenizerBase] = None
+    padding: Union[bool, str, PaddingStrategy] = True
+    truncation: Union[bool, str] = True
+    max_length: Optional[int] = 512
+    pad_to_multiple_of: Optional[int] = None
+    return_tensors: str = "pt"
+    padding: Union[bool, str] = True
+    is_train: Union[bool, str] = False
+    is_eval: Union[bool, str] = False
+    # spec
+    n_samples_per_example: int = 2
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        # text and id info 
+        texts_p = []
+        texts_pq = []
+        texts_nq = []
+
+        for batch in features:
+            texts_p += [batch['passage']] * self.n_samples_per_example
+            texts_pq += batch['positive'][:self.n_samples_per_example]
+            texts_nq += batch['negative'][:self.n_samples_per_example]
+
+        if self.is_train:
+            inputs = self.tokenizer(
+                    texts_p + texts_p,
+                    max_length=self.max_length,
+                    truncation=True,
+                    padding=True,
+                    return_tensors=self.return_tensors
+            )
+
+            targets = self.tokenizer(
+                    texts_pq + texts_nq,
                     padding=True,
                     return_tensors=self.return_tensors
             )

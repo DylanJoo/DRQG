@@ -92,7 +92,14 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     from models import T5VQGDEV
-    model = T5VQGDEV.from_pretrained(
+    MODELS = {"t5vqg": T5VQGDEV}
+
+    model_key = 't5vqg' # default
+    for key in MODELS:
+        if key in hfmodel_args.model_name_or_path.lower():
+            model_key = key
+
+    model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             vae_config=model_args,
@@ -109,13 +116,20 @@ def main():
     model.generation_config = generation_config
 
     ## data collator
-    from datacollator import DataCollatorForT5Dev
-    data_collator = DataCollatorForT5Dev(
+    from datacollator import DataCollatorForT5Dev, DataCollatorForT5vL
+    DATACOLLATORS = {"t5vqg": DataCollatorForT5Dev, "vl": DataCollatorForT5vL}
+
+    datacollator_key = 't5vqg' # default
+    for key in DATACOLLATORS:
+        if key in data_args.train_file.lower():
+            datacollator_key = key
+
+    data_collator = DATACOLLATORS[datacollator_key](
             tokenizer=tokenizer, 
             padding=True,
             max_length=data_args.max_p_length,
             return_tensors='pt',
-            is_train=True
+            is_train=True,
     )
 
     # freezing parameters
@@ -131,11 +145,21 @@ def main():
                 param.requires_grad = False
 
     # Dataset
-    from data import msmarco 
-    dataset = msmarco.passage_centric_dataset(data_args.train_file)
+    from data import msmarco, dragon
+    DATASETS = {"msmarco": msmarco, 'dragon': dragon}
+
+    dataset_key = 'msmarco' # default
+    for key in DATASETS:
+        if key in data_args.train_file.lower():
+            dataset_key = key
+
+    dataset = DATASETS[dataset_key].passage_centric_dataset(data_args.train_file)
+
     if training_args.do_eval is True:
         if data_args.eval_file is None:
-            dataset = dataset['train'].train_test_split(test_size=0.001)
+            dataset = dataset['train'].train_test_split(
+                    test_size=99, train_size=400000
+            )
         else:
             dataset['test'] = \
                     load_dataset('json', data_files=data_args.eval_file)['train']
