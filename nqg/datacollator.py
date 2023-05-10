@@ -128,7 +128,7 @@ class DataCollatorForT5PQG: # prompt-T5 generation
             return inputs, inputs1, inputs0
 
 @dataclass
-class DataCollatorForT5Dev:
+class DataCollatorForVQGSPT:
     tokenizer: Union[PreTrainedTokenizerBase] = None
     padding: Union[bool, str, PaddingStrategy] = True
     truncation: Union[bool, str] = True
@@ -186,7 +186,7 @@ class DataCollatorForT5Dev:
         return inputs
 
 @dataclass
-class DataCollatorForT5vL:
+class DataCollatorForVQGDEV:
     tokenizer: Union[PreTrainedTokenizerBase] = None
     padding: Union[bool, str, PaddingStrategy] = True
     truncation: Union[bool, str] = True

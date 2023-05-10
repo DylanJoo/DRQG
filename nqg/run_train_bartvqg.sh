@@ -1,23 +1,19 @@
 export CUDA_VISIBLE_DEVICES=1
-rm -rvf t5vqgspt/test
+rm -rvf bartvqgspt/test
 MODEL=test
-PRT_MODEL=google/t5-v1_1-small
-PRT_CONFIG=google/t5-v1_1-small
-# PRT_MODEL=doc2query/msmarco-t5-small-v1
+PRT_MODEL=facebook/bart-base
+PRT_CONFIG=facebook/bart-base
 
 python3 train_t5vqg.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
-  --output_dir t5vqgspt/$MODEL \
+  --output_dir bartvqgspt/$MODEL \
   --max_p_length 256 \
   --max_q_length 16 \
   --per_device_train_batch_size 8 \
   --evaluation_strategy 'steps' \
-  --learning_rate 1e-3 \
-  --optim adafactor \
-  --lr_scheduler_type constant \
-  --train_file /home/jhju/datasets/dragon.pseudo_datasets/dragon.colbertv2.pcentric.train.jsonl \
+  --train_file /home/jhju/datasets/dragon.pseudo_datasets/dragon.colbertv2.pcentric.train.v1.jsonl \
   --max_steps 5000 \
   --save_steps 1000 \
   --eval_steps 1000 \

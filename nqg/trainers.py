@@ -2,7 +2,7 @@ from transformers import Trainer, Seq2SeqTrainer
 import torch
 import copy
 
-class TrainerForT5(Trainer):
+class TrainerForVQG(Trainer):
     # customized loss counting function
     def compute_loss(self, model, inputs, return_outputs=False):
         """

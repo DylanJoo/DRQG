@@ -11,7 +11,7 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from trainers import TrainerForT5
+from trainers import TrainerForVQG
 from datasets import load_dataset
 
 import os
@@ -20,12 +20,11 @@ os.environ["WANDB_DISABLED"] = "false"
 @dataclass
 class OurHFModelArguments:
     # Huggingface's original arguments
-    model_name_or_path: Optional[str] = field(default='t5-base')
-    config_name: Optional[str] = field(default='t5-base')
-    tokenizer_name: Optional[str] = field(default='t5-base')
+    model_name_or_path: Optional[str] = field(default=None)
+    config_name: Optional[str] = field(default=None)
+    tokenizer_name: Optional[str] = field(default=None)
     cache_dir: Optional[str] = field(default=None)
     use_fast_tokenizer: bool = field(default=True)
-    model_revision: str = field(default="main")
     use_auth_token: bool = field(default=False)
 
 @dataclass
@@ -36,7 +35,7 @@ class OurModelArguments:
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
-    freeze_t5: bool = field(default=False)
+    freeze_LM: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
@@ -91,12 +90,14 @@ def main():
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
-    from models import T5VQGDEV
-    MODELS = {"t5vqg": T5VQGDEV}
+    from models import T5VQGSPT, BartVQGSPT
+    MODELS = {
+            "t5vqg": T5VQGSPT, 
+            'bartvqg': BartVQGSPT
+    }
 
-    model_key = 't5vqg' # default
     for key in MODELS:
-        if key in hfmodel_args.model_name_or_path.lower():
+        if key in training_args.output_dir.lower():
             model_key = key
 
     model = MODELS[model_key].from_pretrained(
@@ -106,8 +107,12 @@ def main():
             tokenizer=tokenizer
     )
     
-    ## add generation config
-    generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
+    ## add generation config # bart has no config
+    try:
+        generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
+    except:
+        generation_config = GenerationConfig()
+
     generation_config.update(
         _from_model_config=False,
         num_beams=1,
@@ -116,10 +121,15 @@ def main():
     model.generation_config = generation_config
 
     ## data collator
-    from datacollator import DataCollatorForT5Dev, DataCollatorForT5vL
-    DATACOLLATORS = {"t5vqg": DataCollatorForT5Dev, "vl": DataCollatorForT5vL}
+    ### TODO Change the name `v0/v1` since the models have same setups
+    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
+    DATACOLLATORS = {
+            "v0": DataCollatorForVQGSPT, 
+            "v1": DataCollatorForVQGSPT, 
+            "vl": DataCollatorForVQGDEV
+    }
 
-    datacollator_key = 't5vqg' # default
+    datacollator_key = 'v0' # default
     for key in DATACOLLATORS:
         if key in data_args.train_file.lower():
             datacollator_key = key
@@ -135,7 +145,7 @@ def main():
     # freezing parameters
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
 
-    if model_args.freeze_t5:
+    if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')
         for name, param in model.named_parameters():
             if any([p in name for p in optimized_prefix]):
@@ -167,7 +177,7 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    trainer = TrainerForT5(
+    trainer = TrainerForVQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],

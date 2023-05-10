@@ -9,9 +9,9 @@ from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 from torch import nn
 from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
-from utils import kl_weight, kl_loss, sim_loss
+from utils import kl_weight, kl_loss
 import copy
-from .prompt import SoftEmbedding
+from .prompt import SoftEmbedding, SoftAdaptiveEmbedding
 
 class T5VQG(T5ForConditionalGeneration):
     _keys_to_ignore_on_load_missing = [
@@ -51,40 +51,33 @@ class T5VQG(T5ForConditionalGeneration):
 
         # Reparameterized initialization
         self.tokenizer = tokenizer
+        self.n_soft_prompts = vae_config.n_soft_prompts
+        self.d_latent = vae_config.latent_size
         self.vae_kwargs = {
                 'annealing_fn': vae_config.annealing_fn, 
                 'k': vae_config.k, 'x0': vae_config.x0
         }
 
-        ## the additional layers for t5 prompt tuning
-        self.n_soft_prompts = vae_config.n_soft_prompts
-        self.sp_embeds = nn.Parameter(
-                self.shared.weight[-vae_config.n_soft_prompts:].clone().detach())
-        self.sp_hidden2mean = nn.Linear(
-                config.hidden_size, vae_config.latent_size, bias=False
-        )
-        self.sp_hidden2logv = nn.Linear(
-                config.hidden_size, vae_config.latent_size, bias=False
-        )
-        self.sp_latent2hidden = nn.Linear(
-                vae_config.latent_size, config.hidden_size, bias=False
-        )
-        ## the additional layers for t5 prompt tuning
-        prompts = SoftEmbedding(
-                orig_embeddings=self.shared,
-                soft_embeddings=self.sp_embeds,
-                hidden2mean=self.sp_hidden2mean,
-                hidden2logv=self.sp_hidden2logv,
-                latent2hidden=self.sp_latent2hidden,
-                latent_size=vae_config.latent_size
-        )
+        if vae_config.pooling == 'static':
+            self.prompts = SoftEmbedding(
+                    wte=self.shared, 
+                    n_prompts=vae_config.n_soft_prompts,
+                    hidden_size=config.d_model,
+                    latent_size=vae_config.latent_size
+            )
+        elif vae_config.pooling == 'adaptive':
+            self.prompts = SoftAdaptiveEmbedding(
+                    wte=self.shared, 
+                    n_prompts=vae_config.n_soft_prompts,
+                    hidden_size=config.d_model,
+                    latent_size=vae_config.latent_size
+            )
 
-        prompts.set_gaussian_n_samples_for_generation(5)
-        self.n_samples = prompts.n_samples
-        self.samples_mapping = {i: std 
-                for i, std in enumerate(prompts.std_list)
-        }
-        self.encoder.set_input_embeddings(prompts)
+        self.prompts.set_gaussian_n_samples_for_generation(5)
+        self.n_samples = self.prompts.n_samples
+        self.samples_mapping = {i: std for i, std in enumerate(self.prompts.std_list)}
+
+        self.encoder.set_input_embeddings(self.prompts)
         self.decoder.set_input_embeddings(self.shared)
         print('Prompt embedding set finished.')
 
@@ -165,22 +158,36 @@ class T5VQG(T5ForConditionalGeneration):
         # Loss
         if labels is not None:
             if steps % 50 == 0:
+                # self.eval()
                 print(f"\nNLL: {outputs['loss']}\
-                        \nKLD: {self.encoder.embed_tokens.loss_KL}\
-                        \nCOSINE: {self.encoder.embed_tokens.loss_COSINE}")
+                        \nKLD: {self.encoder.embed_tokens.loss_KL}")
                 with torch.no_grad():
                     n = input_ids.size(0)//2
                     input_ids = input_ids[:n, :]
                     attention_mask = attention_mask[:n, :]
-                    temp = self.generate(input_ids, attention_mask=attention_mask)
+                    out = self.generate(
+                            input_ids, attention_mask=attention_mask, 
+                            return_dict_in_generate=True,
+                            output_scores=True
+                    )
+                    temp = out.sequences
+                    logits = out.scores
                     labels_reformulate = [l for l in labels[0] if l != -100]
                     print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
                     for i in range(self.n_samples):
-                        print(f"D2Q ({self.samples_mapping[i]}):", self.tokenizer.decode(temp[i*n], skip_special_tokens=True))
+                        print(f"D2Q ({self.samples_mapping[i]:<3}):", self.tokenizer.decode(temp[i*n], skip_special_tokens=True))
+                        p=[]
+                        for j in range(len(logits)):
+                            p.append(round(torch.nn.functional.softmax(logits[j][i]).max().item(), 2))
+                        print("------->:", p)
                     labels_reformulate = [l for l in labels[n] if l != -100]
                     print("D2Q- *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+                self.train()
 
+            # add reparameterize
             outputs.loss += self.encoder.embed_tokens.loss_KL
+
+            # [DEBUG] output the probs
 
         return outputs
 
@@ -234,64 +241,3 @@ class T5VQG(T5ForConditionalGeneration):
                 device = self.device
             return torch.ones((batch_size, 1), dtype=torch.long, device=device) * decoder_start_token_id
 
-
-# class SoftEmbedding(nn.Module):
-#     def __init__(
-#             self,
-#             wte: nn.Embedding,
-#             n_prompts: int = 1,
-#             initialize_from_vocab: bool = True, 
-#             hidden_size: int = 768, 
-#             latent_size: int = 128
-#         ):
-#         super(SoftEmbedding, self).__init__()
-#         self.n_prompts = n_prompts
-#         self.orig_embeds = wte
-#         self.soft_prompt_embeds = nn.parameter.Parameter(
-#                 self.orig_embeds.weight[-n_prompts:].clone().detach()
-#         )
-#         self.hidden2mean = nn.Linear(hidden_size, latent_size, bias=False)
-#         self.hidden2logv = nn.Linear(hidden_size, latent_size, bias=False)
-#         self.latent2hidden = nn.Linear(latent_size, hidden_size, bias=False)
-#         self.hidden_size = hidden_size
-#         self.latent_size = latent_size
-#
-#     def set_gaussian_n_samples_for_generation(self, n_side: int):
-#         self.std_list = list(range(-n_side, n_side+1, 1))
-#         self.n_samples = 1 + 2*n_side
-#
-#     def forward(self, tokens, is_train=False, **kwargs):
-#         self.loss_KL = 0
-#         self.loss_COSINE = 0
-#         batch_size, seq_length = tokens.shape
-#         e_source = self.orig_embeds(tokens) 
-#         e_prompt = self.soft_prompt_embeds.repeat(batch_size, 1, 1)
-#
-#         # Reparameterize
-#         mean = self.hidden2mean(e_prompt[:(batch_size//2), :, :])
-#         logv = self.hidden2logv(e_prompt[:(batch_size//2), :, :])
-#         std = torch.exp(0.5*logv)
-#         if is_train: # variational with gaussian noises
-#             r = torch.randn(mean.shape, device=e_source.device)
-#             z = torch.cat([mean, mean+r*std], 0)
-#
-#             e_prompt_prime = self.latent2hidden(z)
-#             e_input = torch.cat([e_prompt_prime, e_source], 1)
-#
-#             # loss
-#             loss = kl_loss(logv.view(-1, self.latent_size),
-#                            mean.view(-1, self.latent_size))
-#             weight = kl_weight(**kwargs)
-#             self.loss_KL = loss * weight
-#             self.loss_COSINE = sim_loss(mean, mean+r*std)
-#
-#         else: # variational with stat-parameters
-#             # evaluation 
-#             e_source = e_source[:(batch_size//2), :, :]
-#             e_source = e_source.repeat(self.n_samples, 1, 1)
-#             z = torch.cat([mean+std*i for i in self.std_list], 0)
-#
-#             e_prompt_prime = self.latent2hidden(z)
-#             e_input = torch.cat([e_prompt_prime, e_source], 1)
-#
-#         return e_input

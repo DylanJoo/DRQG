@@ -1,5 +1,6 @@
 """
 TODO: Making this module to be the inherited class of vqg_single_dist
+TODO: Take out the unused modules
 """
 import torch
 import inspect
