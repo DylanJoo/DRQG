@@ -167,7 +167,8 @@ class T5VQG(T5ForConditionalGeneration):
                     input_ids = input_ids[:n, :]
                     attention_mask = attention_mask[:n, :]
                     out = self.generate(
-                            input_ids, attention_mask=attention_mask, 
+                            input_ids,
+                            attention_mask=attention_mask,
                             return_dict_in_generate=True,
                             output_scores=True
                     )

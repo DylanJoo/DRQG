@@ -159,9 +159,9 @@ class DataCollatorForVQGSPT:
             )
 
             targets = self.tokenizer(
-                    texts_pq + texts_nq,
+                    [p for p in texts_pq+texts_nq],
                     padding=True,
-                    return_tensors=self.return_tensors
+                    return_tensors=self.return_tensors,
             )
 
             target_ids = targets['input_ids']

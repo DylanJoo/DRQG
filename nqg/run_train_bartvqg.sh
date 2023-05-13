@@ -11,17 +11,18 @@ python3 train_t5vqg.py \
   --output_dir bartvqgspt/$MODEL \
   --max_p_length 256 \
   --max_q_length 16 \
-  --per_device_train_batch_size 8 \
+  --per_device_train_batch_size 4 \
   --evaluation_strategy 'steps' \
+  --learning_rate 2e-5 \
   --train_file /home/jhju/datasets/dragon.pseudo_datasets/dragon.colbertv2.pcentric.train.v1.jsonl \
-  --max_steps 5000 \
-  --save_steps 1000 \
-  --eval_steps 1000 \
+  --max_steps 10000 \
+  --save_steps 5000 \
+  --eval_steps 5000 \
   --freeze_LM false \
-  --pooling static \
-  --n_soft_prompts 10 \
+  --pooling adaptive \
+  --n_soft_prompts 1 \
   --latent_size 128 \
-  --k 0.00025 \
+  --k 0.0025 \
   --x0 2000 \
   --annealing logistic \
   --do_train \

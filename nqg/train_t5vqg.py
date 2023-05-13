@@ -36,6 +36,7 @@ class OurModelArguments:
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
     freeze_LM: bool = field(default=False)
+    initialize_from_vocab: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
@@ -71,6 +72,7 @@ class OurTrainingArguments(TrainingArguments):
     save_total_limit: Optional[int] = field(default=5)
     learning_rate: Optional[float] = field(default=5e-5)
     lr_scheduler_type: Union[str] = field(default='linear')
+    warmup_ratio: Union[float] = field(default=0.1)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
 
@@ -109,15 +111,16 @@ def main():
     
     ## add generation config # bart has no config
     try:
-        generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
+        generation_config = GenerationConfig.from_pretrained(
+                hfmodel_args.config_name,
+                _from_model_config=False,
+                num_beams=1,
+                max_length=data_args.max_q_length
+        )
     except:
-        generation_config = GenerationConfig()
+        if 'bart' in hfmodel_args.config_name:
+            generation_config = GenerationConfig.from_model_config(model.config)
 
-    generation_config.update(
-        _from_model_config=False,
-        num_beams=1,
-        max_length=data_args.max_q_length
-    )
     model.generation_config = generation_config
 
     ## data collator
@@ -142,8 +145,8 @@ def main():
             is_train=True,
     )
 
-    # freezing parameters
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    # freezing parameters [DEBUG]
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
 
     if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')
@@ -168,7 +171,7 @@ def main():
     if training_args.do_eval is True:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
-                    test_size=99, train_size=400000
+                    test_size=99, train_size=min(len(dataset['train'])-99, 400000)
             )
         else:
             dataset['test'] = \

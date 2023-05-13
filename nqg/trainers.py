@@ -15,9 +15,16 @@ class TrainerForVQG(Trainer):
         else:
             labels = None
 
+        # [NOTE] add evaluation for monitoring
+        batch_size = inputs['input_ids'].size()[0]
+        inputs_for_eval = {
+                "input_ids_eval": inputs['input_ids'][:(batch_size//2), :],
+                "attention_mask_eval": inputs['attention_mask'][:(batch_size//2), :]
+        }
+
         # [NOTE] add training steps info 
         training_steps = copy.deepcopy(self.state.global_step)
-        outputs = model(**inputs, steps=training_steps)
+        outputs = model(**inputs, steps=training_steps, **inputs_for_eval)
 
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
@@ -30,10 +37,4 @@ class TrainerForVQG(Trainer):
             # We don't use .loss here since the model may return tuples instead of ModelOutput.
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
-        # test gradient
-        # if training_steps % 100 == 0:
-        #     print(model.encoder.embed_tokens.hidden2mean.weight.abs().sum())
-        #     print(model.encoder.embed_tokens.hidden2logv.weight.abs().sum())
-
         return (loss, outputs) if return_outputs else loss
-
