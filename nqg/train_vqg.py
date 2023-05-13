@@ -145,8 +145,9 @@ def main():
             is_train=True,
     )
 
-    # freezing parameters [DEBUG]
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
+    # freezing parameters 
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    # optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
 
     if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')

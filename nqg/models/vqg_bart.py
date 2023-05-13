@@ -134,40 +134,37 @@ class BartVQG(BartForConditionalGeneration):
         )
 
         # Loss
-        if labels is not None:
-            if steps % 50 == 0:
-                # self.eval()
-                print(f"\nNLL: {outputs['loss']}\
-                        \nKLD: {self.model.encoder.embed_tokens.loss_KL}")
-                with torch.no_grad():
-                    # generate the normal one
-                    n=input_ids_eval.size()[0]
-                    out = self.generate_(
-                            input_ids_eval, 
-                            attention_mask=attention_mask_eval, 
-                            return_dict_in_generate=True,
-                            output_scores=True,
-                            num_beams=5
-                    )
-                    temp = out.sequences
-                    logits = out.scores
-                    labels_reformulate = [l for l in labels[0] if l != -100]
-                    print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-                    for i in range(self.n_samples):
-                        print(f"D2Q ({self.samples_mapping[i]:<3}):", 
-                                self.tokenizer.decode(temp[i*n], skip_special_tokens=True)
-                        )
-                        # p = []
-                        # for j in range(len(logits)):
-                        #     p.append(round(torch.nn.functional.softmax(logits[j][i]).max().item(), 2))
-                        # print("------->:", p)
-
-                    labels_reformulate = [l for l in labels[n] if l != -100]
-                    print("D2Q- *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-                # self.train()
-
-            # add reparameterize
-            outputs.loss += self.model.encoder.embed_tokens.loss_KL
+        # if labels is not None:
+            # if steps % 50 == 0:
+            #     self.eval()
+            #     print(f"\nNLL: {outputs['loss']}\
+            #             \nKLD: {self.model.encoder.embed_tokens.loss_KL}")
+            #     with torch.no_grad():
+            #         # generate the normal one
+            #         n=input_ids_eval.size()[0]
+            #         out = self.generate_(
+            #                 input_ids_eval, 
+            #                 attention_mask=attention_mask_eval, 
+            #                 return_dict_in_generate=True,
+            #                 output_scores=True,
+            #                 num_beams=1
+            #         )
+            #         temp = out.sequences
+            #         logits = out.scores
+            #         labels_reformulate = [l for l in labels[0] if l != -100]
+            #         print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+            #         for i in range(self.n_samples):
+            #             print(f"D2Q ({self.samples_mapping[i]:<3}):", 
+            #                     self.tokenizer.decode(temp[i*n], skip_special_tokens=True)
+            #             )
+            #             p = []
+            #             for j in range(len(logits)):
+            #                 p.append(round(torch.nn.functional.softmax(logits[j][i]).max().item(), 2))
+            #             print("------->:", p)
+            #
+            #         labels_reformulate = [l for l in labels[n] if l != -100]
+            #         print("D2Q- *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+            #     self.train()
 
         return outputs
 

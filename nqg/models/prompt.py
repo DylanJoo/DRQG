@@ -13,6 +13,10 @@ from utils import kl_weight, kl_loss
 import copy
 
 class SoftEmbedding(nn.Module):
+
+    def get_KL_loss(self):
+        return self.loss
+
     def __init__(self,
                 wte: nn.Embedding,
                 n_prompts: int = 1,
@@ -37,6 +41,7 @@ class SoftEmbedding(nn.Module):
         self.hidden2logv = nn.Linear(hidden_size, latent_size, bias=False)
         self.latent2hidden = nn.Linear(latent_size, hidden_size, bias=False)
         self.latent_size = latent_size
+        self.loss = 0
 
     def set_gaussian_n_samples_for_generation(self, n_side: int):
         self.std_list = list(range(-n_side, n_side+1, 1))
@@ -68,7 +73,7 @@ class SoftEmbedding(nn.Module):
             loss = kl_loss(logv.view(-1, self.latent_size),
                            mean.view(-1, self.latent_size))
             weight = kl_weight(**kwargs)
-            self.loss_KL = loss * weight
+            self.loss = loss * weight
 
         # evaluation
         else: 
@@ -88,13 +93,13 @@ class SoftEmbedding(nn.Module):
                     torch.repeat_interleave(e_prompt_prime, batch_size, dim=0),
                     e_source.repeat(self.n_samples, 1, 1)
             ], 1)
+            self.loss = 0
 
         return e_input
 
 class SoftAdaptiveEmbedding(SoftEmbedding):
 
     def forward(self, tokens, is_train=False, **kwargs):
-        self.loss_KL = 0
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens) 
         # e_prompt = self.soft_prompt_embeds.unsqueeze(0) # 1, n_prompt, hidden
@@ -118,10 +123,13 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             ], 1)
 
             # compute loss
-            loss = kl_loss(logv.view(-1, self.latent_size),
-                           mean.view(-1, self.latent_size))
+            loss = kl_loss(
+                    logv.view(-1, self.latent_size),
+                    mean.view(-1, self.latent_size)
+            )
             weight = kl_weight(**kwargs)
-            self.loss_KL = loss * weight
+            self.loss = loss * weight
+
 
         # evaluation  # batch would be the same as number of passage 
         else: 
@@ -136,5 +144,6 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
                 e_prompt_prime.repeat(batch_size*self.n_samples, 1, 1), 
                 e_source.repeat(self.n_samples, 1, 1)
             ], 1)
+            self.loss = 0
 
         return e_input
