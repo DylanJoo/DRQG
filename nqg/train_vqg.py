@@ -43,7 +43,6 @@ class OurDataArguments:
     # Huggingface's original arguments. 
     dataset_config_name: Optional[str] = field(default=None)
     overwrite_cache: bool = field(default=False)
-    validation_split_percentage: Optional[int] = field(default=5)
     preprocessing_num_workers: Optional[int] = field(default=None)
     # Customized arguments
     train_file: Optional[str] = field(default=None)
@@ -72,7 +71,7 @@ class OurTrainingArguments(TrainingArguments):
     save_total_limit: Optional[int] = field(default=5)
     learning_rate: Optional[float] = field(default=5e-5)
     lr_scheduler_type: Union[str] = field(default='linear')
-    warmup_ratio: Union[float] = field(default=0.1)
+    warmup_ratio: Union[float] = field(default=0.0)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
 
@@ -88,16 +87,13 @@ def main():
         # [CONCERN] Deprecated? or any parser issue.
         hfmodel_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # additional config for models
+    # Config and Tokenizer
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
+    # Model: generation config
     from models import T5VQGSPT, BartVQGSPT
-    MODELS = {
-            "t5vqg": T5VQGSPT, 
-            'bartvqg': BartVQGSPT
-    }
-
+    MODELS = {"t5vqg": T5VQGSPT, 'bartvqg': BartVQGSPT}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
@@ -108,8 +104,8 @@ def main():
             vae_config=model_args,
             tokenizer=tokenizer
     )
+    # model.set_tokenzier() # TODO better impl. with set outside (?)
     
-    ## add generation config # bart has no config
     try:
         generation_config = GenerationConfig.from_pretrained(
                 hfmodel_args.config_name,
@@ -123,7 +119,7 @@ def main():
 
     model.generation_config = generation_config
 
-    ## data collator
+    # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
     from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
     DATACOLLATORS = {
