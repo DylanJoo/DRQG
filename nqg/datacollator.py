@@ -70,7 +70,7 @@ class DataCollatorForT5VQG:
         return inputs
 
 @dataclass
-class DataCollatorForT5PQG: # prompt-T5 generation
+class DataCollatorForPQG: 
     tokenizer: Union[PreTrainedTokenizerBase] = None
     padding: Union[bool, str, PaddingStrategy] = True
     truncation: Union[bool, str] = True
@@ -261,3 +261,39 @@ class DataCollatorForVQGDEV:
                 inputs['positive'] = [batch['positive'] for batch in features]
                 inputs['negative'] = [batch['negative'] for batch in features]
         return inputs
+
+@dataclass
+class DataCollatorBase:
+    tokenizer: Union[PreTrainedTokenizerBase] = None
+    prefix: str = ""
+    max_p_length: Optional[int] = 512
+    max_q_length: Optional[int] = 64
+    is_eval: bool = False
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        texts_p = [batch['passage'] for batch in features]
+        texts_q = [batch['positive'] for batch in features]
+
+        inputs = self.tokenizer(
+                [f"{self.prefix}{p}" for p in texts_p],
+                max_length=self.max_p_length,
+                truncation=True,
+                padding=True,
+                return_tensors='pt'
+        )
+        target_ids = self.tokenizer(
+                texts_q,
+                max_length=self.max_q_length,
+                padding=True,
+                return_tensors='pt'
+        ).input_ids
+        target_ids[target_ids == self.tokenizer.pad_token_id] = -100
+        inputs['labels'] = target_ids
+
+        if self.is_eval:
+            inputs['passage'] = texts_p
+            inputs['positive'] = texts_q
+
+        return inputs
+

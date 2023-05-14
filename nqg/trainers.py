@@ -5,7 +5,53 @@ import copy
 from torch.nn import CrossEntropyLoss, NLLLoss
 from torch.nn import functional as F
 
-class TrainerForVQG(Trainer):
+class TrainerBase(Trainer):
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        training_steps = copy.deepcopy(self.state.global_step)
+        if training_steps % 1000 == 0:
+            out=model.generate(inputs.input_ids)
+            print("D2Q: ", model.tokenizer.decode(
+                out[0], skip_special_tokens=True)
+            )
+        return super().compute_loss(model, inputs, return_outputs)
+
+    def _verbose_prediction(
+        self, 
+        model, 
+        input_ids, 
+        attention_mask, 
+        labels,
+    ):
+        model.eval()
+        with torch.no_grad():
+            # generate the normal one
+            n=input_ids.size()[0]
+            out = model.generate_(
+                    input_ids, 
+                    attention_mask=attention_mask, 
+                    return_dict_in_generate=True,
+                    output_scores=True,
+                    num_beams=1
+            )
+            temp = out.sequences
+            logits = out.scores
+            labels_reformulate = [l for l in labels[0] if l != -100]
+            print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+            for i in range(model.n_samples):
+                print(f"D2Q ({model.samples_mapping[i]:<3}):", 
+                        model.tokenizer.decode(temp[i*n], skip_special_tokens=True)
+                )
+                # p = []
+                # for j in range(len(logits)):
+                #     p.append(round(F.softmax(logits[j][i]).max().item(), 2))
+                # print("------->:", p)
+
+            labels_reformulate = [l for l in labels[n] if l != -100]
+            print("D2Q- *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+        model.train()
+
+class TrainerForVQG(TrainerBase):
 
     def compute_loss(self, model, inputs, return_outputs=False):
 
@@ -62,37 +108,3 @@ class TrainerForVQG(Trainer):
 
         return (loss, outputs) if return_outputs else loss
     
-    def _verbose_prediction(
-        self, 
-        model, 
-        input_ids, 
-        attention_mask, 
-        labels
-    ):
-        model.eval()
-        with torch.no_grad():
-            # generate the normal one
-            n=input_ids.size()[0]
-            out = model.generate_(
-                    input_ids, 
-                    attention_mask=attention_mask, 
-                    return_dict_in_generate=True,
-                    output_scores=True,
-                    num_beams=1
-            )
-            temp = out.sequences
-            logits = out.scores
-            labels_reformulate = [l for l in labels[0] if l != -100]
-            print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-            for i in range(model.n_samples):
-                print(f"D2Q ({model.samples_mapping[i]:<3}):", 
-                        model.tokenizer.decode(temp[i*n], skip_special_tokens=True)
-                )
-                # p = []
-                # for j in range(len(logits)):
-                #     p.append(round(F.softmax(logits[j][i]).max().item(), 2))
-                # print("------->:", p)
-
-            labels_reformulate = [l for l in labels[n] if l != -100]
-            print("D2Q- *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-        model.train()

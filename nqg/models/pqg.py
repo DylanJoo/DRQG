@@ -16,15 +16,8 @@ class T5PQG(T5ForConditionalGeneration):
     def set_tokenizer(self, tokenizer=None):
         self.tokenizer = tokenizer
 
-    def generate(self):
-        pass
-
 from transformers import BartForConditionalGeneration
 class BartPQG(BartForConditionalGeneration):
 
     def set_tokenizer(self, tokenizer=None):
         self.tokenizer = tokenizer
-
-    def generate(self):
-        pass
-

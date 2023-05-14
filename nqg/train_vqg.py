@@ -49,8 +49,6 @@ class OurDataArguments:
     eval_file: Optional[str] = field(default=None)
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
-    # collection: Optional[str] = field(default=None)
-    # p_centric_triplet: Optional[str] = field(default='triples.train.small.v1.sample.jsonl')
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -119,6 +117,17 @@ def main():
 
     model.generation_config = generation_config
 
+    # Model: freezing LM
+    if model_args.freeze_LM:
+        print('\nThe fine-tuned components:\n')
+        for name, param in model.named_parameters():
+            if any([p in name for p in optimized_prefix]):
+                print('param {}: {}'.format(name, param.grad))
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+
+
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
     from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
@@ -141,7 +150,6 @@ def main():
             is_train=True,
     )
 
-    # freezing parameters 
     # [NOTE] Failed (this might need warming up)
     # optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
     # [NOTE] OK-ish
@@ -149,27 +157,16 @@ def main():
     # [NOTE] the better one
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
 
-    if model_args.freeze_LM:
-        print('\nThe fine-tuned components:\n')
-        for name, param in model.named_parameters():
-            if any([p in name for p in optimized_prefix]):
-                print('param {}: {}'.format(name, param.grad))
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
-
-    # Dataset
+    # Data: dataset
     from data import msmarco, dragon
     DATASETS = {"msmarco": msmarco, 'dragon': dragon}
 
-    dataset_key = 'msmarco' # default
     for key in DATASETS:
         if key in data_args.train_file.lower():
             dataset_key = key
 
     dataset = DATASETS[dataset_key].passage_centric_dataset(data_args.train_file)
-
-    if training_args.do_eval is True:
+   if training_args.do_eval is True:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
                     test_size=99, train_size=min(len(dataset['train'])-99, 400000)

@@ -1,0 +1,25 @@
+    def doc2query(batch):
+        prefix = ""
+        # source
+        inputs = tokenizer(
+                [f"{prefix}{p}" for p in batch['passage']],
+                max_length=data_args.max_p_length,
+                truncation=True,
+                padding=True,
+                return_tensors='pt'
+        )
+        # target
+        target = tokenizer(
+                batch['positive'],
+                max_length=data_args.max_q_length,
+                padding=True,
+                return_tensors='pt'
+        )
+
+        target_ids = target['input_ids']
+        target_mask = target['attention_mask'].bool()
+        target_ids = target_ids.masked_fill(~target_mask, -100)
+        inputs['labels'] = target_ids
+        inputs['decoder_attention_mask'] = target_mask
+
+        return inputs
