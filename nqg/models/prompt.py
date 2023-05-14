@@ -102,25 +102,20 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
     def forward(self, tokens, is_train=False, **kwargs):
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens) 
-        # e_prompt = self.soft_prompt_embeds.unsqueeze(0) # 1, n_prompt, hidden
-        e_prompt = torch.mean(e_source, dim=1).unsqueeze(1).repeat(
-                1, self.n_prompts, 1
-        ) # bs, n_prompt, hidden
+        e_prompt = torch.mean(e_source, dim=1).unsqueeze(1)
+        # B, 1, hidden
 
         # Reparameterize
         if is_train: # variational with gaussian noises
-            mean = self.hidden2mean(e_prompt)
-            logv = self.hidden2logv(e_prompt)
+            mean = self.hidden2mean(e_prompt[:(batch_size//2), :, :])
+            logv = self.hidden2logv(e_prompt[:(batch_size//2), :, :])
             std = torch.exp(0.5*logv)
             r = torch.randn(mean.shape, device=e_source.device)
             z = torch.cat([mean, mean+r*std], 0) 
             e_prompt_prime = self.latent2hidden(z) 
 
             # Concat z to original embeddings
-            e_input = torch.cat([
-                e_prompt_prime.repeat(batch_size//2, 1, 1), 
-                e_source
-            ], 1)
+            e_input = torch.cat([e_prompt_prime, e_source], 1)
 
             # compute loss
             loss = kl_loss(
@@ -141,7 +136,7 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
 
             # Concat z to original embeddings
             e_input = torch.cat([
-                e_prompt_prime.repeat(batch_size*self.n_samples, 1, 1), 
+                e_prompt_prime,
                 e_source.repeat(self.n_samples, 1, 1)
             ], 1)
             self.loss = 0

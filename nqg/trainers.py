@@ -19,21 +19,23 @@ class TrainerForVQG(Trainer):
         # [NOTE] calculate losses with customized objectives
         logits = outputs.get("logits")
         labels = inputs.get("labels").to(logits.device)
+        # loss_gen = outputs.get("loss")
 
         ## (1) CE loss (MLE using argmax)
         # loss_fct = CrossEntropyLoss()
-        # masked_lm_loss = loss_fct(
+        # loss_gen = loss_fct(
         #         logits.view(-1, model.config.vocab_size), labels.view(-1)
         # )
 
         ## (2) CE loss (MLE using Gumbel softmax)
         loss_fct = NLLLoss()
         tau_hp = max(0.5, math.exp(-1*1e-5*training_steps))
-        log_probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
+        probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
         loss_gen = loss_fct(
-                log_probs_gumbel.log().view(-1, model.config.vocab_size), 
+                probs_gumbel.log().view(-1, model.config.vocab_size), 
                 labels.view(-1)
         )
+
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
         loss = loss_gen + loss_reparam
@@ -41,13 +43,16 @@ class TrainerForVQG(Trainer):
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
             print(f"\nNLL: {loss_gen}\nKLD: {loss_reparam}")
-
             bs = inputs['input_ids'].size()[0]
             inputs_for_eval = {
                     "input_ids": inputs['input_ids'][:(bs//2), :],
                     "attention_mask": inputs['attention_mask'][:(bs//2), :],
                     "labels": labels
             }
+
+            # print('\n')
+            # print(probs_gumbel.max(-1).values[:bs, :3], 
+            #         probs_gumbel.max(-1).values[bs:, :3])
             self._verbose_prediction(model, **inputs_for_eval)
 
         # Save past state if it exists

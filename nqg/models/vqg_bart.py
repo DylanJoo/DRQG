@@ -10,7 +10,12 @@ from torch.nn import CrossEntropyLoss
 
 from utils import kl_weight, kl_loss
 import copy
-from .prompt import SoftEmbedding
+from .prompt import SoftEmbedding, SoftAdaptiveEmbedding
+
+PROMPT_EMBEDS = {
+        'static': SoftEmbedding,
+        'adaptive': SoftAdaptiveEmbedding
+}
 
 class BartVQG(BartForConditionalGeneration):
     base_model_prefix = "model"
@@ -33,14 +38,14 @@ class BartVQG(BartForConditionalGeneration):
         }
 
         # soft prompting
-        self.prompts = SoftEmbedding(
+        self.prompts = PROMPT_EMBEDS[vae_config.pooling](
                 wte=self.model.shared, 
                 n_prompts=vae_config.n_soft_prompts,
                 initialize_from_vocab=vae_config.initialize_from_vocab,
                 hidden_size=config.d_model,
                 latent_size=vae_config.latent_size
         )
-        self.prompts.set_gaussian_n_samples_for_generation(5)
+        self.prompts.set_gaussian_n_samples_for_generation(vae_config.n_eval_samples)
         self.n_samples = self.prompts.n_samples
         self.samples_mapping = {i: std for i, std in enumerate(self.prompts.std_list)}
 
@@ -64,7 +69,7 @@ class BartVQG(BartForConditionalGeneration):
                 input_ids.view(-1, input_ids.size()[-1]),
                 is_train=(steps is not None),
                 **self.vae_kwargs, steps=steps
-        ) * self.model.encoder.embed_scale
+        ) 
         # attention_mask --> attention_mask (row expanded)
         if inputs_embeds.size(0) % input_ids.size(0) != 0:
             N = inputs_embeds.size(0) // (attn_mask.size(0)//2)

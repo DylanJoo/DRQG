@@ -1,3 +1,6 @@
+"""
+The datacollator for pcentric dataset.
+"""
 import random
 import torch
 from dataclasses import dataclass, field
@@ -17,6 +20,7 @@ class DataCollatorForT5VQG:
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     # spec
+    m_samples_per_example: int = 1
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -77,6 +81,7 @@ class DataCollatorForT5PQG: # prompt-T5 generation
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     # spec
+    m_samples_per_example: int = 1
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -139,6 +144,7 @@ class DataCollatorForVQGSPT:
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     # spec
+    m_samples_per_example: int = 1
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -197,7 +203,7 @@ class DataCollatorForVQGDEV:
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     # spec
-    n_samples_per_example: int = 2
+    m_samples_per_example: int = 2
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -206,10 +212,19 @@ class DataCollatorForVQGDEV:
         texts_pq = []
         texts_nq = []
 
+        """
+        Preparing (a) passage; (b) positive/ negative query 
+
+        # p: [(b1p * m; b2p * m .. bnp * m)] * 2
+        # q+: (b1q+1, b1q+2, ...b1q+m; b2q+1, b2q+2, ...b2q+m; bnq+1 ...)
+        # q-: (b1q-1, b1q-2, ...b1q-m; b2q-1, b2q-2, ...b2q-m; bnq-1 ...)
+        """
         for batch in features:
-            texts_p += [batch['passage']] * self.n_samples_per_example
-            texts_pq += batch['positive'][:self.n_samples_per_example]
-            texts_nq += batch['negative'][:self.n_samples_per_example]
+            texts_p += [batch['passage']] * self.m_samples_per_example
+
+        for batch in features:
+            texts_pq += batch['positive'][:self.m_samples_per_example]
+            texts_nq += batch['negative'][:self.m_samples_per_example]
 
         if self.is_train:
             inputs = self.tokenizer(

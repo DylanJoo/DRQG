@@ -31,6 +31,7 @@ class OurHFModelArguments:
 class OurModelArguments:
     pooling: str = field(default='static')
     n_soft_prompts: int = field(default=1)
+    n_eval_samples: int = field(default=5)
     latent_size: int = field(default=128)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
@@ -50,8 +51,7 @@ class OurDataArguments:
     eval_file: Optional[str] = field(default=None)
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
-    # collection: Optional[str] = field(default=None)
-    # p_centric_triplet: Optional[str] = field(default='triples.train.small.v1.sample.jsonl')
+    m_samples_per_example: int = field(default=1)
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -143,6 +143,7 @@ def main():
             max_length=data_args.max_p_length,
             return_tensors='pt',
             is_train=True,
+            m_samples_per_example=data_args.m_samples_per_example
     )
 
     # freezing parameters 

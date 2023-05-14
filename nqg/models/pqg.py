@@ -1,7 +1,3 @@
-"""
-TODO: Add a controller to switch the training mode to inference mode
-with positive/negative variational inference decoding.
-"""
 import torch
 from typing import Optional, Tuple, Union
 from transformers import T5ForConditionalGeneration, T5Config
@@ -131,23 +127,6 @@ class T5PQG(T5ForConditionalGeneration):
             loss_ce_neg = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels_neg.view(-1))
             # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
             loss = (loss_ce_pos + loss_ce_neg) / 2
-
-            # add varaiational losses
-            if steps % 50 == 0:
-                print(f"\nNLL: (positive) {loss_ce_pos}\t (negative) {loss_ce_neg}")
-                # inferece during training
-                if steps % 200 == 0:
-                    with torch.no_grad():
-                        temp=self.generate(input_ids)
-
-                        labels_reformulate = [l for l in labels[0] if l != -100]
-                        print("D2Q+:", self.tokenizer.decode(temp[0], skip_special_tokens=True))
-                        print("D2Q+*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-
-                        n=input_ids.shape[0]//2
-                        labels_reformulate = [l for l in labels[n] if l != -100]
-                        print("D2Q-:", self.tokenizer.decode(temp[n], skip_special_tokens=True))
-                        print("D2Q-*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
 
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs

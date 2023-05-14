@@ -21,9 +21,9 @@ python3 train_t5vqg.py \
   --max_steps 5000 \
   --save_steps 1000 \
   --eval_steps 1000 \
-  --freeze_LM false \
-  --pooling static \
-  --n_soft_prompts 10 \
+  --freeze_LM true \
+  --pooling adaptive \
+  --n_soft_prompts 1 \
   --latent_size 128 \
   --k 0.00025 \
   --x0 2000 \
