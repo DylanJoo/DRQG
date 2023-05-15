@@ -148,7 +148,7 @@ def main():
     # [NOTE] OK-ish
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
     # [NOTE] the better one
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')

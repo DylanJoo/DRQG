@@ -1,5 +1,5 @@
 export CUDA_VISIBLE_DEVICES=1
-MODEL=test
+MODEL=colbert-stat_10-Z_128-BS_4
 rm -rvf bartvqgspt/$MODEL
 PRT_MODEL=facebook/bart-base
 PRT_CONFIG=facebook/bart-base
