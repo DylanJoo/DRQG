@@ -9,18 +9,46 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.tokenization_utils_base import PaddingStrategy, PreTrainedTokenizerBase
 
 @dataclass
-class DataCollatorForT5VQG:
+class DataCollatorBase:
     tokenizer: Union[PreTrainedTokenizerBase] = None
+    pad_to_multiple_of: Optional[int] = None
     padding: Union[bool, str, PaddingStrategy] = True
     truncation: Union[bool, str] = True
-    max_length: Optional[int] = 512
-    pad_to_multiple_of: Optional[int] = None
+    max_p_length: Optional[int] = 512
+    max_q_length: Optional[int] = 64
     return_tensors: str = "pt"
-    padding: Union[bool, str] = True
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        texts_p = [batch['passage'] for batch in features]
+        texts_q = [batch['positive'] for batch in features]
+
+        inputs = self.tokenizer(
+                [f"{self.prefix}{p}" for p in texts_p],
+                max_length=self.max_p_length,
+                truncation=True,
+                padding=True,
+                return_tensors='pt'
+        )
+        target_ids = self.tokenizer(
+                texts_q,
+                max_length=self.max_q_length,
+                padding=True,
+                return_tensors='pt'
+        ).input_ids
+        target_ids[target_ids == self.tokenizer.pad_token_id] = -100
+        inputs['labels'] = target_ids
+
+        if self.is_eval:
+            inputs['passage'] = texts_p
+            inputs['positive'] = texts_q
+
+        return inputs
+
+@dataclass
+class DataCollatorForT5VQG(DataCollatorBase):
     is_train: Union[bool, str] = False
-    is_eval: Union[bool, str] = False
-    # spec
-    m_samples_per_example: int = 1
+    is_eval: bool = False
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -30,14 +58,10 @@ class DataCollatorForT5VQG:
         if self.is_train:
             texts_pq = [batch['positive'] for batch in features]
             texts_nq = [batch['negative'] for batch in features]
-            """
-            When training, a batch contains two passaegs, this is for 
-            optimizing NQG and PQF(doc2query) in the same batch with
-            discrepancy loss of same passage but different target.
-            """
+
             inputs = self.tokenizer(
                     [f"<extra_id_10> {p}" for p in texts_p] * 2 ,
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
@@ -57,7 +81,7 @@ class DataCollatorForT5VQG:
             """
             inputs = self.tokenizer(
                     [f"<extra_id_10> {p}" for p in texts_p],
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
@@ -71,17 +95,9 @@ class DataCollatorForT5VQG:
 
 @dataclass
 class DataCollatorForPQG: 
-    tokenizer: Union[PreTrainedTokenizerBase] = None
-    padding: Union[bool, str, PaddingStrategy] = True
-    truncation: Union[bool, str] = True
-    max_length: Optional[int] = 512
-    pad_to_multiple_of: Optional[int] = None
-    return_tensors: str = "pt"
-    padding: Union[bool, str] = True
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
-    # spec
-    m_samples_per_example: int = 1
+    prefix: str = ""
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -134,17 +150,8 @@ class DataCollatorForPQG:
 
 @dataclass
 class DataCollatorForVQGSPT:
-    tokenizer: Union[PreTrainedTokenizerBase] = None
-    padding: Union[bool, str, PaddingStrategy] = True
-    truncation: Union[bool, str] = True
-    max_length: Optional[int] = 512
-    pad_to_multiple_of: Optional[int] = None
-    return_tensors: str = "pt"
-    padding: Union[bool, str] = True
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
-    # spec
-    m_samples_per_example: int = 1
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -192,17 +199,9 @@ class DataCollatorForVQGSPT:
         return inputs
 
 @dataclass
-class DataCollatorForVQGDEV:
-    tokenizer: Union[PreTrainedTokenizerBase] = None
-    padding: Union[bool, str, PaddingStrategy] = True
-    truncation: Union[bool, str] = True
-    max_length: Optional[int] = 512
-    pad_to_multiple_of: Optional[int] = None
-    return_tensors: str = "pt"
-    padding: Union[bool, str] = True
+class DataCollatorForVQGDIV:
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
-    # spec
     m_samples_per_example: int = 2
     random_masking_ratio: Union[float] = 0
 
@@ -273,40 +272,5 @@ class DataCollatorForVQGDEV:
             if self.is_eval:
                 inputs['positive'] = [batch['positive'] for batch in features]
                 inputs['negative'] = [batch['negative'] for batch in features]
-        return inputs
-
-@dataclass
-class DataCollatorBase:
-    tokenizer: Union[PreTrainedTokenizerBase] = None
-    prefix: str = ""
-    max_p_length: Optional[int] = 512
-    max_q_length: Optional[int] = 64
-    is_eval: bool = False
-
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
-
-        texts_p = [batch['passage'] for batch in features]
-        texts_q = [batch['positive'] for batch in features]
-
-        inputs = self.tokenizer(
-                [f"{self.prefix}{p}" for p in texts_p],
-                max_length=self.max_p_length,
-                truncation=True,
-                padding=True,
-                return_tensors='pt'
-        )
-        target_ids = self.tokenizer(
-                texts_q,
-                max_length=self.max_q_length,
-                padding=True,
-                return_tensors='pt'
-        ).input_ids
-        target_ids[target_ids == self.tokenizer.pad_token_id] = -100
-        inputs['labels'] = target_ids
-
-        if self.is_eval:
-            inputs['passage'] = texts_p
-            inputs['positive'] = texts_q
-
         return inputs
 

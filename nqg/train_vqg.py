@@ -119,10 +119,8 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    # [NOTE] Failed (this might need warming up)
-    # optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
     # [NOTE] OK-ish
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
     # [NOTE] the better one
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
 
@@ -141,7 +139,7 @@ def main():
 
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
+    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDIV
     DATACOLLATORS = {
             "v0": DataCollatorForVQGSPT, 
             "v1": DataCollatorForVQGSPT, 

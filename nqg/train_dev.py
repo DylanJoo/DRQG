@@ -45,7 +45,6 @@ class OurModelArguments:
 class OurDataArguments:
     dataset_config_name: Optional[str] = field(default=None)
     overwrite_cache: bool = field(default=False)
-    validation_split_percentage: Optional[int] = field(default=5)
     preprocessing_num_workers: Optional[int] = field(default=None)
     # Customized arguments
     train_file: Optional[str] = field(default=None)
@@ -121,6 +120,25 @@ def main():
 
     model.generation_config = generation_config
 
+    # Model: freezing parameters 
+    # [NOTE] OK-ish
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    # [NOTE] the better one
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
+
+    if model_args.freeze_embeds is False:
+        optimized_prefix.append('shared')
+
+    if model_args.freeze_LM:
+        print('\nThe fine-tuned components:\n')
+        for name, param in model.named_parameters():
+            if any([p in name for p in optimized_prefix]):
+                print('param {}: {}'.format(name, param.grad))
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+
+
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
     from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
@@ -143,24 +161,6 @@ def main():
             m_samples_per_example=data_args.m_samples_per_example,
             random_masking_ratio=model_args.random_masking_ratio,
     )
-
-    # Model: freezing parameters 
-    # [NOTE] OK-ish
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
-    # [NOTE] the better one
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
-
-    if model_args.freeze_embeds is False:
-        optimized_prefix.append('shared')
-
-    if model_args.freeze_LM:
-        print('\nThe fine-tuned components:\n')
-        for name, param in model.named_parameters():
-            if any([p in name for p in optimized_prefix]):
-                print('param {}: {}'.format(name, param.grad))
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
 
     # Data: dataset
     from data import msmarco, dragon
