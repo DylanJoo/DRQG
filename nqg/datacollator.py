@@ -165,7 +165,7 @@ class DataCollatorForVQGSPT:
             )
 
             targets = self.tokenizer(
-                    [p for p in texts_pq+texts_nq],
+                    texts_pq + texts_nq,
                     padding=True,
                     return_tensors=self.return_tensors,
             )
@@ -179,12 +179,12 @@ class DataCollatorForVQGSPT:
 
         else:
             inputs = self.tokenizer(
-                    [p for p in texts_p],
+                    texts_p1,
                     max_length=self.max_length,
                     truncation=True,
                     return_tensors=self.return_tensors
             )
-            inputs['passage'] = texts_p
+            inputs['passage'] = texts_p1
 
             if self.is_eval:
                 inputs['positive'] = [batch['positive'] for batch in features]
@@ -204,6 +204,16 @@ class DataCollatorForVQGDEV:
     is_eval: Union[bool, str] = False
     # spec
     m_samples_per_example: int = 2
+    random_masking_ratio: Union[float] = 0
+
+    def random_masking(self, mat, half_mask=True):
+        # random mask for all 
+        if half_mask:
+            random_mask = (torch.rand(mat.shape) >= self.random_masking_ratio)
+            random_mask[:(mat.size()[0]//2), :] = True
+        else:
+            random_mask = (torch.rand(mat.shape) >= self.random_masking_ratio)
+        return mat * random_mask
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -223,8 +233,8 @@ class DataCollatorForVQGDEV:
             texts_p += [batch['passage']] * self.m_samples_per_example
 
         for batch in features:
-            texts_pq += batch['positive'][:self.m_samples_per_example]
-            texts_nq += batch['negative'][:self.m_samples_per_example]
+            texts_pq += (batch['positive']*self.m_samples_per_example)[:self.m_samples_per_example]
+            texts_nq += (batch['negative']*self.m_samples_per_example)[:self.m_samples_per_example]
 
         if self.is_train:
             inputs = self.tokenizer(
@@ -247,6 +257,9 @@ class DataCollatorForVQGDEV:
 
             inputs['labels'] = target_ids
             inputs['decoder_attention_mask'] = target_mask
+
+            if self.random_masking_ratio:
+                inputs['attention_mask'] = self.random_masking(inputs['attention_mask'], True)
 
         else:
             inputs = self.tokenizer(

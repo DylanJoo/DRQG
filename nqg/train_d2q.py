@@ -13,7 +13,7 @@ from transformers import (
 )
 
 import os
-os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "false"
 
 @dataclass
 class OurHFModelArguments:
@@ -79,8 +79,8 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model: backbone and pretrained 
-    from models import T5PQG, BartPQG
-    MODELS = {"t5pqg": T5PQG, "bartpqf": BartPQG}
+    from models import T5QG, BartQG
+    MODELS = {"t5": T5QG, "bart": BartQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
@@ -92,9 +92,7 @@ def main():
     
     # Model: generation config
     try:
-        generation_config = GenerationConfig.from_pretrained(
-                hfmodel_args.config_name
-        )
+        generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
     except:
         if 'bart' in hfmodel_args.config_name:
             generation_config = GenerationConfig.from_model_config(model.config)

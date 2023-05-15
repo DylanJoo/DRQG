@@ -10,6 +10,7 @@ from torch.nn import CrossEntropyLoss
 
 from utils import kl_weight, kl_loss
 import copy
+from .questiongenerator import BartQG
 from .prompt import SoftEmbedding, SoftAdaptiveEmbedding
 
 PROMPT_EMBEDS = {
@@ -17,7 +18,7 @@ PROMPT_EMBEDS = {
         'adaptive': SoftAdaptiveEmbedding
 }
 
-class BartVQG(BartForConditionalGeneration):
+class BartVQG(BartQG):
     base_model_prefix = "model"
     _keys_to_ignore_on_load_missing = [
         r"final_logits_bias",
@@ -26,64 +27,61 @@ class BartVQG(BartForConditionalGeneration):
         "decoder.embed_tokens.weight",
     ]
 
-    def __init__(self, config: BartConfig, vae_config=None, tokenizer=None):
+    def __init__(self, config: BartConfig, vqg_config=None):
         super().__init__(config)
 
         # Reparameterized initialization
-        self.tokenizer = tokenizer
-        self.n_soft_prompts = vae_config.n_soft_prompts
-        self.vae_kwargs = {
-                'annealing_fn': vae_config.annealing_fn, 
-                'k': vae_config.k, 'x0': vae_config.x0
-        }
+        self.n_soft_prompts = vqg_config.n_soft_prompts
 
         # soft prompting
-        self.prompts = PROMPT_EMBEDS[vae_config.pooling](
+        kwargs = {
+                'annealing_fn': vqg_config.annealing_fn, 
+                'k': vqg_config.k, 'x0': vqg_config.x0
+        }
+        self.prompts = PROMPT_EMBEDS[vqg_config.pooling](
                 wte=self.model.shared, 
-                n_prompts=vae_config.n_soft_prompts,
-                initialize_from_vocab=vae_config.initialize_from_vocab,
                 hidden_size=config.d_model,
-                latent_size=vae_config.latent_size
+                latent_size=vqg_config.latent_size,
+                n_prompts=vqg_config.n_soft_prompts,
+                **kwargs
         )
-        self.prompts.set_gaussian_n_samples_for_generation(vae_config.n_eval_samples)
-        self.n_samples = self.prompts.n_samples
-        self.samples_mapping = {i: std for i, std in enumerate(self.prompts.std_list)}
-
         self.model.encoder.set_input_embeddings(self.prompts)
         self.model.decoder.set_input_embeddings(self.model.shared)
-        print('Prompt embedding set finished.')
 
-        # sequence classification task
-        # self.classification_head = BartClassificationHead(
-        #     config.d_model,
-        #     config.d_model,
-        #     config.num_labels,
-        #     config.classifier_dropout,
-        # )
+        # set evaluation sample when inference temp results
+        # attrs: (1) n_samples (2) name_samples
+        self.set_n_eval_samples(n=vqg_config.n, n_side=vqg_config.n_side)
+        self.prompts.set_gaussian_range(self.name_samples)
+        print(f'Prompt embedding set finished with \
+                \n{self.n_samples} eval samples: {self.name_samples}.')
 
-        # Initialize weights and apply final processing
-
-    def _reparam_inputs(self, input_ids, attn_mask, steps=None):
-        # input_ids --> input_embeds (with reparameterization)
+    def reparam_inputs(self, input_ids, attn_mask, steps=None):
+        """
+        Transform the inputs to reparemterized inputs.
+        input_ids --> add variational prompts
+        attn_mask --> add prompt-length attention
+        """
+        # input_ids --> input_embeds 
         inputs_embeds = self.model.encoder.embed_tokens(
                 input_ids.view(-1, input_ids.size()[-1]),
-                is_train=(steps is not None),
-                **self.vae_kwargs, steps=steps
+                is_train=(steps is not None), 
+                steps=steps
         ) 
-        # attention_mask --> attention_mask (row expanded)
+        # attention_mask --> attention_mask 
         if inputs_embeds.size(0) % input_ids.size(0) != 0:
             N = inputs_embeds.size(0) // (attn_mask.size(0)//2)
-            attn_mask_ = attn_mask[:attn_mask.size(0)//2, :]
+            attn_mask_unit = attn_mask[:attn_mask.size(0)//2, :]
         else:
             N = inputs_embeds.size(0) // attn_mask.size(0)
-            attn_mask_ = attn_mask
+            attn_mask_unit = attn_mask
 
-        # attention_mask --> attention_mask (col expanded)
-        soft_attn_mask = torch.ones((attn_mask_.size(0), self.n_soft_prompts))
-        attn_mask_ = torch.cat([soft_attn_mask.to(attn_mask_.device), attn_mask_], 1)[:, :512]
-        attn_mask_new = attn_mask_.repeat(N, 1)
+        ## (row expanded) (col expanded)
+        soft_attn_mask_unit = torch.cat([
+            torch.ones((attn_mask_unit.size(0), self.n_soft_prompts)).to(attn_mask_unit.device),
+            attn_mask_unit
+        ], 1)
 
-        return inputs_embeds, attn_mask_new
+        return inputs_embeds, soft_attn_mask_unit.repeat(N, 1)
 
     def forward(
         self,
@@ -104,13 +102,11 @@ class BartVQG(BartForConditionalGeneration):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         steps: Optional[int] = None,
-        input_ids_eval: torch.LongTensor = None,
-        attention_mask_eval: Optional[torch.Tensor] = None,
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
         if encoder_outputs is None: # the first momnet when generating 
-            inputs_embeds, attention_mask_new = self._reparam_inputs(
+            inputs_embeds, attention_mask_new = self.reparam_inputs(
                     input_ids, attention_mask, steps
             )
         else:
@@ -119,7 +115,7 @@ class BartVQG(BartForConditionalGeneration):
 
         # standard enc-dec pipeline
         # TODO add classfication task head here
-        outputs = super().forward(
+        return super().forward(
                 input_ids=None, 
                 attention_mask=attention_mask_new,
                 decoder_input_ids=decoder_input_ids,
@@ -138,64 +134,8 @@ class BartVQG(BartForConditionalGeneration):
                 **kwargs
         )
 
-        # Loss
-        # if labels is not None:
-            # if steps % 50 == 0:
-            #     self.eval()
-            #     print(f"\nNLL: {outputs['loss']}\
-            #             \nKLD: {self.model.encoder.embed_tokens.loss_KL}")
-            #     with torch.no_grad():
-            #         # generate the normal one
-            #         n=input_ids_eval.size()[0]
-            #         out = self.generate_(
-            #                 input_ids_eval, 
-            #                 attention_mask=attention_mask_eval, 
-            #                 return_dict_in_generate=True,
-            #                 output_scores=True,
-            #                 num_beams=1
-            #         )
-            #         temp = out.sequences
-            #         logits = out.scores
-            #         labels_reformulate = [l for l in labels[0] if l != -100]
-            #         print("D2Q+ *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-            #         for i in range(self.n_samples):
-            #             print(f"D2Q ({self.samples_mapping[i]:<3}):", 
-            #                     self.tokenizer.decode(temp[i*n], skip_special_tokens=True)
-            #             )
-            #             p = []
-            #             for j in range(len(logits)):
-            #                 p.append(round(torch.nn.functional.softmax(logits[j][i]).max().item(), 2))
-            #             print("------->:", p)
-            #
-            #         labels_reformulate = [l for l in labels[n] if l != -100]
-            #         print("D2Q- *", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-            #     self.train()
-
-        return outputs
-
-    # TODO: Bart clf
-    # def _run_classification(self, hidden_states):
-    #     eos_mask = input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
-    #
-    #     if len(torch.unique_consecutive(eos_mask.sum(1))) > 1:
-    #         raise ValueError("All examples must have the same number of <eos> tokens.")
-    #     sentence_representation = hidden_states[eos_mask, :].view(
-    #             hidden_states.size(0), -1, hidden_states.size(-1))[:, -1, :]
-    #
-    #     logits = self.classification_head(sentence_representation)
-    #
-    #     # setting 1: similarity (ideally, first half contradicts the other)
-    #     loss_fct = CrossEntropyLoss()
-    #     loss = loss_fct(logits.view(-1, self.config.num_labels), labels.view(-1))
-    #     return loss
-
-    def generate_(
-        self, 
-        input_ids=None, 
-        attention_mask=None, 
-        **kwargs
-    ):
-        inputs_embeds, attention_mask_new = self._reparam_inputs(
+    def generate(self, input_ids=None, attention_mask=None, **kwargs):
+        inputs_embeds, attention_mask_new = self.reparam_inputs(
                 input_ids, attention_mask, steps=None
         )
         return super().generate(

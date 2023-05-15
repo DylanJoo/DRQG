@@ -1,7 +1,6 @@
 for MODEL in t5vqgspt/*;do
     DIR=evaluation/$MODEL
     mkdir -p $DIR
-
     python3 inference.py \
         --model_name google/t5-v1_1-small \
         --model_path $MODEL/checkpoint-5000 \

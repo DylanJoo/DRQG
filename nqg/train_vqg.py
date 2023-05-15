@@ -19,7 +19,6 @@ os.environ["WANDB_DISABLED"] = "false"
 
 @dataclass
 class OurHFModelArguments:
-    # Huggingface's original arguments
     model_name_or_path: Optional[str] = field(default=None)
     config_name: Optional[str] = field(default=None)
     tokenizer_name: Optional[str] = field(default=None)
@@ -36,11 +35,13 @@ class OurModelArguments:
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
     freeze_LM: bool = field(default=False)
+    freeze_embeds: bool = field(default=False)
     initialize_from_vocab: bool = field(default=False)
+    n: int = field(default=1)
+    n_side: int = field(default=None)
 
 @dataclass
 class OurDataArguments:
-    # Huggingface's original arguments. 
     dataset_config_name: Optional[str] = field(default=None)
     overwrite_cache: bool = field(default=False)
     preprocessing_num_workers: Optional[int] = field(default=None)
@@ -49,10 +50,10 @@ class OurDataArguments:
     eval_file: Optional[str] = field(default=None)
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
+    m_samples_per_example: int = field(default=1)
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
-    # Huggingface's original arguments. 
     output_dir: str = field(default='./temp')
     seed: int = field(default=42)
     data_seed: int = field(default=None)
@@ -89,9 +90,9 @@ def main():
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
-    # Model: generation config
-    from models import T5VQGSPT, BartVQGSPT
-    MODELS = {"t5vqg": T5VQGSPT, 'bartvqg': BartVQGSPT}
+    # Model
+    from models import T5VQG, BartVQG
+    MODELS = {"t5": T5VQG, 'bart': BartVQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
@@ -99,11 +100,11 @@ def main():
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
-            vae_config=model_args,
-            tokenizer=tokenizer
+            vqg_config=model_args
     )
-    # model.set_tokenzier() # TODO better impl. with set outside (?)
+    model.set_tokenizer(tokenizer)
     
+    # Model: generation config
     try:
         generation_config = GenerationConfig.from_pretrained(
                 hfmodel_args.config_name,
@@ -118,6 +119,16 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
+    # [NOTE] Failed (this might need warming up)
+    # optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    # [NOTE] OK-ish
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
+    # [NOTE] the better one
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
+
+    if model_args.freeze_embeds is False:
+        optimized_prefix.append('shared')
+
     if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')
         for name, param in model.named_parameters():
@@ -137,7 +148,6 @@ def main():
             "vl": DataCollatorForVQGDEV
     }
 
-    datacollator_key = 'v0' # default
     for key in DATACOLLATORS:
         if key in data_args.train_file.lower():
             datacollator_key = key
@@ -164,9 +174,9 @@ def main():
     for key in DATASETS:
         if key in data_args.train_file.lower():
             dataset_key = key
-
     dataset = DATASETS[dataset_key].passage_centric_dataset(data_args.train_file)
-   if training_args.do_eval is True:
+
+    if training_args.do_eval is True:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
                     test_size=99, train_size=min(len(dataset['train'])-99, 400000)

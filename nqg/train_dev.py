@@ -1,6 +1,4 @@
-"""
-NOTE: this is made for processing version List pcentric datsaet.
-"""
+""" NOTE: this is made for processing version List pcentric datsaet.  """
 import sys
 import multiprocessing
 from dataclasses import dataclass, field
@@ -14,7 +12,6 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from trainers import TrainerForVQG
 from datasets import load_dataset
 
 import os
@@ -22,7 +19,6 @@ os.environ["WANDB_DISABLED"] = "false"
 
 @dataclass
 class OurHFModelArguments:
-    # Huggingface's original arguments
     model_name_or_path: Optional[str] = field(default=None)
     config_name: Optional[str] = field(default=None)
     tokenizer_name: Optional[str] = field(default=None)
@@ -34,17 +30,19 @@ class OurHFModelArguments:
 class OurModelArguments:
     pooling: str = field(default='static')
     n_soft_prompts: int = field(default=1)
-    n_eval_samples: int = field(default=5)
     latent_size: int = field(default=128)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
     freeze_LM: bool = field(default=False)
+    freeze_embeds: bool = field(default=False)
     initialize_from_vocab: bool = field(default=False)
+    n: int = field(default=1)
+    n_side: int = field(default=None)
+    random_masking_ratio: Optional[float] = field(default=None)
 
 @dataclass
 class OurDataArguments:
-    # Huggingface's original arguments. 
     dataset_config_name: Optional[str] = field(default=None)
     overwrite_cache: bool = field(default=False)
     validation_split_percentage: Optional[int] = field(default=5)
@@ -58,7 +56,6 @@ class OurDataArguments:
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
-    # Huggingface's original arguments. 
     output_dir: str = field(default='./temp')
     seed: int = field(default=42)
     data_seed: int = field(default=None)
@@ -75,7 +72,7 @@ class OurTrainingArguments(TrainingArguments):
     save_total_limit: Optional[int] = field(default=5)
     learning_rate: Optional[float] = field(default=5e-5)
     lr_scheduler_type: Union[str] = field(default='linear')
-    warmup_ratio: Union[float] = field(default=0.1)
+    warmup_ratio: Union[float] = field(default=0.0)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
 
@@ -91,15 +88,13 @@ def main():
         # [CONCERN] Deprecated? or any parser issue.
         hfmodel_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # additional config for models
+    # Config and Tokenizer
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
-    from models import T5VQGSPT, BartVQGSPT
-    MODELS = {
-            "t5vqg": T5VQGSPT, 
-            'bartvqg': BartVQGSPT
-    }
+    # Model
+    from models import T5VQG, BartVQG
+    MODELS = {"t5": T5VQG, 'bart': BartVQG}
 
     for key in MODELS:
         if key in training_args.output_dir.lower():
@@ -108,11 +103,11 @@ def main():
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
-            vae_config=model_args,
-            tokenizer=tokenizer
+            vqg_config=model_args
     )
+    model.set_tokenizer(tokenizer)
     
-    ## add generation config # bart has no config
+    # Model: generation config
     try:
         generation_config = GenerationConfig.from_pretrained(
                 hfmodel_args.config_name,
@@ -126,7 +121,7 @@ def main():
 
     model.generation_config = generation_config
 
-    ## data collator
+    # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
     from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
     DATACOLLATORS = {
@@ -135,7 +130,6 @@ def main():
             "vl": DataCollatorForVQGDEV
     }
 
-    datacollator_key = 'v0' # default
     for key in DATACOLLATORS:
         if key in data_args.train_file.lower():
             datacollator_key = key
@@ -146,16 +140,18 @@ def main():
             max_length=data_args.max_p_length,
             return_tensors='pt',
             is_train=True,
-            m_samples_per_example=data_args.m_samples_per_example
+            m_samples_per_example=data_args.m_samples_per_example,
+            random_masking_ratio=model_args.random_masking_ratio,
     )
 
-    # freezing parameters 
-    # [NOTE] Failed (this might need warming up)
-    # optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    # Model: freezing parameters 
     # [NOTE] OK-ish
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
-    # [NOTE] the better one
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
+    # [NOTE] the better one
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+
+    if model_args.freeze_embeds is False:
+        optimized_prefix.append('shared')
 
     if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')
@@ -166,11 +162,10 @@ def main():
             else:
                 param.requires_grad = False
 
-    # Dataset
+    # Data: dataset
     from data import msmarco, dragon
     DATASETS = {"msmarco": msmarco, 'dragon': dragon}
 
-    dataset_key = 'msmarco' # default
     for key in DATASETS:
         if key in data_args.train_file.lower():
             dataset_key = key
@@ -189,6 +184,7 @@ def main():
         dataset['test'] = None
 
     # Trainer
+    from trainers import TrainerForVQG
     trainer = TrainerForVQG(
             model=model, 
             args=training_args,

@@ -1,4 +1,4 @@
-MODEL=doc2query-bart-msmarco
+MODEL=doc2query-bartqg-msmarco
 mkdir -p $MODEL
 
 export CUDA_VISIBLE_DEVICES=1

@@ -1,6 +1,5 @@
 export CUDA_VISIBLE_DEVICES=2
 
-# VQG v0
 python3 train_t5pqg.py \
   --model_name_or_path t5-base \
   --tokenizer_name t5-base \

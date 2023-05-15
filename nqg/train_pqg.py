@@ -1,7 +1,7 @@
 import sys
 import multiprocessing
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 from transformers import (
     AutoConfig,
@@ -73,23 +73,20 @@ def main():
     else:
         hfmodel_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-# from trainers import TrainerForT5
-# from datacollator import DataCollatorForT5PQG
-# import msmarco 
-
     # Config and Tokenizer 
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model: backbone and pretrained 
-    from models import T5PQG, BartPQG
-    MODELS = {"t5pqg": T5PQG, "bartpqf": BartPQG}
+    from models import T5QG, BartQG
+    MODELS = {"t5": T5QG, "bartqg": BartQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
 
     model = MODELS[key].from_pretrained(
-            hfmodel_args.model_name_or_path, config=config, 
+            hfmodel_args.model_name_or_path, 
+            config=config, 
     )
     model.set_tokenizer(tokenizer)
     
@@ -101,6 +98,7 @@ def main():
     except:
         if 'bart' in hfmodel_args.config_name:
             generation_config = GenerationConfig.from_model_config(model.config)
+
     model.generation_config = generaiton_config
     # generation_config.update(
     #     _from_model_config=False,
@@ -109,24 +107,37 @@ def main():
     # )
 
     # Data: collator
-    from datacollator import DataCollatorForVQGSPT
-    data_collator = DataCollatorForT5PQG(
+    from datacollator import DataCollatorForPQG, DataCollatorBase
+    # DataCollatorForPQG: 
+    # `positive question generation: passage: {p}` -> `{q}`
+    # `negative question generation: passage: {p}` -> `{q}`
+    data_collator = DataCollatorForPQG(
             tokenizer=tokenizer, 
             padding=True,
-            return_tensors='pt',
             is_train=True
+            return_tensors='pt',
     )
 
-    # Trainer
-    dataset = msmarco.passage_centric_triplet_dataset(data_args)
-    N = len(dataset['train'])
-    if training_args.do_eval and data_args.eval_file is None:
-        # split 0.1% for evaluation
-        dataset = dataset['train'].train_test_split(test_size=0.001)
+    # Data: dataset
+    from data import msmarco, dragon
+    DATASETS = {"msmarco": msmarco, "dragon": dragon}
+    for key in DATASETS:
+        if key in data_args.train_file.lower():
+            dataset_key = key
+    dataset = DATASETS[dataset_key].passage_centric_triplet_dataset(data_args.train_file)
+
+    if training_args.do_eval is True:
+        if data_args.eval_file is None:
+        dataset = dataset['train'].train_test_split(
+                test_size=99, train_size=min(len(dataset['train'])-99, 400000)
+        )
+        else:
+            dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
     else:
-        dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
+        dataset['test'] = None
 
 
+    # Trainer
     trainer = TrainerForT5(
             model=model, 
             args=training_args,

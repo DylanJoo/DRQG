@@ -11,8 +11,10 @@ from transformers import T5ForConditionalGeneration
 from datacollator import DataCollatorForT5VQG
 from utils import interpolate
 
-from models import T5VQGV0, T5VQGV1, T5PQG, T5VQGSPT, T5VQGDEV
+from models import *
+# T5VQGV0, T5VQGV1, T5PQG, T5VQGSPT, T5VQGDEV
 from models import VAE_CONFIG
+
 class QuestionGenerator:
 
     def __init__(self, 
@@ -32,14 +34,6 @@ class QuestionGenerator:
         #`num_beams`, `do_sample`, `top_k`
 
     def __call__(self, **batch):
-        """
-        This generation is for variational inference.
-
-        Returns
-        -------
-        Each return object is a dictionary of prediction;
-        The key(index) represents the batch examples.
-        """
         batch_size = batch['input_ids'].size(0)
 
         ## TODO sepeare each type of generation: 
@@ -58,6 +52,12 @@ class QuestionGenerator:
             enc_output.last_hidden_state = hidden_states_prime
             outputs = self.model.generate(
                     encoder_outputs=enc_output,
+                    **self.generation_config
+            )
+        elif isinstance(self.model, T5VQGSPT):
+            outputs = self.model.generate(
+                    batch['input_ids'],
+                    attention_mask=batch['attention_mask'],
                     **self.generation_config
             )
         elif isinstance(self.model, T5VQGSPT):
