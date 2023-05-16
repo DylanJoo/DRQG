@@ -1,21 +1,25 @@
-export CUDA_VISIBLE_DEVICES=1
-MODEL=colbert-stat_10-Z_128-BS_4
-rm -rvf bartvqgspt/$MODEL
-PRT_MODEL=facebook/bart-base
+export CUDA_VISIBLE_DEVICES=0
+BASE=bartvqgspt
+MODEL=colbert-warm-ada_50-Z_128-BS_12
+# BASE=bartvqg-test-movebos-100
+# MODEL=yes/
+
+rm -rvf $BASE/$MODEL
+PRT_MODEL=bartqg-d2q/checkpoint-8000/
 PRT_CONFIG=facebook/bart-base
 
 python3 train_vqg.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
-  --output_dir bartvqgspt/$MODEL \
+  --output_dir $BASE/$MODEL \
   --max_p_length 256 \
   --max_q_length 16 \
-  --per_device_train_batch_size 4 \
+  --per_device_train_batch_size 12 \
   --m_samples_per_example 1 \
   --n_side 5 \
   --evaluation_strategy steps \
-  --learning_rate 2e-5 \
+  --learning_rate 1e-3 \
   --lr_scheduler_type constant \
   --train_file /home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.v1.jsonl \
   --max_steps 10000 \
@@ -23,14 +27,11 @@ python3 train_vqg.py \
   --eval_steps 1000 \
   --freeze_LM true \
   --freeze_embeds false \
-  --warmup_steps 1000 \
   --pooling static \
-  --n_soft_prompts 10 \
+  --n_soft_prompts 50 \
   --latent_size 128 \
   --k 0.5 \
-  --x0 1000 \
+  --x0 100 \
   --annealing logistic \
   --do_train \
   --do_eval 
-  # --random_masking_ratio 0.0 \
-  # --train_file /home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v1.jsonl \

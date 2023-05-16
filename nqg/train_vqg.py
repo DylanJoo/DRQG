@@ -11,7 +11,6 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from trainers import TrainerForVQG
 from datasets import load_dataset
 
 import os
@@ -34,11 +33,13 @@ class OurModelArguments:
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
-    freeze_LM: bool = field(default=False)
-    freeze_embeds: bool = field(default=False)
+    freeze_LM: bool = field(default=True)
+    freeze_embeds: bool = field(default=True)
+    freeze_first_layer: bool = field(default=True)
     initialize_from_vocab: bool = field(default=False)
     n: int = field(default=1)
     n_side: int = field(default=None)
+    random_masking_ratio: Optional[float] = field(default=None)
 
 @dataclass
 class OurDataArguments:
@@ -122,10 +123,13 @@ def main():
     # [NOTE] OK-ish
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
     # [NOTE] the better one
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
+    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')
+
+    if model_args.freeze_first_layer is False:
+        optimized_prefix.append('encoder.layers.0')
 
     if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')
@@ -143,7 +147,7 @@ def main():
     DATACOLLATORS = {
             "v0": DataCollatorForVQGSPT, 
             "v1": DataCollatorForVQGSPT, 
-            "vl": DataCollatorForVQGDEV
+            "vl": DataCollatorForVQGDIV
     }
 
     for key in DATACOLLATORS:
@@ -153,17 +157,10 @@ def main():
     data_collator = DATACOLLATORS[datacollator_key](
             tokenizer=tokenizer, 
             padding=True,
-            max_length=data_args.max_p_length,
+            max_p_length=data_args.max_p_length,
             return_tensors='pt',
             is_train=True,
     )
-
-    # [NOTE] Failed (this might need warming up)
-    # optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
-    # [NOTE] OK-ish
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'decoder']
-    # [NOTE] the better one
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt', 'shared']
 
     # Data: dataset
     from data import msmarco, dragon
@@ -186,6 +183,7 @@ def main():
         dataset['test'] = None
 
     # Trainer
+    from trainers import TrainerForVQG
     trainer = TrainerForVQG(
             model=model, 
             args=training_args,

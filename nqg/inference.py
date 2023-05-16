@@ -80,7 +80,7 @@ if __name__ == "__main__":
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=128, type=int)
 
-    ## the unused parameters
+    ## the model parameters
     parser.add_argument("--k", default=0.0025, type=float) 
     parser.add_argument("--x0", default=2500, type=int)
     parser.add_argument("--annealing_fn", default='logistic')
@@ -110,6 +110,7 @@ if __name__ == "__main__":
             latent_size=args.latent_size, 
             n_soft_prompts=args.n_soft_prompts,
             n_side=args.n_side_tail,
+            pooling='adaptive' if 'ada' in args.model_path else 'static'
     )
 
     for key in MODELS:
@@ -127,22 +128,13 @@ if __name__ == "__main__":
     dataset = load_dataset("json", data_files=args.input_jsonl)['train']
 
     # Data: datacollator
-    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
-    DATACOLLATORS = {
-            "v0": DataCollatorForVQGSPT,
-            "v1": DataCollatorForVQGSPT,
-            "vl": DataCollatorForVQGDEV
-    }
-    for key in DATACOLLATORS:
-        if key in args.input_jsonl:
-            datacollator_key = key
-
-    data_collator = DATACOLLATORS[datacollator_key](
+    from datacollator import DataCollatorForVQGSPT
+    data_collator = DataCollatorForVQGSPT(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
-            max_length=args.max_p_length,
-            is_train=False,
+            max_p_length=args.max_p_length,
+            max_q_length=args.max_q_length,
             is_eval=True # to check the ground truth
     )
 

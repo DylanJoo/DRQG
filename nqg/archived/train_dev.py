@@ -1,4 +1,3 @@
-""" NOTE: this is made for processing version List pcentric datsaet.  """
 import sys
 import multiprocessing
 from dataclasses import dataclass, field
@@ -120,7 +119,7 @@ def main():
 
     model.generation_config = generation_config
 
-    # Model: freezing parameters 
+    # Model: freezing LM
     # [NOTE] OK-ish
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
     # [NOTE] the better one
@@ -141,11 +140,11 @@ def main():
 
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDEV
+    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDIV
     DATACOLLATORS = {
             "v0": DataCollatorForVQGSPT, 
             "v1": DataCollatorForVQGSPT, 
-            "vl": DataCollatorForVQGDEV
+            "vl": DataCollatorForVQGDIV
     }
 
     for key in DATACOLLATORS:
