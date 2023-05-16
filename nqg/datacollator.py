@@ -17,6 +17,8 @@ class DataCollatorBase:
     max_p_length: Optional[int] = 512
     max_q_length: Optional[int] = 64
     return_tensors: str = "pt"
+    is_eval: Union[bool] = False
+    prefix: str = ""
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -94,7 +96,7 @@ class DataCollatorForT5VQG(DataCollatorBase):
         return inputs
 
 @dataclass
-class DataCollatorForPQG: 
+class DataCollatorForPQG(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     prefix: str = ""
@@ -128,7 +130,7 @@ class DataCollatorForPQG:
             inputs1 = self.tokenizer(
                     [f"positive question generation: passage: {p}" \
                             for p in texts_p],
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
@@ -136,7 +138,7 @@ class DataCollatorForPQG:
             inputs0 = self.tokenizer(
                     [f"negative question generation: passage: {p}" \
                             for p in texts_p],
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
@@ -149,7 +151,7 @@ class DataCollatorForPQG:
             return inputs, inputs1, inputs0
 
 @dataclass
-class DataCollatorForVQGSPT:
+class DataCollatorForVQGSPT(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
 
@@ -165,7 +167,7 @@ class DataCollatorForVQGSPT:
 
             inputs = self.tokenizer(
                     texts_p1 + texts_p0,
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
@@ -187,7 +189,7 @@ class DataCollatorForVQGSPT:
         else:
             inputs = self.tokenizer(
                     texts_p1,
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     return_tensors=self.return_tensors
             )
@@ -199,7 +201,7 @@ class DataCollatorForVQGSPT:
         return inputs
 
 @dataclass
-class DataCollatorForVQGDIV:
+class DataCollatorForVQGDIV(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     m_samples_per_example: int = 2
@@ -238,7 +240,7 @@ class DataCollatorForVQGDIV:
         if self.is_train:
             inputs = self.tokenizer(
                     texts_p + texts_p,
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
                     return_tensors=self.return_tensors
@@ -263,7 +265,7 @@ class DataCollatorForVQGDIV:
         else:
             inputs = self.tokenizer(
                     [p for p in texts_p],
-                    max_length=self.max_length,
+                    max_length=self.max_p_length,
                     truncation=True,
                     return_tensors=self.return_tensors
             )

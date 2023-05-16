@@ -35,11 +35,11 @@ class SoftEmbedding(nn.Module):
 
         if initialize_from_vocab:
             self.prompt_embeds = nn.Parameter(
-                    self.orig_embeds.weight[-n_prompts:].clone().detach()
+                    self.orig_embeds.weight[-self.n_prompts:].clone().detach()
             )
         else:
             self.prompt_embeds = nn.Parameter(
-                    torch.rand((n_prompts, hidden_size), device=wte.weight.device)-0.5
+                    torch.rand((self.n_prompts, hidden_size), device=wte.weight.device)-0.5
             )
 
         self.hidden2mean = nn.Linear(hidden_size, latent_size, bias=False)
@@ -54,7 +54,11 @@ class SoftEmbedding(nn.Module):
         as exact mini-batch during training; while evaluation batch is unmodified."""
 
         batch_size, seq_length = tokens.shape
-        e_source = self.orig_embeds(tokens)        
+
+        # bos = self.orig_embeds(torch.tensor([1], device=tokens.device)).unsqueeze(0)
+        # e_source = self.orig_embeds(tokens[:, 1:])        
+
+        e_source = self.orig_embeds(tokens)
         e_prompt = self.prompt_embeds.unsqueeze(0) 
 
         if is_train:
@@ -65,6 +69,7 @@ class SoftEmbedding(nn.Module):
             r = torch.randn(mean.shape, device=e_source.device)
             z = torch.cat([mean, mean+r*std], 0)
             e_prompt_prime = self.latent2hidden(z) 
+
             e_input = torch.cat([
                 torch.repeat_interleave(e_prompt_prime, batch_size//2, dim=0),
                 e_source 
@@ -82,6 +87,7 @@ class SoftEmbedding(nn.Module):
             std = torch.exp(0.5*logv)
             z = torch.cat([mean+std*i for i in self.std_list], 0)
             e_prompt_prime = self.latent2hidden(z)
+
             e_input = torch.cat([
                     torch.repeat_interleave(e_prompt_prime, batch_size, dim=0),
                     e_source.repeat(len(self.std_list), 1, 1)
@@ -90,21 +96,26 @@ class SoftEmbedding(nn.Module):
             self.kld_loss = 0
             self.kld_weight = 0
 
+        # return torch.cat([bos.repeat(e_input.size()[0], 1, 1), e_input], 1)
         return e_input
 
 class SoftAdaptiveEmbedding(SoftEmbedding):
 
     def forward(self, tokens, is_train=False, steps=1):
         batch_size, seq_length = tokens.shape
-        e_source = self.orig_embeds(tokens) 
+
+        # bos = self.orig_embeds(torch.tensor([1], device=tokens.device)).unsqueeze(0)
+        # e_source = self.orig_embeds(tokens[:, 1:])        
+        e_source = self.orig_embeds(tokens)
         e_prompt = self.prompt_embeds.unsqueeze(0) 
 
         # mean pooling
-        e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
-        e_adaprompt = e_prompt + e_pooled
+        # e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
+
         # max pooling
-        # e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
-        # e_prompt= e_prompt_ + torch.max(e_source, dim=1).values.unsqueeze(1)
+        e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
+
+        e_adaprompt = e_prompt + e_pooled
         # B, n_prompts, hidden
 
         # Reparameterize
@@ -142,4 +153,5 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             self.kld_loss = 0
             self.kld_weight = 0
 
+        # return torch.cat([bos.repeat(e_input.size()[0], 1, 1), e_input], 1)
         return e_input
