@@ -25,3 +25,4 @@ class VQG_CONFIG:
     initialize_from_vocab: bool = field(default=False)
     n: int = field(default=None)
     n_side: int = field(default=5)
+    attentive_pooler: Optional[str] = field(default=None)

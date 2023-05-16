@@ -1,17 +1,11 @@
-"""
-TODO: tidy up imported modules
-"""
-# import torch
-# from typing import Optional, Tuple, Union
-# from transformers.models.t5.modeling_t5 import T5Stack
-# from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
-# from torch import nn
-# from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
-# from utils import kl_weight, kl_loss
-# import copy
+from transformers import T5ForConditionalGeneration, BartForConditionalGeneration
+from transformers.models.t5.modeling_t5 import T5Stack
+from transformers.models.bart.modeling_bart import BartEncoderLayer
 
-from transformers import T5ForConditionalGeneration
 class T5QG(T5ForConditionalGeneration):
+
+    def get_pooler(self, config=None):
+        return T5Block(config)
 
     def set_n_eval_samples(self, n=None, n_side=None):
         self.name_samples = list(range(n))
@@ -24,8 +18,10 @@ class T5QG(T5ForConditionalGeneration):
     def set_tokenizer(self, tokenizer=None):
         self.tokenizer = tokenizer
 
-from transformers import BartForConditionalGeneration
 class BartQG(BartForConditionalGeneration):
+
+    def get_pooler(self, config=None):
+        return BartEncoderLayer(config)
 
     def set_tokenizer(self, tokenizer=None):
         self.tokenizer = tokenizer

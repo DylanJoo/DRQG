@@ -11,11 +11,12 @@ from torch.nn import CrossEntropyLoss
 from utils import kl_weight, kl_loss
 import copy
 from .questiongenerator import BartQG
-from .prompt import SoftEmbedding, SoftAdaptiveEmbedding
+from .prompt import SoftEmbedding, SoftAdaptiveEmbedding, SoftAttentiveEmbedding
 
 PROMPT_EMBEDS = {
         'static': SoftEmbedding,
-        'adaptive': SoftAdaptiveEmbedding
+        'adaptive': SoftAdaptiveEmbedding,
+        'attentive': SoftAttentiveEmbedding
 }
 
 class BartVQG(BartQG):
@@ -34,15 +35,24 @@ class BartVQG(BartQG):
         self.n_soft_prompts = vqg_config.n_soft_prompts
 
         # soft prompting
+        ## config
         kwargs = {
                 'annealing_fn': vqg_config.annealing_fn, 
-                'k': vqg_config.k, 'x0': vqg_config.x0
+                'k': vqg_config.k, 'x0': vqg_config.x0,
         }
+        ## pooler
+        if vqg_config.add_attentive_pooler:
+            pooler = self.get_pooler(config)
+        else:
+            pooler = None
+
+        ## prompt layer
         self.prompts = PROMPT_EMBEDS[vqg_config.pooling](
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
                 n_prompts=vqg_config.n_soft_prompts,
+                pooler=pooler,
                 **kwargs
         )
         self.model.encoder.set_input_embeddings(self.prompts)

@@ -5,7 +5,6 @@ import torch
 import inspect
 from typing import Optional, Tuple, Union, Dict, Any
 from transformers import T5ForConditionalGeneration, T5Config
-from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 from torch import nn
 from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
@@ -27,6 +26,7 @@ class SoftEmbedding(nn.Module):
             latent_size: int = 128, 
             n_prompts: int = 1,
             initialize_from_vocab: bool = False, 
+            pooler: Optional[object] = None,
             **kwargs
         ):
         super(SoftEmbedding, self).__init__()
@@ -46,6 +46,7 @@ class SoftEmbedding(nn.Module):
         self.hidden2logv = nn.Linear(hidden_size, latent_size, bias=False)
         self.latent2hidden = nn.Linear(latent_size, hidden_size, bias=False)
         self.latent_size = latent_size
+        self.pooler = pooler
         self.kld_kwargs = kwargs
 
     def forward(self, tokens, is_train=False, steps=1):
@@ -155,3 +156,16 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
 
         # return torch.cat([bos.repeat(e_input.size()[0], 1, 1), e_input], 1)
         return e_input
+
+class SoftAttentiveEmbedding(SoftEmbedding):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        assert self.pooler is not None, \
+                'the pooler was not succesfully assigned.'
+        print(self.pooler)
+
+    def forward(self, tokens, is_train=False, steps=1):
+        e_input = super().forward(tokens, is_train, steps)
+        pooled_output = self.pooler(e_input, None, None)[0]
+        return pooled_output

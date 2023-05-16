@@ -57,13 +57,13 @@ class TrainerBase(Trainer):
 
 class TrainerForVQG(TrainerBase):
 
-    def random_attention(self, mat, half_mask=True):
-        if half_mask:
-            random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
-            random_mask[:(mat.size()[0]//2), :] = True
-        else:
-            random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
-        return mat * random_mask
+    # def random_attention(self, mat, half_mask=True):
+    #     if half_mask:
+    #         random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
+    #         random_mask[:(mat.size()[0]//2), :] = True
+    #     else:
+    #         random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
+    #     return mat * random_mask
 
     def compute_loss(self, model, inputs, return_outputs=False):
 

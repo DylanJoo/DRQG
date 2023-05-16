@@ -40,6 +40,7 @@ class OurModelArguments:
     n: int = field(default=1)
     n_side: int = field(default=None)
     random_masking_ratio: Optional[float] = field(default=None)
+    add_attentive_pooler: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
@@ -98,6 +99,7 @@ def main():
         if key in training_args.output_dir.lower():
             model_key = key
 
+    # Model: Enc-Dec
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
@@ -123,7 +125,7 @@ def main():
     # [NOTE] OK-ish
     optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
     # [NOTE] the better one
-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+    optimized_prefix = ['embed_tokens']
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')
