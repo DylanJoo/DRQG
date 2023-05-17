@@ -1,7 +1,7 @@
 BASE=bartvqg
 # for MODEL in ${BASE}/*;do
 
-for MODEL in $BASE/colbert-warm-attn_1-BS_4x3-*;do
+for MODEL in $BASE/*attn_50-BS*;do
     EVAL_DATA=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.sample.jsonl
     DIR=evaluation/$MODEL
     mkdir -p $DIR
@@ -17,7 +17,7 @@ for MODEL in $BASE/colbert-warm-attn_1-BS_4x3-*;do
         --latent_size 128 \
         --max_q_length 32 \
         --max_p_length 128 \
-        --n_soft_prompts 1 \
+        --n_soft_prompts 50 \
         --pooling attentive \
         --has_attentive_pooler true \
         --n_side_tail 10  \

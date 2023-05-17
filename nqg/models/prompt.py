@@ -101,7 +101,13 @@ class SoftEmbedding(nn.Module):
         return e_input
 
 class SoftAdaptiveEmbedding(SoftEmbedding):
-
+    """
+    [ORIG] Adopt the pooling layer before reparameterization.
+    [NOTE] Adopt the pooling layer after reparameterization.
+        - 1. max pooling with mulitplication
+        - 2. max pooling with addition
+        - 3. self attention layer with multiplcation
+    """
     def forward(self, tokens, is_train=False, steps=1):
         batch_size, seq_length = tokens.shape
 
@@ -163,9 +169,16 @@ class SoftAttentiveEmbedding(SoftEmbedding):
         super().__init__(**kwargs)
         assert self.pooler is not None, \
                 'the pooler was not succesfully assigned.'
-        print(self.pooler)
 
     def forward(self, tokens, is_train=False, steps=1):
+        seq_length = tokens.size()[-1]
         e_input = super().forward(tokens, is_train, steps)
         pooled_output = self.pooler(e_input, None, None)[0]
+
+        ## [DEBUG] concat the original e_inputs
+        # pooled_output = torch.cat([
+        #     pooled_output[:, :self.n_prompts, :], 
+        #     e_input[:, self.n_prompts:, :]
+        # ], 1)
+
         return pooled_output

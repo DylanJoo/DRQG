@@ -4,6 +4,12 @@ from transformers.models.bart.modeling_bart import BartEncoderLayer
 
 class T5QG(T5ForConditionalGeneration):
 
+    def __init__(self, config, **kwargs):
+        super().__init__(config)
+        if len(kwargs) != 0:
+            print(f"{kwargs} would not be used in this model.")
+        self.n_samples = 1
+
     def get_pooler(self, config=None):
         return T5Block(config)
 
@@ -19,6 +25,12 @@ class T5QG(T5ForConditionalGeneration):
         self.tokenizer = tokenizer
 
 class BartQG(BartForConditionalGeneration):
+
+    def __init__(self, config, **kwargs):
+        super().__init__(config)
+        if len(kwargs) != 0:
+            print(f"{kwargs} would not be used in this model.")
+        self.n_samples = 1
 
     def get_pooler(self, config=None):
         return BartEncoderLayer(config)
