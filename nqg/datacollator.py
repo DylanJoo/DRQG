@@ -1,7 +1,6 @@
 """
 The datacollator for pcentric dataset.
 """
-import random
 import torch
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, Tuple, Any
@@ -205,16 +204,6 @@ class DataCollatorForVQGDIV(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     m_samples_per_example: int = 2
-    random_masking_ratio: Union[float] = 0
-
-    def random_masking(self, mat, half_mask=True):
-        # random mask for all 
-        if half_mask:
-            random_mask = (torch.rand(mat.shape) >= self.random_masking_ratio)
-            random_mask[:(mat.size()[0]//2), :] = True
-        else:
-            random_mask = (torch.rand(mat.shape) >= self.random_masking_ratio)
-        return mat * random_mask
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -258,9 +247,6 @@ class DataCollatorForVQGDIV(DataCollatorBase):
 
             inputs['labels'] = target_ids
             inputs['decoder_attention_mask'] = target_mask
-
-            if self.random_masking_ratio:
-                inputs['attention_mask'] = self.random_masking(inputs['attention_mask'], True)
 
         else:
             inputs = self.tokenizer(

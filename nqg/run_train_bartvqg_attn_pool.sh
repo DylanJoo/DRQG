@@ -1,12 +1,11 @@
 export CUDA_VISIBLE_DEVICES=1
-BASE=bartvqg-test
-MODEL=colbert-warm-attn_10-Z_128-BS_4x3
-# BASE=bartvqg-test-movebos-100
-# MODEL=yes/
 
-rm -rvf $BASE/$MODEL
-PRT_MODEL=bartqg-d2q/checkpoint-8000/
+BASE=bartvqg
+MODEL=colbert-warm-attn_1-BS_4x3-bart_d2q-ep2
+PRT_MODEL=bartqg-d2q/checkpoint-16000/
 PRT_CONFIG=facebook/bart-base
+
+TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
 
 python3 train_vqg.py \
   --model_name_or_path $PRT_MODEL \
@@ -21,7 +20,7 @@ python3 train_vqg.py \
   --evaluation_strategy steps \
   --learning_rate 1e-3 \
   --lr_scheduler_type constant \
-  --train_file /home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl \
+  --train_file $TRAIN_FILE \
   --max_steps 10000 \
   --save_steps 1000 \
   --eval_steps 1000 \
@@ -32,7 +31,7 @@ python3 train_vqg.py \
   --n_soft_prompts 1 \
   --latent_size 128 \
   --k 0.5 \
-  --x0 1000 \
+  --x0 2000 \
   --annealing logistic \
   --do_train \
   --do_eval 

@@ -39,8 +39,8 @@ class OurModelArguments:
     initialize_from_vocab: bool = field(default=False)
     n: int = field(default=1)
     n_side: int = field(default=None)
-    random_masking_ratio: Optional[float] = field(default=None)
     add_attentive_pooler: bool = field(default=False)
+    # random_masking_ratio: Optional[float] = field(default=None)
 
 @dataclass
 class OurDataArguments:

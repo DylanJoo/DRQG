@@ -80,17 +80,19 @@ if __name__ == "__main__":
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=128, type=int)
 
-    ## the model parameters
+    ## the VAE parameters (useless)
     parser.add_argument("--k", default=0.0025, type=float) 
     parser.add_argument("--x0", default=2500, type=int)
     parser.add_argument("--annealing_fn", default='logistic')
 
-    # generation type
-    parser.add_argument("--generation_type", default='gaussian', type=str)
+    ## the model hyper paramters
+    parser.add_argument("--n_soft_prompts", default=1, type=int)
+    parser.add_argument("--n_side_tail", default=0, type=int)
+    parser.add_argument("--pooling", default='static', type=str)
+    parser.add_argument("--has_attentive_pooler", default=False, type=bool)
 
     # generation config
-    parser.add_argument("--n_soft_prompts", default=20, type=int)
-    parser.add_argument("--n_side_tail", default=0, type=int)
+    parser.add_argument("--generation_type", default='gaussian', type=str)
     parser.add_argument("--num_beams", default=1, type=int)
     parser.add_argument("--max_q_length", default=100, type=int)
     parser.add_argument("--max_p_length", default=256, type=int)
@@ -110,7 +112,8 @@ if __name__ == "__main__":
             latent_size=args.latent_size, 
             n_soft_prompts=args.n_soft_prompts,
             n_side=args.n_side_tail,
-            pooling='adaptive' if 'ada' in args.model_path else 'static'
+            pooling=args.pooling,
+            add_attentive_pooler=args.has_attentive_pooler
     )
 
     for key in MODELS:

@@ -42,14 +42,6 @@ class TrainerBase(Trainer):
                 print(f"D2Q ({model.name_samples[i]:<3}):", 
                         model.tokenizer.decode(temp[i*n], skip_special_tokens=True)
                 )
-                # p = []
-                # for j in range(len(logits)):
-                #     p.append(round(F.softmax(logits[j][i*n], -1).argmax().item(), 2))
-                # print("------->:", p)
-                # p = []
-                # for j in range(len(logits)):
-                #     p.append(round(F.softmax(logits[j][i*n], -1).max().item(), 2))
-                # print("------->:", p)
 
             labels_reformulate = [l for l in labels[n] if l != -100]
             print("D2Q- *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))

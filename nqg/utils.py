@@ -73,7 +73,9 @@ def transform_pred_to_good_read(path_jsonl, path_txt):
 
         for key in data:
             fw.write(f"{key}:\n")
-            qlist = [f"{i+1}\t{q}" for (i, q) in enumerate(data[key])]
+            n_side = (len(data[key])-1) // 2
+            sigma_map = list(range(-n_side, n_side+1, 1))
+            qlist = [f"{sigma_map[i]}\t{q}" for (i, q) in enumerate(data[key])]
             fw.write("\n".join(qlist))
             fw.write("\n\n")
 
