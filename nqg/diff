@@ -1,0 +1,648 @@
+diff --git a/nqg/datacollator.py b/nqg/datacollator.py
+index aa06dd4..23868d0 100644
+--- a/nqg/datacollator.py
++++ b/nqg/datacollator.py
+@@ -1,7 +1,7 @@
+-"""
+-The datacollator for pcentric dataset.
++""" The datacollator for pcentric dataset.
+ """
+ import torch
++import random
+ from dataclasses import dataclass, field
+ from typing import Optional, Union, List, Dict, Tuple, Any
+ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+@@ -18,11 +18,18 @@ class DataCollatorBase:
+     return_tensors: str = "pt"
+     is_eval: Union[bool] = False
+     prefix: str = ""
++    irrelevant_included: bool = field(default=False)
+ 
+     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+ 
+         texts_p = [batch['passage'] for batch in features]
+-        texts_q = [batch['positive'] for batch in features]
++
++        texts_q1 = [batch['positive'] for batch in features]
++        texts_q0 = [batch['negative'] for batch in features]
++
++        if self.irrelevant_included: 
++            texts_q = [random.sample((q1, q0), k=1)[0] \
++                    for q1, q0 in zip(texts_q1, texts_q0)]
+ 
+         inputs = self.tokenizer(
+                 [f"{self.prefix}{p}" for p in texts_p],
+@@ -42,7 +49,8 @@ class DataCollatorBase:
+ 
+         if self.is_eval:
+             inputs['passage'] = texts_p
+-            inputs['positive'] = texts_q
++            inputs['positive'] = texts_q1
++            inputs['negative'] = texts_q0
+ 
+         return inputs
+ 
+@@ -224,7 +232,7 @@ class DataCollatorForVQGDIV(DataCollatorBase):
+ 
+         for batch in features:
+             texts_pq += (batch['positive']*self.m_samples_per_example)[:self.m_samples_per_example]
+-            texts_nq += (batch['negative']*self.m_samples_per_example)[:self.m_samples_per_example]
++            texts_nq += (batch['negative'][::-1]*self.m_samples_per_example)[:self.m_samples_per_example]
+ 
+         if self.is_train:
+             inputs = self.tokenizer(
+diff --git a/nqg/models/prompt.py b/nqg/models/prompt.py
+index 042151d..a9a0214 100644
+--- a/nqg/models/prompt.py
++++ b/nqg/models/prompt.py
+@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Union, Dict, Any
+ from transformers import T5ForConditionalGeneration, T5Config
+ from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
+ from torch import nn
+-from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
++from torch.nn import CrossEntropyLoss
+ from utils import kl_weight, kl_loss
+ import copy
+ 
+@@ -30,6 +30,7 @@ class SoftEmbedding(nn.Module):
+             **kwargs
+         ):
+         super(SoftEmbedding, self).__init__()
++        # [NOTE] If prepending <s> is needed
+         self.n_prompts = n_prompts
+         self.orig_embeds = wte
+ 
+@@ -39,7 +40,7 @@ class SoftEmbedding(nn.Module):
+             )
+         else:
+             self.prompt_embeds = nn.Parameter(
+-                    torch.rand((self.n_prompts, hidden_size), device=wte.weight.device)-0.5
++                    torch.rand((self.n_prompts, hidden_size), device=wte.weight.device)
+             )
+ 
+         self.hidden2mean = nn.Linear(hidden_size, latent_size, bias=False)
+@@ -48,6 +49,7 @@ class SoftEmbedding(nn.Module):
+         self.latent_size = latent_size
+         self.pooler = pooler
+         self.kld_kwargs = kwargs
++        self.norm = nn.BatchNorm1d(hidden_size)
+ 
+     def forward(self, tokens, is_train=False, steps=1):
+         """ `training` and `evaluation/prediction` phrases have diff setups. 
+@@ -56,9 +58,7 @@ class SoftEmbedding(nn.Module):
+ 
+         batch_size, seq_length = tokens.shape
+ 
+-        # bos = self.orig_embeds(torch.tensor([1], device=tokens.device)).unsqueeze(0)
+-        # e_source = self.orig_embeds(tokens[:, 1:])        
+-
++        bos = self.orig_embeds(torch.tensor([1], device=tokens.device)).unsqueeze(0)
+         e_source = self.orig_embeds(tokens)
+         e_prompt = self.prompt_embeds.unsqueeze(0) 
+ 
+@@ -69,16 +69,19 @@ class SoftEmbedding(nn.Module):
+             std = torch.exp(0.5*logv)
+             r = torch.randn(mean.shape, device=e_source.device)
+             z = torch.cat([mean, mean+r*std], 0)
+-            e_prompt_prime = self.latent2hidden(z) 
++            e = self.latent2hidden(z) 
++
++            # [reshape]
++            e = e.repeat_interleave(batch_size//2, dim=0)
++            # e_source was done
++            bos = bos.repeat(batch_size, 1, 1)
+ 
+-            e_input = torch.cat([
+-                torch.repeat_interleave(e_prompt_prime, batch_size//2, dim=0),
+-                e_source 
+-            ], 1)
++            # e_input = torch.cat([bos, e, e_source[:, 1:, :]], 1)
++            e_input = torch.cat([e, e_source], 1)
+ 
+             # compute loss
+             loss = kl_loss(logv.view(-1, self.latent_size),
+-                           mean.view(-1, self.latent_size))
++                           mean.view(-1, self.latent_size)) 
+             self.kld_loss = loss
+             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
+ 
+@@ -87,17 +90,19 @@ class SoftEmbedding(nn.Module):
+             logv = self.hidden2logv(e_prompt)
+             std = torch.exp(0.5*logv)
+             z = torch.cat([mean+std*i for i in self.std_list], 0)
+-            e_prompt_prime = self.latent2hidden(z)
++            e = self.latent2hidden(z)
+ 
+-            e_input = torch.cat([
+-                    torch.repeat_interleave(e_prompt_prime, batch_size, dim=0),
+-                    e_source.repeat(len(self.std_list), 1, 1)
+-            ], 1)
++            # [reshape]
++            e = e.repeat_interleave(batch_size, dim=0)
++            e_source = e_source.repeat(len(self.std_list), 1, 1)
++            bos = bos.repeat(batch_size*len(self.std_list), 1, 1)
++
++            # e_input = torch.cat([bos, e, e_source[:, 1:, :]], 1)
++            e_input = torch.cat([e, e_source], 1)
+ 
+             self.kld_loss = 0
+             self.kld_weight = 0
+ 
+-        # return torch.cat([bos.repeat(e_input.size()[0], 1, 1), e_input], 1)
+         return e_input
+ 
+ class SoftAdaptiveEmbedding(SoftEmbedding):
+@@ -111,31 +116,31 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
+     def forward(self, tokens, is_train=False, steps=1):
+         batch_size, seq_length = tokens.shape
+ 
+-        # bos = self.orig_embeds(torch.tensor([1], device=tokens.device)).unsqueeze(0)
+         # e_source = self.orig_embeds(tokens[:, 1:])        
+         e_source = self.orig_embeds(tokens)
+         e_prompt = self.prompt_embeds.unsqueeze(0) 
+ 
+-        # mean pooling
+-        # e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
+-
+-        # max pooling
+-        e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
+-
+-        e_adaprompt = e_prompt + e_pooled
+-        # B, n_prompts, hidden
++        # [pooling]
++        ## mean
++        e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
++        ## max (2B, 1, H)
++        # e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
+ 
+-        # Reparameterize
++        # [reparameterize]
+         if is_train: # variational with gaussian noises
+-            mean = self.hidden2mean(e_adaprompt[:(batch_size//2), :, :])
+-            logv = self.hidden2logv(e_adaprompt[:(batch_size//2), :, :])
++            mean = self.hidden2mean(e_prompt)
++            logv = self.hidden2logv(e_prompt)
+             std = torch.exp(0.5*logv)
+             r = torch.randn(mean.shape, device=e_source.device)
+             z = torch.cat([mean, mean+r*std], 0) 
+-            e_adaprompt_prime = self.latent2hidden(z) 
++            e = self.latent2hidden(z) 
++
++            # [reshape]
++            e = e.repeat_interleave(batch_size//2, dim=0)
++            e = e + e_pooled
+ 
+             # Concat z to original embeddings
+-            e_input = torch.cat([e_adaprompt_prime, e_source], 1)
++            e_input = torch.cat([e, e_source], 1)
+ 
+             # compute loss
+             loss = kl_loss(
+@@ -145,22 +150,27 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
+             self.kld_loss = loss
+             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
+ 
++            e_input = self.norm(e_input)
++
+         else: 
+-            mean = self.hidden2mean(e_adaprompt)
+-            logv = self.hidden2logv(e_adaprompt)
++            mean = self.hidden2mean(e_prompt)
++            logv = self.hidden2logv(e_prompt)
+             std = torch.exp(0.5*logv)
+             z = torch.cat([mean+std*i for i in self.std_list], 0)
+-            e_adaprompt_prime = self.latent2hidden(z)
++            e = self.latent2hidden(z) 
++
++            # [reshape]
++            e = e.repeat_interleave(batch_size, dim=0)
++            e = e + e_pooled.repeat(len(self.std_list), 1, 1)
++            e = self.norm(e)
+ 
+             # Concat z to original embeddings
+-            e_input = torch.cat([
+-                e_adaprompt_prime,
+-                e_source.repeat(len(self.std_list), 1, 1)
+-            ], 1)
++            e_input = torch.cat([e, e_source.repeat(len(self.std_list), 1, 1)], 1)
++
++            # compute loss
+             self.kld_loss = 0
+             self.kld_weight = 0
+ 
+-        # return torch.cat([bos.repeat(e_input.size()[0], 1, 1), e_input], 1)
+         return e_input
+ 
+ class SoftAttentiveEmbedding(SoftEmbedding):
+@@ -175,10 +185,84 @@ class SoftAttentiveEmbedding(SoftEmbedding):
+         e_input = super().forward(tokens, is_train, steps)
+         pooled_output = self.pooler(e_input, None, None)[0]
+ 
++        return pooled_output
++
++class SoftAdaptiveEmbeddingDev(SoftEmbedding):
++    def forward(self, tokens, is_train=False, steps=1):
++        seq_length = tokens.size()[-1]
++        e_input = super().forward(tokens, is_train, steps)
++
++        # encoder attention
++        # pooled_output, attn_weights, _ =  self.pooler(e_input, None, None)
++
++        # decoder attention
++        pooled_output, attn_weights, _ =  self.pooler(
++                e_input, 
++                e_input[:, :self.n_prompts], 
++                None
++        )
++
+         ## [DEBUG] concat the original e_inputs
+-        # pooled_output = torch.cat([
+-        #     pooled_output[:, :self.n_prompts, :], 
+-        #     e_input[:, self.n_prompts:, :]
+-        # ], 1)
++        pooled_output = torch.cat([
++            pooled_output[:, :self.n_prompts, :], 
++            e_input[:, self.n_prompts:, :]
++        ], 1)
+ 
+         return pooled_output
++
++# old version of dev
++# class SoftAdaptiveEmbeddingDev(SoftEmbedding):
++#     def forward(self, tokens, is_train=False, steps=1):
++#         batch_size, seq_length = tokens.shape
++#
++#         # e_source = self.orig_embeds(tokens[:, 1:])        
++#         e_source = self.orig_embeds(tokens)
++#         e_prompt = self.prompt_embeds.unsqueeze(0) 
++#
++#         # mean pooling
++#         # e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
++#         # max pooling
++#         # e_prompt = torch.max(e_source, dim=1).values.unsqueeze(1)
++#         # (2B, 1, H)
++#         e = torch.cat([e_prompt.repeat(batch_size, 1, 1), e_source], 1)
++#
++#         # Reparameterize
++#         if is_train: # variational with gaussian noises
++#             mean = self.hidden2mean(e[:(batch_size//2)])
++#             logv = self.hidden2logv(e[:(batch_size//2)])
++#             std = torch.exp(0.5*logv)
++#             r = torch.randn(mean.shape, device=e_source.device)
++#             z = torch.cat([mean, mean+r*std], 0) 
++#             e_input = self.latent2hidden(z) 
++#
++#             # Concat z to original embeddings
++#             # e_input = torch.cat([
++#             #     e_prompt_prime,
++#             #     e_source
++#             # ], 1)
++#
++#             # compute loss
++#             loss = kl_loss(
++#                     logv.view(-1, self.latent_size),
++#                     mean.view(-1, self.latent_size)
++#             )
++#             self.kld_loss = loss
++#             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
++#
++#         else: 
++#             mean = self.hidden2mean(e)
++#             logv = self.hidden2logv(e)
++#             std = torch.exp(0.5*logv)
++#             z = torch.cat([mean+std*i for i in self.std_list], 0)
++#             e_input = self.latent2hidden(z)
++#
++#             # Concat z to original embeddings
++#             # e_input = torch.cat([
++#             #     e_prompt_prime,
++#             #     e_source.repeat(len(self.std_list), 1, 1)
++#             # ], 1)
++#
++#             self.kld_loss = 0
++#             self.kld_weight = 0
++#
++#         return e_input
+diff --git a/nqg/models/questiongenerator.py b/nqg/models/questiongenerator.py
+index a888927..60d8f3e 100644
+--- a/nqg/models/questiongenerator.py
++++ b/nqg/models/questiongenerator.py
+@@ -1,6 +1,6 @@
+ from transformers import T5ForConditionalGeneration, BartForConditionalGeneration
+ from transformers.models.t5.modeling_t5 import T5Stack
+-from transformers.models.bart.modeling_bart import BartEncoderLayer
++from transformers.models.bart.modeling_bart import BartEncoderLayer, BartAttention
+ 
+ class T5QG(T5ForConditionalGeneration):
+ 
+@@ -11,7 +11,7 @@ class T5QG(T5ForConditionalGeneration):
+         self.n_samples = 1
+ 
+     def get_pooler(self, config=None):
+-        return T5Block(config)
++        return T5Stack(config)
+ 
+     def set_n_eval_samples(self, n=None, n_side=None):
+         self.name_samples = list(range(n))
+@@ -33,7 +33,13 @@ class BartQG(BartForConditionalGeneration):
+         self.n_samples = 1
+ 
+     def get_pooler(self, config=None):
+-        return BartEncoderLayer(config)
++        # return BartEncoderLayer(config)
++        return BartAttention(
++                embed_dim=config.d_model,
++                num_heads=config.decoder_attention_heads,
++                dropout=0,
++                is_decoder=True,
++        )
+ 
+     def set_tokenizer(self, tokenizer=None):
+         self.tokenizer = tokenizer
+diff --git a/nqg/models/variationalquestiongenerator.py b/nqg/models/variationalquestiongenerator.py
+index b759d56..41f1702 100644
+--- a/nqg/models/variationalquestiongenerator.py
++++ b/nqg/models/variationalquestiongenerator.py
+@@ -11,12 +11,13 @@ from torch.nn import CrossEntropyLoss
+ from utils import kl_weight, kl_loss
+ import copy
+ from .questiongenerator import BartQG
+-from .prompt import SoftEmbedding, SoftAdaptiveEmbedding, SoftAttentiveEmbedding
++from .prompt import SoftEmbedding, SoftAdaptiveEmbedding, SoftAttentiveEmbedding, SoftAdaptiveEmbeddingDev
+ 
+ PROMPT_EMBEDS = {
+         'static': SoftEmbedding,
+         'adaptive': SoftAdaptiveEmbedding,
+-        'attentive': SoftAttentiveEmbedding
++        'attentive': SoftAttentiveEmbedding,
++        'test': SoftAdaptiveEmbeddingDev
+ }
+ 
+ class BartVQG(BartQG):
+diff --git a/nqg/run_infer.sh b/nqg/run_infer.sh
+index 5a2ada7..f779e0b 100644
+--- a/nqg/run_infer.sh
++++ b/nqg/run_infer.sh
+@@ -1,7 +1,7 @@
+-BASE=bartvqg
++BASE=bartvqgspt
+ # for MODEL in ${BASE}/*;do
+ 
+-for MODEL in $BASE/*attn_50-BS*;do
++for MODEL in $BASE/testing;do
+     EVAL_DATA=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.sample.jsonl
+     DIR=evaluation/$MODEL
+     mkdir -p $DIR
+@@ -17,27 +17,28 @@ for MODEL in $BASE/*attn_50-BS*;do
+         --latent_size 128 \
+         --max_q_length 32 \
+         --max_p_length 128 \
+-        --n_soft_prompts 50 \
++        --n_soft_prompts 10 \
+         --pooling attentive \
+         --has_attentive_pooler true \
+         --n_side_tail 10  \
+-        --do_sample --top_k 10 
++        --num_beams 1
++        # --do_sample --top_k 10 
+ 
+-    python3 inference.py \
+-        --model_name facebook/bart-base \
+-        --model_path $MODEL/checkpoint-10000 \
+-        --input_jsonl $EVAL_DATA \
+-        --output_jsonl $DIR/triples.eval.small.v0.bs.pred.jsonl \
+-        --generation_type gaussian \
+-        --flags prediction  \
+-        --device cuda:1 \
+-        --batch_size 1 \
+-        --latent_size 128 \
+-        --max_q_length 32 \
+-        --max_p_length 128 \
+-        --n_soft_prompts 1 \
+-        --pooling attentive \
+-        --has_attentive_pooler true \
+-        --n_side_tail 10  \
+-        --num_beams 5
++    # python3 inference.py \
++    #     --model_name facebook/bart-base \
++    #     --model_path $MODEL/checkpoint-10000 \
++    #     --input_jsonl $EVAL_DATA \
++    #     --output_jsonl $DIR/triples.eval.small.v0.bs.pred.jsonl \
++    #     --generation_type gaussian \
++    #     --flags prediction  \
++    #     --device cuda:1 \
++    #     --batch_size 1 \
++    #     --latent_size 128 \
++    #     --max_q_length 32 \
++    #     --max_p_length 128 \
++    #     --n_soft_prompts 1 \
++    #     --pooling attentive \
++    #     --has_attentive_pooler true \
++    #     --n_side_tail 10  \
++    #     --num_beams 5
+ done
+diff --git a/nqg/run_train_bartd2q.sh b/nqg/run_train_bartd2q.sh
+index a203c99..3fbef48 100644
+--- a/nqg/run_train_bartd2q.sh
++++ b/nqg/run_train_bartd2q.sh
+@@ -1,4 +1,4 @@
+-MODEL=doc2query-bartqg-msmarco
++MODEL=bartqg-d2q/generalized/
+ mkdir -p $MODEL
+ 
+ export CUDA_VISIBLE_DEVICES=1
+@@ -15,7 +15,10 @@ python3 train_d2q.py \
+   --learning_rate 1e-4 \
+   --warmup_steps 4000 \
+   --per_device_train_batch_size 64 \
+-  --train_file /home/jhju/datasets/msmarco.triples_train_small/doc_query_pairs.train.jsonl \
++  --train_file /home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.jsonl \
++  --irrelevant_included true \
+   --max_steps 20000 \
+-  --save_steps 8000 \
++  --save_steps 4000 \
+   --do_train 
++# relevant: /home/jhju/datasets/msmarco.triples_train_small/doc_query_pairs.train.jsonl 
++# generalized: /home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.jsonl
+diff --git a/nqg/run_train_bartvqg.sh b/nqg/run_train_bartvqg.sh
+index 754fe04..3946320 100644
+--- a/nqg/run_train_bartvqg.sh
++++ b/nqg/run_train_bartvqg.sh
+@@ -1,12 +1,14 @@
+-export CUDA_VISIBLE_DEVICES=0
++export CUDA_VISIBLE_DEVICES=1
+ BASE=bartvqgspt
+-MODEL=colbert-warm-ada_50-Z_128-BS_12
++MODEL=testing
+ 
+ rm -rvf $BASE/$MODEL
+-PRT_MODEL=bartqg-d2q/checkpoint-8000/
++PRT_MODEL=bartqg-d2q/checkpoint-16000/
+ PRT_CONFIG=facebook/bart-base
+ 
+-TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.v1.jsonl
++# TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.v1.jsonl
++# TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
++TRAIN_FILE=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.jsonl  
+ 
+ python3 train_vqg.py \
+   --model_name_or_path $PRT_MODEL \
+@@ -15,9 +17,9 @@ python3 train_vqg.py \
+   --output_dir $BASE/$MODEL \
+   --max_p_length 256 \
+   --max_q_length 16 \
+-  --per_device_train_batch_size 12 \
+-  --m_samples_per_example 1 \
+-  --n_side 5 \
++  --per_device_train_batch_size 4 \
++  --m_samples_per_example 3 \
++  --n_side 1 \
+   --evaluation_strategy steps \
+   --learning_rate 1e-3 \
+   --lr_scheduler_type constant \
+@@ -26,12 +28,13 @@ python3 train_vqg.py \
+   --save_steps 1000 \
+   --eval_steps 1000 \
+   --freeze_LM true \
+-  --freeze_embeds false \
+-  --pooling static \
+-  --n_soft_prompts 1 \
++  --freeze_embeds true \
++  --pooling adaptive \
++  --add_attentive_pooler false \
++  --n_soft_prompts 10 \
+   --latent_size 128 \
+   --k 0.5 \
+-  --x0 2000 \
++  --x0 1000 \
+   --annealing logistic \
+   --do_train \
+   --do_eval 
+diff --git a/nqg/run_train_bartvqg_attn_pool.sh b/nqg/run_train_bartvqg_attn_pool.sh
+index 2cecdaa..a0ffba3 100644
+--- a/nqg/run_train_bartvqg_attn_pool.sh
++++ b/nqg/run_train_bartvqg_attn_pool.sh
+@@ -1,11 +1,11 @@
+ export CUDA_VISIBLE_DEVICES=1
+ 
+ BASE=bartvqg
+-MODEL=colbert-warm-attn_1-BS_4x3-bart_d2q-ep2
++MODEL=colbert-warm-attn_1-BS_8
+ PRT_MODEL=bartqg-d2q/checkpoint-16000/
+ PRT_CONFIG=facebook/bart-base
+ 
+-TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
++TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.v1.jsonl
+ 
+ python3 train_vqg.py \
+   --model_name_or_path $PRT_MODEL \
+@@ -14,8 +14,8 @@ python3 train_vqg.py \
+   --output_dir $BASE/$MODEL \
+   --max_p_length 256 \
+   --max_q_length 16 \
+-  --per_device_train_batch_size 4 \
+-  --m_samples_per_example 3 \
++  --per_device_train_batch_size 8 \
++  --m_samples_per_example 1 \
+   --n_side 5 \
+   --evaluation_strategy steps \
+   --learning_rate 1e-3 \
+@@ -26,12 +26,12 @@ python3 train_vqg.py \
+   --eval_steps 1000 \
+   --freeze_LM true \
+   --freeze_embeds true \
+-  --pooling attentive \
+-  --add_attentive_pooler true \
+-  --n_soft_prompts 50 \
++  --pooling adaptive \
++  --add_attentive_pooler false \
++  --n_soft_prompts 1 \
+   --latent_size 128 \
+-  --k 0.5 \
+-  --x0 2000 \
++  --k 0.025 \
++  --x0 100 \
+   --annealing logistic \
+   --do_train \
+   --do_eval 
+diff --git a/nqg/train_d2q.py b/nqg/train_d2q.py
+index 5e69734..a2abf6c 100644
+--- a/nqg/train_d2q.py
++++ b/nqg/train_d2q.py
+@@ -37,6 +37,7 @@ class OurDataArguments:
+     eval_file: Optional[str] = field(default=None)
+     max_p_length: int = field(default=256)
+     max_q_length: int = field(default=16)
++    irrelevant_included: bool = field(default=False)
+ 
+ @dataclass
+ class OurTrainingArguments(Seq2SeqTrainingArguments):
+@@ -104,7 +105,8 @@ def main():
+             tokenizer=tokenizer,
+             max_p_length=data_args.max_p_length,
+             max_q_length=data_args.max_q_length,
+-            is_eval=False
++            is_eval=False,
++            irrelevant_included=data_args.irrelevant_included
+     )
+     # Data: dataset
+     from data import msmarco, dragon
+diff --git a/nqg/train_vqg.py b/nqg/train_vqg.py
+index 4033e32..b341d0d 100644
+--- a/nqg/train_vqg.py
++++ b/nqg/train_vqg.py
+@@ -80,7 +80,6 @@ def main():
+ 
+     # Parseing argument for huggingface packages
+     parser = HfArgumentParser((OurHFModelArguments, OurModelArguments, OurDataArguments, OurTrainingArguments))
+-    # model_args, data_args, training_args = parser.parse_args_into_datalcasses()
+     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+         hfmodel_args, model_args, data_args, training_args = \
+                 parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+@@ -122,9 +121,6 @@ def main():
+     model.generation_config = generation_config
+ 
+     # Model: freezing LM
+-    # [NOTE] OK-ish
+-    optimized_prefix = ['hidden2', 'latent', 'soft', 'prompt']
+-    # [NOTE] the better one
+     optimized_prefix = ['embed_tokens']
+ 
+     if model_args.freeze_embeds is False:
+diff --git a/nqg/trainers.py b/nqg/trainers.py
+index 4ef7daa..9615545 100644
+--- a/nqg/trainers.py
++++ b/nqg/trainers.py
+@@ -49,14 +49,6 @@ class TrainerBase(Trainer):
+ 
+ class TrainerForVQG(TrainerBase):
+ 
+-    # def random_attention(self, mat, half_mask=True):
+-    #     if half_mask:
+-    #         random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
+-    #         random_mask[:(mat.size()[0]//2), :] = True
+-    #     else:
+-    #         random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
+-    #     return mat * random_mask
+-
+     def compute_loss(self, model, inputs, return_outputs=False):
+ 
+         # [NOTE] `label_smoother` was tooked out in this trainer. 
+@@ -66,7 +58,7 @@ class TrainerForVQG(TrainerBase):
+         training_steps = copy.deepcopy(self.state.global_step)
+         outputs = model(**inputs, steps=training_steps)
+ 
+-        # [NOTE] calculate losses with customized objectives
++        # Calculate losses with customized objectives
+         logits = outputs.get("logits")
+         labels = inputs.get("labels").to(logits.device)
+ 
+@@ -96,8 +88,6 @@ class TrainerForVQG(TrainerBase):
+                     "labels": labels
+             }
+ 
+-            # print(probs_gumbel.max(-1).values[:bs, :3], 
+-            #         probs_gumbel.max(-1).values[bs:, :3])
+             self._verbose_prediction(model, **inputs_for_eval)
+ 
+         # Save past state if it exists

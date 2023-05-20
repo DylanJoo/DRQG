@@ -93,8 +93,8 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
-    from models import T5VQG, BartVQG
-    MODELS = {"t5": T5VQG, 'bart': BartVQG}
+    from models import T5VQG, BartDQG
+    MODELS = {"t5": T5VQG, 'bart': BartDQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
@@ -122,7 +122,7 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['embed_tokens']
+    optimized_prefix = ['embed_tokens', 'classification_head']
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')
@@ -145,11 +145,11 @@ def main():
 
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDIV
+    from datacollator import DataCollatorForVQGSPT, DataCollatorForDQG
     DATACOLLATORS = {
             "v0": DataCollatorForVQGSPT, 
             "v1": DataCollatorForVQGSPT, 
-            "vl": DataCollatorForVQGDIV
+            "vl": DataCollatorForDQG
     }
 
     for key in DATACOLLATORS:
@@ -185,8 +185,8 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers import TrainerForVQG
-    trainer = TrainerForVQG(
+    from trainers_dev import TrainerForDQG
+    trainer = TrainerForDQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],

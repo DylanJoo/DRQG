@@ -49,14 +49,6 @@ class TrainerBase(Trainer):
 
 class TrainerForVQG(TrainerBase):
 
-    # def random_attention(self, mat, half_mask=True):
-    #     if half_mask:
-    #         random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
-    #         random_mask[:(mat.size()[0]//2), :] = True
-    #     else:
-    #         random_mask = (torch.rand(mat.shape) >= 0.5).to(mat.device)
-    #     return mat * random_mask
-
     def compute_loss(self, model, inputs, return_outputs=False):
 
         # [NOTE] `label_smoother` was tooked out in this trainer. 
@@ -66,7 +58,7 @@ class TrainerForVQG(TrainerBase):
         training_steps = copy.deepcopy(self.state.global_step)
         outputs = model(**inputs, steps=training_steps)
 
-        # [NOTE] calculate losses with customized objectives
+        # Calculate losses with customized objectives
         logits = outputs.get("logits")
         labels = inputs.get("labels").to(logits.device)
 
@@ -84,7 +76,7 @@ class TrainerForVQG(TrainerBase):
 
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
-        loss = loss_gen + loss_reparam
+        loss = loss_gen + loss_reparam 
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
@@ -96,8 +88,6 @@ class TrainerForVQG(TrainerBase):
                     "labels": labels
             }
 
-            # print(probs_gumbel.max(-1).values[:bs, :3], 
-            #         probs_gumbel.max(-1).values[bs:, :3])
             self._verbose_prediction(model, **inputs_for_eval)
 
         # Save past state if it exists

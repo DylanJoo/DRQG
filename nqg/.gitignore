@@ -16,6 +16,7 @@ t5pqg*/
 t5vqgdev/
 *vqg*/
 *d2q*/
+bartdqg/
 
 # evaluation
 evaluation/**/*.jsonl

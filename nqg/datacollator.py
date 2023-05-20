@@ -1,7 +1,7 @@
-"""
-The datacollator for pcentric dataset.
+""" The datacollator for pcentric dataset.
 """
 import torch
+import random
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, Tuple, Any
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
@@ -18,11 +18,23 @@ class DataCollatorBase:
     return_tensors: str = "pt"
     is_eval: Union[bool] = False
     prefix: str = ""
+    irrelevant_included: bool = field(default=False)
+    relevant_included: bool = field(default=True)
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
         texts_p = [batch['passage'] for batch in features]
-        texts_q = [batch['positive'] for batch in features]
+        texts_q1 = [batch['positive'] for batch in features]
+        texts_q0 = [batch['negative'] for batch in features]
+
+        if self.irrelevant_included and self.relevant_included:
+            texts_q = [random.sample((q1, q0), k=1)[0] \
+                    for q1, q0 in zip(texts_q1, texts_q0)]
+        else:
+            if self.irrelevant_included:
+                texts_q = texts_q1
+            if self.relevant_included:
+                texts_q = texts_q0
 
         inputs = self.tokenizer(
                 [f"{self.prefix}{p}" for p in texts_p],
@@ -42,7 +54,8 @@ class DataCollatorBase:
 
         if self.is_eval:
             inputs['passage'] = texts_p
-            inputs['positive'] = texts_q
+            inputs['positive'] = texts_q1
+            inputs['negative'] = texts_q0
 
         return inputs
 
@@ -200,7 +213,7 @@ class DataCollatorForVQGSPT(DataCollatorBase):
         return inputs
 
 @dataclass
-class DataCollatorForVQGDIV(DataCollatorBase):
+class DataCollatorForDQG(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     m_samples_per_example: int = 2
@@ -209,26 +222,26 @@ class DataCollatorForVQGDIV(DataCollatorBase):
 
         # text and id info 
         texts_p = []
-        texts_pq = []
-        texts_nq = []
+        texts_q = []
+        clf_labels = []
+        example_id = []
 
-        """
-        Preparing (a) passage; (b) positive/ negative query 
+        for i, batch in enumerate(features):
+            texts_p += [batch['passage']]
+            texts_q += [batch['positive'][0]]
+            clf_labels += [1]
+            example_id += [i]
 
-        # p: [(b1p * m; b2p * m .. bnp * m)] * 2
-        # q+: (b1q+1, b1q+2, ...b1q+m; b2q+1, b2q+2, ...b2q+m; bnq+1 ...)
-        # q-: (b1q-1, b1q-2, ...b1q-m; b2q-1, b2q-2, ...b2q-m; bnq-1 ...)
-        """
-        for batch in features:
-            texts_p += [batch['passage']] * self.m_samples_per_example
-
-        for batch in features:
-            texts_pq += (batch['positive']*self.m_samples_per_example)[:self.m_samples_per_example]
-            texts_nq += (batch['negative']*self.m_samples_per_example)[:self.m_samples_per_example]
+            for i, batch_neg in \
+                    enumerate(batch['negative'][::-1][:self.m_samples_per_example]):
+                texts_p += [batch['passage']]
+                texts_q += [batch_neg]
+                clf_labels += [0]
+                example_id += [i]
 
         if self.is_train:
             inputs = self.tokenizer(
-                    texts_p + texts_p,
+                    texts_p,
                     max_length=self.max_p_length,
                     truncation=True,
                     padding=True,
@@ -236,9 +249,10 @@ class DataCollatorForVQGDIV(DataCollatorBase):
             )
 
             targets = self.tokenizer(
-                    texts_pq + texts_nq,
+                    texts_q,
                     padding=True,
-                    return_tensors=self.return_tensors
+                    return_tensors=self.return_tensors,
+                    max_length=self.max_q_length
             )
 
             target_ids = targets['input_ids']
@@ -247,18 +261,20 @@ class DataCollatorForVQGDIV(DataCollatorBase):
 
             inputs['labels'] = target_ids
             inputs['decoder_attention_mask'] = target_mask
+            inputs['clf_labels'] = torch.LongTensor(clf_labels)
+            inputs['example_id'] = torch.Tensor(example_id)
 
         else:
             inputs = self.tokenizer(
-                    [p for p in texts_p],
+                    [batch['passage'] for batch in features],
                     max_length=self.max_p_length,
                     truncation=True,
                     return_tensors=self.return_tensors
             )
-            inputs['passage'] = texts_p
+            inputs['passage'] = batch['passage']
 
             if self.is_eval:
-                inputs['positive'] = [batch['positive'] for batch in features]
-                inputs['negative'] = [batch['negative'] for batch in features]
+                inputs['positive'] = [batch['positive'][0] for batch in features]
+                inputs['negative'] = [batch['negative'][0] for batch in features]
         return inputs
 

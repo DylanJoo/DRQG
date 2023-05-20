@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 import math
 import numpy as np
-from torch.nn import CosineEmbeddingLoss
+from torch.nn import CosineEmbeddingLoss, CrossEntropyLoss
 
 def interpolate(A, B, n):
     return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
@@ -27,6 +27,13 @@ def sim_loss(a, b, metric='cosine'):
 
 def kl_loss(logv, mean):
     return -0.5 * torch.sum(1 + logv - mean.pow(2) - logv.exp())
+
+def PairwiseCELoss(scores):
+    CELoss = CrossEntropyLoss()
+    logits = scores.view(2, -1).permute(1, 0) # (B*2 1) -> (B 2)
+    labels = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
+    return CELoss(logits, labels)
+
 
 def random_masking(tokens_lists, masked_token):
 

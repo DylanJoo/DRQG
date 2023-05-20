@@ -1,4 +1,4 @@
-MODEL=bartqg-d2q
+MODEL=bartqg-d2q/irrelevant
 EVAL_DATA=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.sample.jsonl
 DIR=evaluation/$MODEL
 mkdir -p $DIR

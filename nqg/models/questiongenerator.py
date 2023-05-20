@@ -11,7 +11,7 @@ class T5QG(T5ForConditionalGeneration):
         self.n_samples = 1
 
     def get_pooler(self, config=None):
-        return T5Block(config)
+        return T5Stack(config)
 
     def set_n_eval_samples(self, n=None, n_side=None):
         self.name_samples = list(range(n))

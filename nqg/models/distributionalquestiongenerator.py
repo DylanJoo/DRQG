@@ -2,7 +2,6 @@ import torch
 import inspect
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig, BartModel
-from transformers.models.bart.modeling_bart import BartClassificationHead
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from torch import nn
@@ -20,7 +19,7 @@ PROMPT_EMBEDS = {
         'test': SoftAdaptiveEmbeddingDev
 }
 
-class BartVQG(BartQG):
+class BartDQG(BartQG):
     base_model_prefix = "model"
     _keys_to_ignore_on_load_missing = [
         r"final_logits_bias",
@@ -66,7 +65,7 @@ class BartVQG(BartQG):
         print(f'Prompt embedding set finished with \
                 \n{self.n_samples} eval samples: {self.name_samples}.')
 
-    def reparam_inputs(self, input_ids, attn_mask, steps=None):
+    def reparam_inputs(self, input_ids, attn_mask, steps=None, clf_labels=None):
         """
         Transform the inputs to reparemterized inputs.
         input_ids --> add variational prompts
@@ -76,24 +75,16 @@ class BartVQG(BartQG):
         inputs_embeds = self.model.encoder.embed_tokens(
                 input_ids.view(-1, input_ids.size()[-1]),
                 is_train=(steps is not None), 
-                steps=steps
+                steps=steps,
+                clf_labels=clf_labels
         ) 
 
-        # attention_mask --> attention_mask 
-        if inputs_embeds.size(0) % input_ids.size(0) != 0:
-            N = inputs_embeds.size(0) // (attn_mask.size(0)//2)
-            attn_mask_unit = attn_mask[:attn_mask.size(0)//2, :]
-        else:
-            N = inputs_embeds.size(0) // attn_mask.size(0)
-            attn_mask_unit = attn_mask
-
-        ## (row expanded) (col expanded)
         soft_attn_mask_unit = torch.cat([
-            torch.ones((attn_mask_unit.size(0), self.n_soft_prompts)).to(attn_mask_unit.device),
-            attn_mask_unit
+            torch.ones((attn_mask.size(0), self.n_soft_prompts)).to(attn_mask.device),
+            attn_mask
         ], 1)
 
-        return inputs_embeds, soft_attn_mask_unit.repeat(N, 1)
+        return inputs_embeds, soft_attn_mask_unit
 
     def forward(
         self,
@@ -114,20 +105,21 @@ class BartVQG(BartQG):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         steps: Optional[int] = None,
+        clf_labels: Optional[torch.LongTensor] = None,
+        example_id: Optional[torch.LongTensor] = None,
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
         if encoder_outputs is None: # the first momnet when generating 
             inputs_embeds, attention_mask_new = self.reparam_inputs(
-                    input_ids, attention_mask, steps
+                    input_ids, attention_mask, steps, clf_labels
             )
         else:
             inputs_embeds = None
             attention_mask_new = attention_mask
 
         # standard enc-dec pipeline
-        # TODO add classfication task head here
-        return super().forward(
+        outputs = super().forward(
                 input_ids=None, 
                 attention_mask=attention_mask_new,
                 decoder_input_ids=decoder_input_ids,
@@ -140,68 +132,22 @@ class BartVQG(BartQG):
                 decoder_inputs_embeds=decoder_inputs_embeds,
                 labels=labels,
                 use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
+                output_attentions=True,
+                output_hidden_states=True,
                 return_dict=return_dict,
                 **kwargs
         )
 
+        return outputs
+
     def generate(self, input_ids=None, attention_mask=None, **kwargs):
         inputs_embeds, attention_mask_new = self.reparam_inputs(
-                input_ids, attention_mask, steps=None
+                input_ids, attention_mask, steps=None, 
         )
+        attention_mask_new = attention_mask_new.repeat(self.n_samples, 1)
         return super().generate(
                 inputs_embeds=inputs_embeds, 
                 attention_mask=attention_mask_new, 
                 **kwargs
         )
-
-    def _prepare_encoder_decoder_kwargs_for_generation(
-        self, 
-        inputs_tensor: torch.Tensor, 
-        model_kwargs, 
-        model_input_name: Optional[str] = None
-    ) -> Dict[str, Any]:
-        # 1. get encoder
-        encoder = self.get_encoder()
-
-        # 2. Prepare encoder args and encoder kwargs from model kwargs.
-        irrelevant_prefix = ["decoder_", "cross_attn", "use_cache"]
-        encoder_kwargs = {
-            argument: value
-            for argument, value in model_kwargs.items()
-            if not any(argument.startswith(p) for p in irrelevant_prefix)
-        }
-        encoder_signature = set(inspect.signature(encoder.forward).parameters)
-        encoder_accepts_wildcard = "kwargs" in encoder_signature or "model_kwargs" in encoder_signature
-        if not encoder_accepts_wildcard:
-            encoder_kwargs = {
-                argument: value 
-                for argument, value in encoder_kwargs.items() 
-                if argument in encoder_signature
-            }
-
-        # 3. make sure that encoder returns `ModelOutput`
-        model_input_name = model_input_name if model_input_name is not None else self.main_input_name
-        encoder_kwargs["return_dict"] = True
-
-        model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)
-
-        return model_kwargs
-
-    def _prepare_decoder_input_ids_for_generation(
-        self,
-        batch_size: int,
-        decoder_start_token_id: int = None,
-        bos_token_id: int = None,
-        model_kwargs: Optional[Dict[str, torch.Tensor]] = None,
-        device: torch.device = None,
-    ) -> torch.LongTensor:
-        if model_kwargs is not None and "decoder_input_ids" in model_kwargs:
-            return model_kwargs.pop("decoder_input_ids")
-        else:
-            decoder_start_token_id = self._get_decoder_start_token_id(decoder_start_token_id, bos_token_id)
-            if device is None:
-                device = self.device
-            return torch.ones((batch_size, 1), dtype=torch.long, device=device) * decoder_start_token_id
 

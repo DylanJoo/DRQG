@@ -5,6 +5,7 @@ import collections
 from datasets import load_dataset
 import numpy as np
 from tqdm import tqdm
+import argparse
 
 def query_centric_dataset(path):
     dataset = load_dataset(
@@ -62,7 +63,7 @@ def convert_to_passage_centric(args):
     collection = {v: k for k, v in collection.items()}
     # output jsonl
     with open(args.output_jsonl, 'w') as f:
-        for pid, queries in triplet.items():
+        for docid, queries in triplet.items():
             positives = list(queries['positive'])
             negatives = list(queries['negative'])
             n_pos = len(positives)
@@ -75,19 +76,31 @@ def convert_to_passage_centric(args):
                     positives = (positives * n_neg)[:n_neg]
 
             # Setting0: inner join (each p contains at most min(n_pos, n_neg))
+            if 'v0' in args.output_jsonl or 'v1' in args.output_jsonl:
+                for pos, neg in zip(positives, negatives):
+                    f.write(json.dumps({
+                        "passage": collection[docid],
+                        "positive": pos, 
+                        "negative": neg
+                    }, ensure_ascii=False)+'\n')
 
-            for pos, neg in zip(positives, negatives):
-                f.write(json.dumps({
-                    "passage": collection[pid],
-                    "positive": pos, 
-                    "negative": neg
-                }, ensure_ascii=False)+'\n')
+            # Setting-L: join a list of postives and negative. 
+            # Additionally, put them into a list for making sure there are in-batch
+            if 'vL' in args.output_jsonl:
+                if n_pos >= args.min_n and n_neg >= args.min_n:
+                    f.write(json.dumps({
+                        "passage": collection[docid],
+                        "positive": positives, 
+                        "negative": negatives
+                    }, ensure_ascii=False)+'\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_tsv", type=str, default=None)
     parser.add_argument("--collection", type=str, default=None)
     parser.add_argument("--output_jsonl", type=str, default=None)
+    parser.add_argument("--min_n", type=int, default=1, 
+            help='the minumum number of obtained negative query.')
     args = parser.parse_args()
     
     convert_to_passage_centric(args)

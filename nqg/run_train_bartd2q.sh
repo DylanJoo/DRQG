@@ -1,4 +1,6 @@
-MODEL=doc2query-bartqg-msmarco
+# MODEL=bartqg-d2q/relevant/
+# MODEL=bartqg-d2q/generalized/
+MODEL=bartqg-d2q/irrelevant/
 mkdir -p $MODEL
 
 export CUDA_VISIBLE_DEVICES=1
@@ -15,7 +17,11 @@ python3 train_d2q.py \
   --learning_rate 1e-4 \
   --warmup_steps 4000 \
   --per_device_train_batch_size 64 \
-  --train_file /home/jhju/datasets/msmarco.triples_train_small/doc_query_pairs.train.jsonl \
+  --train_file /home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.jsonl \
+  --irrelevant_included true \
+  --relevant_included false \
   --max_steps 20000 \
-  --save_steps 8000 \
+  --save_steps 4000 \
   --do_train 
+# relevant: /home/jhju/datasets/msmarco.triples_train_small/doc_query_pairs.train.jsonl 
+# generalized: /home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.jsonl

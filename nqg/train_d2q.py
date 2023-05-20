@@ -37,6 +37,8 @@ class OurDataArguments:
     eval_file: Optional[str] = field(default=None)
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
+    relevant_included: bool = field(default=True)
+    irrelevant_included: bool = field(default=False)
 
 @dataclass
 class OurTrainingArguments(Seq2SeqTrainingArguments):
@@ -104,7 +106,9 @@ def main():
             tokenizer=tokenizer,
             max_p_length=data_args.max_p_length,
             max_q_length=data_args.max_q_length,
-            is_eval=False
+            is_eval=False,
+            irrelevant_included=data_args.irrelevant_included,
+            relevant_included=data_args.relevant_included
     )
     # Data: dataset
     from data import msmarco, dragon
