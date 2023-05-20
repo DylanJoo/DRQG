@@ -7,9 +7,9 @@ for MODEL in $BASE/*cold-attn*;do
     mkdir -p $DIR
     python3 inference.py \
         --model_name facebook/bart-base \
-        --model_path $MODEL/checkpoint-8000 \
+        --model_path $MODEL/checkpoint-16000 \
         --input_jsonl $EVAL_DATA \
-        --output_jsonl $DIR/triples.eval.small.v0.topk.pred.jsonl \
+        --output_jsonl $DIR/triples.eval.small.v0.pred.jsonl \
         --generation_type gaussian \
         --flags prediction  \
         --device cuda:2 \

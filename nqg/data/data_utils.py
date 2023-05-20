@@ -10,7 +10,11 @@ def load_collection(path, inverse=False):
     collection = {}
     with open(path, 'r') as f:
         for line in tqdm(f):
-            pid, content = line.strip().split('\t')
+            try: # msmarco's collection
+                pid, content = line.strip().split('\t')
+            except:
+                pid, content, title = line.strip().split('\t')
+
             if inverse:
                 collection[content.strip()] = pid
             else:

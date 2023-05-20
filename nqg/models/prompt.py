@@ -198,3 +198,35 @@ class SoftEmbeddingWithPooler(SoftEmbedding):
         pooled_output = self.pooler(e_input, None, None)[0]
 
         return pooled_output
+
+class SoftEmbeddingForDecoder(SoftEmbedding):
+
+    def __init__(
+            self,
+            wte: nn.Embedding,
+            hidden_size: int = 768, 
+            latent_size: int = 128, 
+            n_prompts: int = 1,
+            initialize_from_vocab: bool = False, 
+            pooler: Optional[object] = None,
+            **kwargs
+        ):
+        super(SoftEmbedding, self).__init__()
+        # [NOTE] If prepending <s> is needed
+        self.n_prompts = n_prompts
+        self.orig_embeds = wte
+        self.latent_size = latent_size
+
+        if initialize_from_vocab:
+            self.prompt_embeds = nn.Parameter(
+                    self.orig_embeds.weight[-self.n_prompts:].clone().detach()
+            )
+        else:
+            self.prompt_embeds = nn.Parameter(
+                    torch.randn((self.n_prompts, hidden_size), device=wte.weight.device)
+            )
+
+    def forward(self, tokens):
+        e_source = self.orig_embeds(tokens)
+        e_prompt = self.prompt_embeds.unsqueeze(0) 
+        return torch.cat([e_prompt.repeat(e_source.size(0), 1, 1), e_source], 1)

@@ -56,37 +56,40 @@ class TrainerForVQG(TrainerBase):
         loss_gen = outputs.get("loss")
 
         ### CE loss separataion
-        loss_fct = CrossEntropyLoss()
-        selected_positive = (clf_labels==1)
-        loss_gen_pos = loss_fct(
-                logits[selected_positive].view(-1, model.config.vocab_size), 
-                labels[selected_positive].view(-1)
-        )
-        selected_negative = (clf_labels<1)
-        loss_gen_neg = loss_fct(
-                logits[selected_negative].view(-1, model.config.vocab_size), 
-                labels[selected_negative].view(-1)
-        )
+        # loss_fct = CrossEntropyLoss()
+        # selected_positive = (clf_labels==1)
+        loss_gen_pos = 0
+        # loss_gen_pos = loss_fct(
+        #         logits[selected_positive].view(-1, model.config.vocab_size), 
+        #         labels[selected_positive].view(-1)
+        # )
+        # selected_negative = (clf_labels<1)
+        loss_gen_neg = 0
+        # loss_gen_neg = loss_fct(
+        #         logits[selected_negative].view(-1, model.config.vocab_size), 
+        #         labels[selected_negative].view(-1)
+        # )
 
         ## (2) CE loss (MLE using Gumbel softmax)
-        loss_fct = NLLLoss()
-        tau_hp = max(0.5, math.exp(-1*1e-5*training_steps))
-        probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
-        loss_gen_gumbel = loss_fct(
-                probs_gumbel.log().view(-1, model.config.vocab_size), 
-                labels.view(-1)
-        )
+        # loss_fct = NLLLoss()
+        # tau_hp = max(0.5, math.exp(-1*1e-5*training_steps))
+        # probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
+        loss_gen_gumbel = 0
+        # loss_gen_gumbel = loss_fct(
+        #         probs_gumbel.log().view(-1, model.config.vocab_size), 
+        #         labels.view(-1)
+        # )
 
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
-        # loss = loss_gen + loss_reparam 
+        loss = loss_gen + loss_reparam 
         # reweight the positive and negative
-        loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam 
+        # loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam 
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
             print(f"\nNLL: {loss_gen} (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
-                    \n(gumbele): {loss_gen_gumbel} (diff) {loss_gen_neg-loss_gen_pos}\
+                    \n(gumbel): {loss_gen_gumbel} (diff) {loss_gen_neg-loss_gen_pos}\
                     \nKLD: {loss_reparam}")
             selected = (inputs['clf_labels'] == 1)
             inputs_for_eval = {
