@@ -46,22 +46,24 @@ class SoftEmbedding(nn.Module):
             )
 
         if kwargs.pop("has_compressed_layer"):
-            self.downproject = nn.Linear(hidden_size, latent_size*2, bias=False)
             self.hidden2mean = nn.Linear(2*latent_size, latent_size, bias=False)
             self.hidden2logv = nn.Linear(2*latent_size, latent_size, bias=False)
-            self.upproject = nn.Linear(latent_size, latent_size*2, bias=False)
             self.latent2hidden = nn.Linear(latent_size*2, hidden_size, bias=False)
+
+            self.downproject = nn.Linear(hidden_size, latent_size*2, bias=False)
+            self.upproject = nn.Linear(latent_size, latent_size*2, bias=False)
         else:
             self.hidden2mean = nn.Linear(hidden_size, latent_size, bias=False)
             self.hidden2logv = nn.Linear(hidden_size, latent_size, bias=False)
             self.latent2hidden = nn.Linear(latent_size, hidden_size, bias=False)
             self.upproject = None
-            self.latent2hidden = None
+            self.downproject = None
+
         self.latent_size = latent_size
         self.pooler = pooler
         self.kld_kwargs = kwargs
 
-    def forward(self, tokens, is_train=False, steps=1):
+    def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         """ `training` and `evaluation/prediction` phrases have diff setups. 
         The training batch contains both (specified) batch_size * 2 
         as exact mini-batch during training; while evaluation batch is unmodified."""
@@ -69,6 +71,8 @@ class SoftEmbedding(nn.Module):
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens)
         e_prompt = self.prompt_embeds.unsqueeze(0) 
+        if self.downproject is not None:
+            e_prompt = self.downproject(e_prompt)
 
         if is_train:
             # (1, Np, H)-->(1, Np, Hz)-->(1*2, Np, H)
@@ -77,9 +81,11 @@ class SoftEmbedding(nn.Module):
             std = torch.exp(0.5*logv)
             r = torch.randn(mean.shape, device=e_source.device)
             z = torch.cat([
-                mean + torch.randn(mean.shape, device=mean.device)* (1-i) * std \
+                mean+torch.randn(mean.shape, device=mean.device)*(1-i)*std \
                     for i in clf_labels
             ], 0)
+            if self.upproject is not None:
+                z = self.upproject(z)
             e = self.latent2hidden(z) 
 
             # [reshape] All done
@@ -116,7 +122,7 @@ class SoftEmbedding(nn.Module):
 
 class SoftAdaptiveEmbedding(SoftEmbedding):
 
-    def forward(self, tokens, is_train=False, steps=1):
+    def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens)
         e_prompt = self.prompt_embeds.unsqueeze(0) 
@@ -163,7 +169,7 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             e = self.latent2hidden(z) 
 
             # [reshape]
-            e = e.repeat_interleave(batch_size, 1, 1)
+            e = e.repeat_interleave(batch_size, dim=0)
             e_source = e_source.repeat(len(self.std_list), 1, 1)
             e_pooled = e_pooled.repeat(len(self.std_list), 1, 1)
 
@@ -186,9 +192,9 @@ class SoftEmbeddingWithPooler(SoftEmbedding):
         assert self.pooler is not None, \
                 'the pooler was not succesfully assigned.'
 
-    def forward(self, tokens, is_train=False, steps=1):
+    def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         seq_length = tokens.size()[-1]
-        e_input = super().forward(tokens, is_train, steps)
+        e_input = super().forward(tokens, is_train, steps, clf_labels)
         pooled_output = self.pooler(e_input, None, None)[0]
 
         return pooled_output

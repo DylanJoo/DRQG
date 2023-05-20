@@ -3,12 +3,13 @@ import copy
 import torch
 import argparse
 import collections
+import numpy as np
 from tqdm import tqdm
 from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from transformers import T5ForConditionalGeneration
-from datacollator import DataCollatorForT5VQG
+from datacollator import DataCollatorForVQG
 from utils import interpolate
 
 class QuestionGenerator:
@@ -89,7 +90,8 @@ if __name__ == "__main__":
     parser.add_argument("--n_soft_prompts", default=1, type=int)
     parser.add_argument("--n_side_tail", default=0, type=int)
     parser.add_argument("--pooling", default='static', type=str)
-    parser.add_argument("--has_attentive_pooler", default=False, type=bool)
+    parser.add_argument("--add_attentive_pooler", default=False, type=bool)
+    parser.add_argument("--has_compressed_layer", default=False, type=bool)
 
     # generation config
     parser.add_argument("--generation_type", default='gaussian', type=str)
@@ -113,7 +115,8 @@ if __name__ == "__main__":
             n_soft_prompts=args.n_soft_prompts,
             n_side=args.n_side_tail,
             pooling=args.pooling,
-            add_attentive_pooler=args.has_attentive_pooler
+            add_attentive_pooler=args.add_attentive_pooler,
+            has_compressed_layer=args.has_compressed_layer
     )
 
     for key in MODELS:
@@ -126,6 +129,13 @@ if __name__ == "__main__":
             vqg_config=vqg_config
     ).to(args.device).eval()
     model.set_tokenizer(tokenizer)
+
+    ## setting the gaussian sampling
+    std_list = np.arange(-0.9, 1, 0.2)
+    model.set_n_eval_samples(n=len(std_list))
+    model.enc_prompts.std_list = model.name_samples
+    model.name_samples = std_list
+    model.enc_prompts.set_gaussian_range(std_list)
 
     # Data: dataset
     dataset = load_dataset("json", data_files=args.input_jsonl)['train']
@@ -199,6 +209,7 @@ if __name__ == "__main__":
     # transform to good read version
     from utils import transform_pred_to_good_read
     transform_pred_to_good_read(
-            args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt')
+            args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt'),
+            sigma_map=std_list
     )
 

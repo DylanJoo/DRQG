@@ -79,7 +79,9 @@ class TrainerForVQG(TrainerBase):
 
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
-        loss = loss_gen + loss_reparam 
+        # loss = loss_gen + loss_reparam 
+        # reweight the positive and negative
+        loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam 
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

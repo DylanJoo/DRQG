@@ -67,7 +67,7 @@ def load_runs(path, output_score=False):
 
     return sorted_run_dict
 
-def transform_pred_to_good_read(path_jsonl, path_txt): 
+def transform_pred_to_good_read(path_jsonl, path_txt, sigma_map=None): 
     fr = open(path_jsonl, 'r')
     fw = open(path_txt, 'w')
 
@@ -81,7 +81,8 @@ def transform_pred_to_good_read(path_jsonl, path_txt):
         for key in data:
             fw.write(f"{key}:\n")
             n_side = (len(data[key])-1) // 2
-            sigma_map = list(range(-n_side, n_side+1, 1))
+            if sigma_map is None:
+                sigma_map = list(range(-n_side, n_side+1, 1))
             qlist = [f"{sigma_map[i]}\t{q}" for (i, q) in enumerate(data[key])]
             fw.write("\n".join(qlist))
             fw.write("\n\n")

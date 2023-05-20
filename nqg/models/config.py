@@ -14,15 +14,19 @@ class VQG_OLD_CONFIG:
 
 @dataclass
 class VQG_CONFIG:
-    pooling: str = field(default='static')
-    n_soft_prompts: int = field(default=1)
+    # VAE
     latent_size: int = field(default=128)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
+    # TRAIN
     freeze_LM: bool = field(default=False)
     freeze_embeds: bool = field(default=False)
     initialize_from_vocab: bool = field(default=False)
     n: int = field(default=None)
     n_side: int = field(default=5)
-    add_attentive_pooler: Optional[str] = field(default=False)
+    has_compressed_layer: Optional[bool] = field(default=False)
+    #  VQG
+    n_soft_prompts: int = field(default=1)
+    pooling: str = field(default='static')
+    add_attentive_pooler: Optional[bool] = field(default=False)
