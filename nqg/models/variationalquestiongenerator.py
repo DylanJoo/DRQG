@@ -2,7 +2,7 @@ import torch
 import inspect
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig, BartModel
-from transformers.models.bart.modeling_bart import BartClassificationHead
+from transformers.models.bart.modeling_bart import shift_tokens_right
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from torch import nn
@@ -11,13 +11,16 @@ from torch.nn import CrossEntropyLoss
 from utils import kl_weight, kl_loss
 import copy
 from .questiongenerator import BartQG
-from .prompt import SoftEmbedding, SoftAdaptiveEmbedding, SoftAttentiveEmbedding, SoftAdaptiveEmbeddingDev
+from .prompt import (
+        SoftEmbedding, 
+        SoftAdaptiveEmbedding, 
+        SoftEmbeddingWithPooler, 
+)
 
 PROMPT_EMBEDS = {
         'static': SoftEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
-        'attentive': SoftAttentiveEmbedding,
-        'generalized': SoftAdaptiveEmbeddingDev
+        'attentive': SoftEmbeddingWithPooler,
 }
 
 class BartVQG(BartQG):
@@ -40,6 +43,7 @@ class BartVQG(BartQG):
         kwargs = {
                 'annealing_fn': vqg_config.annealing_fn, 
                 'k': vqg_config.k, 'x0': vqg_config.x0,
+                'has_compressed_layer': vqg_config.has_compressed_layer
         }
         ## pooler
         if vqg_config.add_attentive_pooler:
@@ -48,7 +52,7 @@ class BartVQG(BartQG):
             pooler = None
 
         ## prompt layer
-        self.prompts = PROMPT_EMBEDS[vqg_config.pooling](
+        self.enc_prompts = PROMPT_EMBEDS[vqg_config.pooling](
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
@@ -56,13 +60,14 @@ class BartVQG(BartQG):
                 pooler=pooler,
                 **kwargs
         )
-        self.model.encoder.set_input_embeddings(self.prompts)
+        self.model.encoder.set_input_embeddings(self.enc_prompts)
         self.model.decoder.set_input_embeddings(self.model.shared)
+        # self.model.decoder.set_input_embeddings(self.dec_prompts)
 
         # set evaluation sample when inference temp results
         # attrs: (1) n_samples (2) name_samples
         self.set_n_eval_samples(n=vqg_config.n, n_side=vqg_config.n_side)
-        self.prompts.set_gaussian_range(self.name_samples)
+        self.enc_prompts.set_gaussian_range(self.name_samples)
         print(f'Prompt embedding set finished with \
                 \n{self.n_samples} eval samples: {self.name_samples}.')
 
@@ -124,7 +129,7 @@ class BartVQG(BartQG):
                 input_ids=None, 
                 attention_mask=attention_mask_new,
                 decoder_input_ids=decoder_input_ids,
-                decoder_attention_mask=decoder_head_mask,
+                decoder_attention_mask=decoder_attention_mask,
                 head_mask=head_mask,
                 cross_attn_head_mask=cross_attn_head_mask,
                 encoder_outputs=encoder_outputs,

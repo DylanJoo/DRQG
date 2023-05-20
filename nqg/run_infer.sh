@@ -1,4 +1,4 @@
-BASE=bartvqgspt
+BASE=bartvqg
 # for MODEL in ${BASE}/*;do
 
 for MODEL in $BASE/testin*;do

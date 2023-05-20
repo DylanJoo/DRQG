@@ -30,6 +30,7 @@ class OurModelArguments:
     pooling: str = field(default='static')
     n_soft_prompts: int = field(default=1)
     latent_size: int = field(default=128)
+    has_compressed_layer: bool = field(default=False)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
