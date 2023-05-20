@@ -53,7 +53,7 @@ class OurDataArguments:
     eval_file: Optional[str] = field(default=None)
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
-    m_samples_per_example: int = field(default=1)
+    m_negative_per_example: int = field(default=1)
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -126,10 +126,8 @@ def main():
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')
-
     if model_args.freeze_a_layer is False:
         optimized_prefix.append('encoder.layers.0') # first
-        # optimized_prefix.append('encoder.layers.5') # last 
     if model_args.freeze_cross_attn is False:
         optimized_prefix.append('encoder_attn')
 
@@ -145,11 +143,11 @@ def main():
 
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQGDIV
+    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQG
     DATACOLLATORS = {
             "v0": DataCollatorForVQGSPT, 
             "v1": DataCollatorForVQGSPT, 
-            "vl": DataCollatorForVQGDIV
+            "vl": DataCollatorForVQG
     }
 
     for key in DATACOLLATORS:
@@ -159,9 +157,10 @@ def main():
     data_collator = DATACOLLATORS[datacollator_key](
             tokenizer=tokenizer, 
             padding=True,
-            max_p_length=data_args.max_p_length,
             return_tensors='pt',
             is_train=True,
+            max_p_length=data_args.max_p_length,
+            m_negatives=data_args.m_negative_per_example
     )
 
     # Data: dataset

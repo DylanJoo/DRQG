@@ -209,15 +209,19 @@ class SoftAdaptiveEmbeddingDev(SoftEmbedding):
             mean = self.hidden2mean(e_prompt)
             logv = self.hidden2logv(e_prompt)
             std = torch.exp(0.5*logv)
-            z = torch.cat([mean + torch.randn(mean.shape, device=mean.device)* (1-i) * std \
-                    for i in clf_labels], 0)
+            z = torch.cat([
+                mean + torch.randn(mean.shape, device=mean.device)* (1-i) * std \
+                    for i in clf_labels
+            ], 0)
             e = self.latent2hidden(z) 
-            # [reshape] 
 
-            # Cat (B N H) & (B L H)
+            # [reshape] All done
+
+            # [concat]
+            ## (B N H) & (B L H)
             e_input = torch.cat([e, e_source], 1)
 
-            # compute loss
+            # [compute loss]
             loss = kl_loss(logv.view(-1, self.latent_size),
                            mean.view(-1, self.latent_size)) 
             self.kld_loss = loss
@@ -235,7 +239,7 @@ class SoftAdaptiveEmbeddingDev(SoftEmbedding):
             e = e.repeat_interleave(e_source.size(0), dim=0)
             e_source = e_source.repeat(len(self.std_list), 1, 1)
 
-            # Cat
+            # [concat]
             e_input = torch.cat([e, e_source], 1)
 
             self.kld_loss = 0
@@ -243,59 +247,3 @@ class SoftAdaptiveEmbeddingDev(SoftEmbedding):
 
         return e_input
 
-# old version of dev
-# class SoftAdaptiveEmbeddingDev(SoftEmbedding):
-#     def forward(self, tokens, is_train=False, steps=1):
-#         batch_size, seq_length = tokens.shape
-#
-#         # e_source = self.orig_embeds(tokens[:, 1:])        
-#         e_source = self.orig_embeds(tokens)
-#         e_prompt = self.prompt_embeds.unsqueeze(0) 
-#
-#         # mean pooling
-#         # e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
-#         # max pooling
-#         # e_prompt = torch.max(e_source, dim=1).values.unsqueeze(1)
-#         # (2B, 1, H)
-#         e = torch.cat([e_prompt.repeat(batch_size, 1, 1), e_source], 1)
-#
-#         # Reparameterize
-#         if is_train: # variational with gaussian noises
-#             mean = self.hidden2mean(e[:(batch_size//2)])
-#             logv = self.hidden2logv(e[:(batch_size//2)])
-#             std = torch.exp(0.5*logv)
-#             r = torch.randn(mean.shape, device=e_source.device)
-#             z = torch.cat([mean, mean+r*std], 0) 
-#             e_input = self.latent2hidden(z) 
-#
-#             # Concat z to original embeddings
-#             # e_input = torch.cat([
-#             #     e_prompt_prime,
-#             #     e_source
-#             # ], 1)
-#
-#             # compute loss
-#             loss = kl_loss(
-#                     logv.view(-1, self.latent_size),
-#                     mean.view(-1, self.latent_size)
-#             )
-#             self.kld_loss = loss
-#             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
-#
-#         else: 
-#             mean = self.hidden2mean(e)
-#             logv = self.hidden2logv(e)
-#             std = torch.exp(0.5*logv)
-#             z = torch.cat([mean+std*i for i in self.std_list], 0)
-#             e_input = self.latent2hidden(z)
-#
-#             # Concat z to original embeddings
-#             # e_input = torch.cat([
-#             #     e_prompt_prime,
-#             #     e_source.repeat(len(self.std_list), 1, 1)
-#             # ], 1)
-#
-#             self.kld_loss = 0
-#             self.kld_weight = 0
-#
-#         return e_input

@@ -59,59 +59,13 @@ class DataCollatorBase:
 
         return inputs
 
-@dataclass
-class DataCollatorForT5VQG(DataCollatorBase):
-    is_train: Union[bool, str] = False
-    is_eval: bool = False
-
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
-
-        # text and id info 
-        texts_p = [batch['passage'] for batch in features]
-
-        if self.is_train:
-            texts_pq = [batch['positive'] for batch in features]
-            texts_nq = [batch['negative'] for batch in features]
-
-            inputs = self.tokenizer(
-                    [f"<extra_id_10> {p}" for p in texts_p] * 2 ,
-                    max_length=self.max_p_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
-            targets = self.tokenizer(
-                    texts_pq+texts_nq,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            ).input_ids
-            targets[targets == self.tokenizer.pad_token_id] = -100
-            inputs['labels'] = targets
-
-        else:
-            """
-            When inferencing, a batch contains only one passaegs. 
-            Each passages is the to-be-predicted instance.
-            """
-            inputs = self.tokenizer(
-                    [f"<extra_id_10> {p}" for p in texts_p],
-                    max_length=self.max_p_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
-            inputs['passage'] = texts_p
-
-            if self.is_eval:
-                inputs['positive'] = [batch['positive'] for batch in features]
-                inputs['negative'] = [batch['negative'] for batch in features]
-        return inputs
 
 @dataclass
 class DataCollatorForPQG(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
-    prefix: str = ""
+    prefix: str = "positive question generation: passage: "
+    negative_prefix: str = "negative question generation: passage: "
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -122,8 +76,8 @@ class DataCollatorForPQG(DataCollatorBase):
             texts_pq = [batch['positive'] for batch in features]
             texts_nq = [batch['negative'] for batch in features]
             inputs = self.tokenizer(
-                    [f"positive question generation: passage: {p}" for p in texts_p] + \
-                    [f"negative question generation: passage: {p}" for p in texts_p],
+                    [f"{self.prefix}{p}" for p in texts_p] + \
+                    [f"{self.negative_prefix} {p}" for p in texts_p],
                     max_length=self.max_length,
                     truncation=True,
                     padding=True,
@@ -140,7 +94,7 @@ class DataCollatorForPQG(DataCollatorBase):
 
         else:
             inputs1 = self.tokenizer(
-                    [f"positive question generation: passage: {p}" \
+                    [f"{self.prefix}{p}" \
                             for p in texts_p],
                     max_length=self.max_p_length,
                     truncation=True,
@@ -148,7 +102,7 @@ class DataCollatorForPQG(DataCollatorBase):
                     return_tensors=self.return_tensors
             )
             inputs0 = self.tokenizer(
-                    [f"negative question generation: passage: {p}" \
+                    [f"{self.negative_prefix}{p}" \
                             for p in texts_p],
                     max_length=self.max_p_length,
                     truncation=True,
@@ -213,10 +167,10 @@ class DataCollatorForVQGSPT(DataCollatorBase):
         return inputs
 
 @dataclass
-class DataCollatorForDQG(DataCollatorBase):
+class DataCollatorForVQG(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
-    m_samples_per_example: int = 2
+    m_negatives: int = 2
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -233,7 +187,7 @@ class DataCollatorForDQG(DataCollatorBase):
             example_id += [i]
 
             for i, batch_neg in \
-                    enumerate(batch['negative'][::-1][:self.m_samples_per_example]):
+                    enumerate(batch['negative'][::-1][:self.m_negatives]):
                 texts_p += [batch['passage']]
                 texts_q += [batch_neg]
                 clf_labels += [0]
@@ -278,3 +232,51 @@ class DataCollatorForDQG(DataCollatorBase):
                 inputs['negative'] = [batch['negative'][0] for batch in features]
         return inputs
 
+# Deprecated
+# @dataclass
+# class DataCollatorForT5VQG(DataCollatorBase):
+#     is_train: Union[bool, str] = False
+#     is_eval: bool = False
+#
+#     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+#
+#         # text and id info 
+#         texts_p = [batch['passage'] for batch in features]
+#
+#         if self.is_train:
+#             texts_pq = [batch['positive'] for batch in features]
+#             texts_nq = [batch['negative'] for batch in features]
+#
+#             inputs = self.tokenizer(
+#                     [f"<extra_id_10> {p}" for p in texts_p] * 2 ,
+#                     max_length=self.max_p_length,
+#                     truncation=True,
+#                     padding=True,
+#                     return_tensors=self.return_tensors
+#             )
+#             targets = self.tokenizer(
+#                     texts_pq+texts_nq,
+#                     padding=True,
+#                     return_tensors=self.return_tensors
+#             ).input_ids
+#             targets[targets == self.tokenizer.pad_token_id] = -100
+#             inputs['labels'] = targets
+#
+#         else:
+#             """
+#             When inferencing, a batch contains only one passaegs. 
+#             Each passages is the to-be-predicted instance.
+#             """
+#             inputs = self.tokenizer(
+#                     [f"<extra_id_10> {p}" for p in texts_p],
+#                     max_length=self.max_p_length,
+#                     truncation=True,
+#                     padding=True,
+#                     return_tensors=self.return_tensors
+#             )
+#             inputs['passage'] = texts_p
+#
+#             if self.is_eval:
+#                 inputs['positive'] = [batch['positive'] for batch in features]
+#                 inputs['negative'] = [batch['negative'] for batch in features]
+#         return inputs

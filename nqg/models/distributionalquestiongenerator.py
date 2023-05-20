@@ -79,12 +79,12 @@ class BartDQG(BartQG):
                 clf_labels=clf_labels
         ) 
 
-        soft_attn_mask_unit = torch.cat([
+        soft_attn_mask = torch.cat([
             torch.ones((attn_mask.size(0), self.n_soft_prompts)).to(attn_mask.device),
             attn_mask
         ], 1)
 
-        return inputs_embeds, soft_attn_mask_unit
+        return inputs_embeds, soft_attn_mask
 
     def forward(
         self,

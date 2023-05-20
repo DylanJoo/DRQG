@@ -122,14 +122,12 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['embed_tokens', 'classification_head']
+    optimized_prefix = ['embed_tokens']
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')
-
     if model_args.freeze_a_layer is False:
         optimized_prefix.append('encoder.layers.0') # first
-        # optimized_prefix.append('encoder.layers.5') # last 
     if model_args.freeze_cross_attn is False:
         optimized_prefix.append('encoder_attn')
 
