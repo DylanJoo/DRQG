@@ -32,7 +32,7 @@ def load_queries(path, inverse=False):
             else:
                 queries[qid] = content
     print("load queries done")
-    return qrels
+    return queries
 
 def load_qrels(path):
     qrels = {}

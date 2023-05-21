@@ -1,13 +1,13 @@
 BASE=bartvqg
 # for MODEL in ${BASE}/*;do
 
-for MODEL in $BASE/*cold-attn*;do
+for MODEL in $BASE/*resid*;do
     EVAL_DATA=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.sample.jsonl
     DIR=evaluation/$MODEL
     mkdir -p $DIR
     python3 inference.py \
         --model_name facebook/bart-base \
-        --model_path $MODEL/checkpoint-16000 \
+        --model_path $MODEL/checkpoint-10000 \
         --input_jsonl $EVAL_DATA \
         --output_jsonl $DIR/triples.eval.small.v0.pred.jsonl \
         --generation_type gaussian \
@@ -20,7 +20,7 @@ for MODEL in $BASE/*cold-attn*;do
         --batch_size 1 \
         --n_side_tail 5  \
         --n_soft_prompts 10 \
-        --pooling attentive \
+        --pooling residual \
         --add_attentive_pooler true \
         --has_compressed_layer true \
         # --do_sample --top_k 10 

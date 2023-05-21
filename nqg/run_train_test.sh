@@ -1,16 +1,17 @@
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=1
 BASE=bartvqg
-MODEL=colbert-cold-resid_10-B_4x3
+MODEL=squad-cold-static_10-B_4x5
 
 rm -rvf $BASE/$MODEL
-# PRT_MODEL=facebook/bart-base
-# PRT_MODEL=bartqg-d2q/irrelevant/checkpoint-16000
+PRT_MODEL=facebook/bart-base
+# PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 
-TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
+# TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
+TRAIN_FILE=/home/jhju/datasets/squad/train.jsonl
 # TRAIN_FILE=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.vL.jsonl  
 
-python3 train_vqg.py \
+python3 train_vqg_test.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
@@ -18,7 +19,7 @@ python3 train_vqg.py \
   --max_p_length 256 \
   --max_q_length 16 \
   --per_device_train_batch_size 4 \
-  --m_negative_per_example 3 \
+  --m_negative_per_example 5 \
   --n_side 5 \
   --evaluation_strategy steps \
   --learning_rate 1e-3 \
@@ -26,8 +27,8 @@ python3 train_vqg.py \
   --max_steps 10000 \
   --save_steps 1000 \
   --eval_steps 1000 \
-  --pooling residual \
-  --add_attentive_pooler false \
+  --pooling attentive \
+  --add_attentive_pooler true \
   --n_soft_prompts 10 \
   --latent_size 128 \
   --has_compressed_layer true \
@@ -37,7 +38,3 @@ python3 train_vqg.py \
   --annealing logistic \
   --do_train \
   --do_eval 
-  # --freeze_LM true \
-  # --freeze_embeds true \
-  # --freeze_a_layer true  \
-  # --freeze_cross_attn true \

@@ -15,12 +15,14 @@ from .prompt import (
         SoftEmbedding, 
         SoftAdaptiveEmbedding, 
         SoftEmbeddingWithPooler, 
+        SoftResidualEmbedding
 )
 
 PROMPT_EMBEDS = {
         'static': SoftEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
         'attentive': SoftEmbeddingWithPooler,
+        'residual': SoftResidualEmbedding
 }
 
 class BartVQG(BartQG):

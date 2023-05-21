@@ -56,19 +56,19 @@ class TrainerForVQG(TrainerBase):
         loss_gen = outputs.get("loss")
 
         ### CE loss separataion
-        # loss_fct = CrossEntropyLoss()
-        # selected_positive = (clf_labels==1)
+        loss_fct = CrossEntropyLoss()
+        selected_positive = (clf_labels==1)
         loss_gen_pos = 0
-        # loss_gen_pos = loss_fct(
-        #         logits[selected_positive].view(-1, model.config.vocab_size), 
-        #         labels[selected_positive].view(-1)
-        # )
-        # selected_negative = (clf_labels<1)
+        loss_gen_pos = loss_fct(
+                logits[selected_positive].view(-1, model.config.vocab_size), 
+                labels[selected_positive].view(-1)
+        )
+        selected_negative = (clf_labels<1)
         loss_gen_neg = 0
-        # loss_gen_neg = loss_fct(
-        #         logits[selected_negative].view(-1, model.config.vocab_size), 
-        #         labels[selected_negative].view(-1)
-        # )
+        loss_gen_neg = loss_fct(
+                logits[selected_negative].view(-1, model.config.vocab_size), 
+                labels[selected_negative].view(-1)
+        )
 
         ## (2) CE loss (MLE using Gumbel softmax)
         # loss_fct = NLLLoss()
@@ -82,9 +82,9 @@ class TrainerForVQG(TrainerBase):
 
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
-        loss = loss_gen + loss_reparam 
+        # loss = loss_gen + loss_reparam 
         # reweight the positive and negative
-        # loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam 
+        loss = loss_gen + loss_reparam 
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

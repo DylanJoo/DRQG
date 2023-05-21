@@ -32,6 +32,7 @@ def convert_to_passage_centric(args):
                     triplet[docid]['positive'] = set()
                     triplet[docid]['negative'] = set()
                 triplet[docid]['positive'].update([query])
+                triplet[docid]['positive_score'].update([score])
 
             # top 46 - 50 
             for docid_score in example['hard_negative_ctxs']:
@@ -40,6 +41,7 @@ def convert_to_passage_centric(args):
                     triplet[docid]['positive'] = set()
                     triplet[docid]['negative'] = set()
                 triplet[docid]['negative'].update([query])
+                triplet[docid]['negative'].update([score])
 
     # calculate stats
     pos, neg = [], []
