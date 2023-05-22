@@ -14,9 +14,9 @@ class TrainerBase(Trainer):
         attention_mask, 
         labels,
     ):
-        model.eval()
         with torch.no_grad():
             # generate the normal one
+            model.eval()
             n=input_ids.size()[0]
             out = model.generate(
                     input_ids, 
@@ -33,8 +33,7 @@ class TrainerBase(Trainer):
                 print(f"D2Q ({model.name_samples[i]:<3}):", 
                         model.tokenizer.decode(temp[i*n], skip_special_tokens=True)
                 )
-
-        model.train()
+            model.train()
 
 class TrainerForVQG(TrainerBase):
 
@@ -71,20 +70,24 @@ class TrainerForVQG(TrainerBase):
         )
 
         ## (2) CE loss (MLE using Gumbel softmax)
-        # loss_fct = NLLLoss()
-        # tau_hp = max(0.5, math.exp(-1*1e-5*training_steps))
-        # probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
+        loss_fct = NLLLoss()
+        tau_hp = max(0.5, math.exp(-1*1e-5*training_steps))
+        probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
         loss_gen_gumbel = 0
-        # loss_gen_gumbel = loss_fct(
-        #         probs_gumbel.log().view(-1, model.config.vocab_size), 
-        #         labels.view(-1)
-        # )
+        loss_gen_gumbel = loss_fct(
+                probs_gumbel.log().view(-1, model.config.vocab_size), 
+                labels.view(-1)
+        )
 
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
-        # loss = loss_gen + loss_reparam 
-        # reweight the positive and negative
         loss = loss_gen + loss_reparam 
+
+        # reweight the positive and negative
+        # if loss_gen_neg > loss_gen_pos:
+        #     loss = 0.5 * (loss_gen_pos + loss_gen_neg) + loss_reparam 
+        # else:
+        #     loss = loss_gen_pos + loss_reparam 
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

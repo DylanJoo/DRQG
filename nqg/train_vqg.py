@@ -38,10 +38,12 @@ class OurModelArguments:
     freeze_embeds: bool = field(default=True)
     freeze_a_layer: bool = field(default=True)
     freeze_cross_attn: bool = field(default=True)
-    initialize_from_vocab: bool = field(default=False)
+    initialize_from_vocab: bool = field(default=True)
+    used_prompt: str = field(default="<s>")
     n: int = field(default=1)
     n_side: int = field(default=None)
     add_attentive_pooler: bool = field(default=False)
+    disable_dropout: bool = field(default=False)
     # random_masking_ratio: Optional[float] = field(default=None)
 
 @dataclass
@@ -91,6 +93,14 @@ def main():
 
     # Config and Tokenizer
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
+
+    if model_args.disable_dropout:
+        config.activation_dropout=0
+        config.attention_dropout=0
+        config.classif_dropout=0
+        config.classifier_dropout=0
+        config.dropout=0
+
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
@@ -101,6 +111,12 @@ def main():
             model_key = key
 
     # Model: Enc-Dec
+    model_args.used_vocab_idx = tokenizer.encode(
+            model_args.used_prompt,
+            add_special_tokens=False
+    )
+    model_args.used_prompt = None
+
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 

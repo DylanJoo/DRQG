@@ -15,11 +15,13 @@ from .prompt import (
         SoftEmbedding, 
         SoftAdaptiveEmbedding, 
         SoftEmbeddingWithPooler, 
-        SoftResidualEmbedding
+        SoftResidualEmbedding,
+        SoftEmbeddingBasic
 )
 
 PROMPT_EMBEDS = {
         'static': SoftEmbedding,
+        'basic': SoftEmbeddingBasic,
         'adaptive': SoftAdaptiveEmbedding,
         'attentive': SoftEmbeddingWithPooler,
         'residual': SoftResidualEmbedding
@@ -58,6 +60,8 @@ class BartVQG(BartQG):
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
+                initialize_from_vocab=vqg_config.initialize_from_vocab,
+                used_vocab_idx=vqg_config.used_vocab_idx,
                 n_prompts=vqg_config.n_soft_prompts,
                 pooler=pooler,
                 **kwargs

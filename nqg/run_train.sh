@@ -1,10 +1,10 @@
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=1
 BASE=bartvqg
-MODEL=colbert-cold-resid_10-B_4x3
+MODEL=colbert-ada-B_4x3
 
 rm -rvf $BASE/$MODEL
 # PRT_MODEL=facebook/bart-base
-# PRT_MODEL=bartqg-d2q/irrelevant/checkpoint-16000
+PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 
 TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
@@ -15,24 +15,28 @@ python3 train_vqg.py \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
   --output_dir $BASE/$MODEL \
-  --max_p_length 256 \
+  --max_p_length 200 \
   --max_q_length 16 \
-  --per_device_train_batch_size 4 \
-  --m_negative_per_example 3 \
+  --per_device_train_batch_size 8 \
+  --m_negative_per_example 1 \
   --n_side 5 \
   --evaluation_strategy steps \
   --learning_rate 1e-3 \
+  --lr_scheduler_type constant \
   --train_file $TRAIN_FILE \
-  --max_steps 10000 \
-  --save_steps 1000 \
-  --eval_steps 1000 \
-  --pooling residual \
+  --max_steps 20000 \
+  --save_steps 2000 \
+  --eval_steps 500 \
+  --pooling adaptive \
   --add_attentive_pooler false \
   --n_soft_prompts 10 \
   --latent_size 128 \
   --has_compressed_layer true \
+  --initialize_from_vocab true \
+  --used_prompt 'positive or negative nquestion generation' \
+  --disable_dropout false \
   --k 0.025 \
-  --x0 2000 \
+  --x0 1000 \
   --warmup_ratio 0.1 \
   --annealing logistic \
   --do_train \

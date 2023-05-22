@@ -26,16 +26,12 @@ def convert_to_passage_centric(args):
         for pid, score in ranklist.items():
             if pid not in triplet:
                 triplet[pid]['positive'] = []
-                triplet[pid]['positive_score'] = []
                 triplet[pid]['negative'] = []
-                triplet[pid]['negative_score'] = []
 
             if score <= 0:
-                triplet[pid]['negative'].append(query)
-                triplet[pid]['negative_score'].append(score)
+                triplet[pid]['negative'].append((query, score))
             else:
-                triplet[pid]['positive'].append(query)
-                triplet[pid]['positive_score'].append(score)
+                triplet[pid]['positive'].append((query, score))
 
     # calculate stats
     pos, neg = [], []
@@ -56,15 +52,22 @@ def convert_to_passage_centric(args):
             negatives = list(queries['negative'])
             n_pos = len(positives)
             n_neg = len(negatives)
+            # sort them 
+            positives = sorted(positives, key=lambda x: x[1], reverse=True)[:args.max_n]
+            negatives = sorted(negatives, key=lambda x: x[1], reverse=True)[:args.max_n]
 
             # Setting-L: join a list of postives and negative. 
             # Additionally, put them into a list for making sure there are in-batch
             if 'vL' in args.output_jsonl:
                 if n_pos >= args.min_n and n_neg >= args.min_n:
+                    p_text, p_score = list(zip(*positives))
+                    n_text, n_score = list(zip(*negatives))
                     f.write(json.dumps({
                         "passage": collection[str(pid)],
-                        "positive": positives, 
-                        "negative": negatives
+                        "positive": p_text, 
+                        "positive_score": p_score, 
+                        "negative": n_text,
+                        "negative_score": n_score
                     }, ensure_ascii=False)+'\n')
 
 if __name__ == '__main__':
@@ -77,6 +80,8 @@ if __name__ == '__main__':
     # spec for dragon pseudo datasets
     parser.add_argument("--min_n", type=int, default=1, 
             help='the minumum number of obtained negative query.')
+    parser.add_argument("--max_n", type=int, default=10, 
+            help='the maximun number of obtained negative query.')
     args = parser.parse_args()
 
     convert_to_passage_centric(args)

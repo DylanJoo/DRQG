@@ -11,6 +11,11 @@ class T5QG(T5ForConditionalGeneration):
         self.n_samples = 1
 
     def get_pooler(self, config=None):
+        config.activation_dropout=0.1
+        config.attention_dropout=0.1
+        config.classif_dropout=0.1
+        config.classifier_dropout=0
+        config.dropout=0.1
         return T5Stack(config)
 
     def set_n_eval_samples(self, n=None, n_side=None):
