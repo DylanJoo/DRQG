@@ -90,6 +90,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_soft_prompts", default=1, type=int)
     parser.add_argument("--n_side_tail", default=0, type=int)
     parser.add_argument("--pooling", default='static', type=str)
+    parser.add_argument("--adaptive_pooling", default='mean', type=str)
     parser.add_argument("--add_attentive_pooler", default=False, type=bool)
     parser.add_argument("--has_compressed_layer", default=False, type=bool)
 
@@ -115,6 +116,7 @@ if __name__ == "__main__":
             n_soft_prompts=args.n_soft_prompts,
             n_side=args.n_side_tail,
             pooling=args.pooling,
+            adaptive_pooling=args.adaptive_pooling,
             add_attentive_pooler=args.add_attentive_pooler,
             has_compressed_layer=args.has_compressed_layer
     )

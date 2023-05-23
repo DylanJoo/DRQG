@@ -64,6 +64,7 @@ class BartVQG(BartQG):
                 used_vocab_idx=vqg_config.used_vocab_idx,
                 n_prompts=vqg_config.n_soft_prompts,
                 pooler=pooler,
+                adaptive_pooling=vqg_config.adaptive_pooling,
                 **kwargs
         )
         self.model.encoder.set_input_embeddings(self.enc_prompts)

@@ -30,3 +30,7 @@ class VQG_CONFIG:
     n_soft_prompts: int = field(default=1)
     pooling: str = field(default='static')
     add_attentive_pooler: Optional[bool] = field(default=False)
+    disable_dropout: bool = field(default=False)
+    used_prompt: str = field(default="<s>")
+    used_vocab_idx: int = field(default=0)
+    adaptive_pooling: Optional[str] = field(default=None)

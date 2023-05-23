@@ -171,10 +171,7 @@ class DataCollatorForVQG(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     m_negatives: int = 2
-
-    def setup_prompt(self, input_ids, attention_mask):
-        # 50265
-        return expanded_input_ids, expanded_attention_mask
+    m_positives: int = 2
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -185,10 +182,13 @@ class DataCollatorForVQG(DataCollatorBase):
         example_id = []
 
         for i, batch in enumerate(features):
-            texts_p += [batch['passage']]
-            texts_q += [batch['positive'][0]]
-            clf_labels += [1]
-            example_id += [i]
+
+            for i, batch_pos in \
+                    enumerate(batch['positive'][:self.m_positives]):
+                texts_p += [batch['passage']]
+                texts_q += [batch_pos]
+                clf_labels += [1]
+                example_id += [i]
 
             for i, batch_neg in \
                     enumerate(batch['negative'][::-1][:self.m_negatives]):

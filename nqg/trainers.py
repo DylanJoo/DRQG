@@ -95,6 +95,8 @@ class TrainerForVQG(TrainerBase):
                     \n(gumbel): {loss_gen_gumbel} (diff) {loss_gen_neg-loss_gen_pos}\
                     \nKLD: {loss_reparam}")
             selected = (inputs['clf_labels'] == 1)
+            if selected.sum() == 0:
+                selected[0] = True
             inputs_for_eval = {
                     "input_ids": inputs['input_ids'][selected],
                     "attention_mask": inputs['attention_mask'][selected],

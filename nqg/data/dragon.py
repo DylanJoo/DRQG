@@ -29,19 +29,17 @@ def convert_to_passage_centric(args):
             for docid_score in example['positive_ctxs']:
                 docid, score = str(docid_score['docidx']), docid_score['score']
                 if docid not in triplet:
-                    triplet[docid]['positive'] = set()
-                    triplet[docid]['negative'] = set()
-                triplet[docid]['positive'].update([query])
-                triplet[docid]['positive_score'].update([score])
+                    triplet[docid]['positive'] = list()
+                    triplet[docid]['negative'] = list()
+                triplet[docid]['positive'].append((query, score))
 
             # top 46 - 50 
             for docid_score in example['hard_negative_ctxs']:
                 docid, score = str(docid_score['docidx']), docid_score['score']
                 if docid not in triplet:
-                    triplet[docid]['positive'] = set()
-                    triplet[docid]['negative'] = set()
-                triplet[docid]['negative'].update([query])
-                triplet[docid]['negative'].update([score])
+                    triplet[docid]['positive'] = list()
+                    triplet[docid]['negative'] = list()
+                triplet[docid]['negative'].append((query, score))
 
     # calculate stats
     pos, neg = [], []
@@ -62,6 +60,9 @@ def convert_to_passage_centric(args):
             negatives = list(queries['negative'])
             n_pos = len(positives)
             n_neg = len(negatives)
+            # sort them
+            positives = sorted(positives, key=lambda x: x[1], reverse=True)[:args.max_n]
+            negatives = sorted(negatives, key=lambda x: x[1], reverse=True)[:args.max_n]
 
             # Setting1: neatives inner-join 
             # each p contains at most n_neg instances with same positive
@@ -82,10 +83,14 @@ def convert_to_passage_centric(args):
             # Additionally, put them into a list for making sure there are in-batch
             if 'vL' in args.output_jsonl:
                 if n_pos >= args.min_n and n_neg >= args.min_n:
+                    p_text, p_score = list(zip(*positives))
+                    n_text, n_score = list(zip(*negatives))
                     f.write(json.dumps({
                         "passage": collection[docid],
-                        "positive": positives, 
-                        "negative": negatives
+                        "positive": p_text, 
+                        "negative": n_text,
+                        "positive_score": p_score, 
+                        "negative_score": n_score
                     }, ensure_ascii=False)+'\n')
 
 if __name__ == '__main__':
@@ -96,6 +101,8 @@ if __name__ == '__main__':
 
     # spec for dragon pseudo datasets
     parser.add_argument("--min_n", type=int, default=1, 
+            help='the minumum number of obtained negative query.')
+    parser.add_argument("--max_n", type=int, default=10, 
             help='the minumum number of obtained negative query.')
     args = parser.parse_args()
 

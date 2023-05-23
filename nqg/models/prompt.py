@@ -6,7 +6,6 @@ from utils import kl_weight, kl_loss, PairwiseCELoss
 import copy
 
 class SoftEmbedding(nn.Module):
-
     def get_pairwise_loss(self):
         return self.pairwise_loss
 
@@ -25,6 +24,7 @@ class SoftEmbedding(nn.Module):
             initialize_from_vocab: bool = False, 
             used_vocab_idx: str = None, 
             pooler: Optional[object] = None,
+            adaptive_pooling: Optional[str] = None,
             **kwargs
         ):
         super(SoftEmbedding, self).__init__()
@@ -66,12 +66,24 @@ class SoftEmbedding(nn.Module):
         self.latent_size = latent_size
         self.hidden_size = hidden_size
         self.pooler = pooler
+        self.adaptive_pooling = adaptive_pooling
         self.kld_kwargs = kwargs
 
     def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         """ `training` and `evaluation/prediction` phrases have diff setups. 
         The training batch contains both (specified) batch_size * 2 
-        as exact mini-batch during training; while evaluation batch is unmodified."""
+        as exact mini-batch during training; while evaluation batch is unmodified
+
+        e_source: the original token embeddings.
+        e_prompt: the prompts embeddings.
+
+        Reparameterization 
+            Convert e_prompt from (dynamic) hidden space into continuous space Z 
+            Convert continuous embedding in Z to hidden space
+        
+        Concat 
+            e (variational prompt) and e_source
+        """
 
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens)
@@ -123,6 +135,20 @@ class SoftEmbedding(nn.Module):
         return e_input
 
 class SoftAdaptiveEmbedding(SoftEmbedding):
+    """ 
+    Preprocess
+        e_pooled is the average sentence embeddings
+
+    Reparameterization 
+        Convert e_pooled from hidden space into continuous space Z 
+        Convert continuous embedding in Z to hidden space
+    
+    Prompt process
+        Summation of (variational sentence embeddings) and (e_prompt)
+
+    Concat 
+        e (prompt with the mean of variational source) and e_source
+    """
 
     def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         batch_size, seq_length = tokens.shape
@@ -130,8 +156,11 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
         e_prompt = self.prompt_embeds.unsqueeze(0) 
 
         # [pooling] mean or max
-        e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
-        # e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
+        if self.adaptive_pooling == 'mean':
+            e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
+        elif self.adaptive_pooling == 'max':
+            e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
+
         if self.downproject is not None:
             e_pooled = self.downproject(e_pooled)
 
@@ -150,7 +179,7 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             # (1, N, H) --> (B, N, H)
             e_prompt = e_prompt.repeat(batch_size, 1, 1)
             # (B, N, H) + (B, 1, H) = (B, N, H)
-            e = e_prompt + e
+            e = e + e_prompt
 
             # compute loss
             loss = kl_loss(logv.view(-1, self.latent_size),
@@ -173,7 +202,7 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             # (B*std, 1, H)
             # (1, N, H) --> (B*std, N, H)
             e_prompt = e_prompt.repeat(len(self.std_list)*batch_size, 1, 1)
-            e = e_prompt + e
+            e = e + e_prompt
             e_source = e_source.repeat(len(self.std_list), 1, 1)
 
             # compute loss
@@ -200,7 +229,17 @@ class SoftEmbeddingWithPooler(SoftEmbedding):
         return pooled_output
 
 class SoftEmbeddingBasic(SoftEmbedding):
+    """ 
+    Reparameterization 
+        Convert e_source from hidden space into continuous space Z 
+        Convert continuous embedding in Z to hidden space
+    
+    Prompt process
+        Summation of (average e among length dimension) and (e_prompt)
 
+    Concat 
+        e (prompt with the mean of variational source) and e_source
+    """
     def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens)
@@ -215,7 +254,7 @@ class SoftEmbeddingBasic(SoftEmbedding):
             std = torch.exp(0.5*logv)
             r = torch.randn(mean.shape, device=e_source.device)
             r[(clf_labels == 1)] = 0
-            z = mean + r 
+            z = mean + r * std
             if self.upproject is not None:
                 z = self.upproject(z)
             e = self.latent2hidden(z) 

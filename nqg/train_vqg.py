@@ -28,6 +28,7 @@ class OurHFModelArguments:
 @dataclass
 class OurModelArguments:
     pooling: str = field(default='static')
+    adaptive_pooling: Optional[str] = field(default=None)
     n_soft_prompts: int = field(default=1)
     latent_size: int = field(default=128)
     has_compressed_layer: bool = field(default=False)
@@ -57,6 +58,7 @@ class OurDataArguments:
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
     m_negative_per_example: int = field(default=1)
+    m_positive_per_example: int = field(default=1)
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -116,6 +118,7 @@ def main():
             add_special_tokens=False
     )
     model_args.used_prompt = None
+    print('Used vocab index initialization', model_args.used_vocab_idx)
 
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
@@ -177,12 +180,13 @@ def main():
             return_tensors='pt',
             is_train=True,
             max_p_length=data_args.max_p_length,
-            m_negatives=data_args.m_negative_per_example
+            m_negatives=data_args.m_negative_per_example,
+            m_positives=data_args.m_positive_per_example
     )
 
     # Data: dataset
-    from data import msmarco, dragon
-    DATASETS = {"msmarco": msmarco, 'dragon': dragon}
+    from data import msmarco, dragon, nils
+    DATASETS = {"msmarco": msmarco, 'dragon': dragon, 'nils': nils}
 
     for key in DATASETS:
         if key in data_args.train_file.lower():
