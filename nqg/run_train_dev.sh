@@ -1,16 +1,15 @@
 export CUDA_VISIBLE_DEVICES=1
-BASE=bartvqg
+BASE=bartvqg-test
 MODEL=nils-warm-adamax-B_444
 
 rm -rvf $BASE/$MODEL
-PRT_MODEL=facebook/bart-base
 PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 
-# TRAIN_FILE=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
-TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
+TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
+# TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
 # TRAIN_FILE=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.vL.jsonl  
-python3 train_vqg.py \
+python3 train_vqg_dev.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
@@ -34,6 +33,7 @@ python3 train_vqg.py \
   --latent_size 128 \
   --has_compressed_layer true \
   --initialize_from_vocab true \
+  --add_classification_head true \
   --used_prompt 'generate positive and negative question from this passage' \
   --disable_dropout false \
   --k 0.5 \

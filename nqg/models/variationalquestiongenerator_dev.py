@@ -2,7 +2,7 @@ import torch
 import inspect
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig, BartModel
-from transformers.models.bart.modeling_bart import shift_tokens_right
+from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from torch import nn
@@ -15,13 +15,16 @@ from .prompt import (
         SoftEmbedding, 
         SoftAdaptiveEmbedding, 
         SoftEmbeddingWithPooler, 
-        SoftEmbeddingForDecoder
+        SoftResidualEmbedding,
+        SoftEmbeddingBasic
 )
 
 PROMPT_EMBEDS = {
         'static': SoftEmbedding,
+        'basic': SoftEmbeddingBasic,
         'adaptive': SoftAdaptiveEmbedding,
         'attentive': SoftEmbeddingWithPooler,
+        'residual': SoftResidualEmbedding
 }
 
 class BartVQG(BartQG):
@@ -57,21 +60,15 @@ class BartVQG(BartQG):
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
+                initialize_from_vocab=vqg_config.initialize_from_vocab,
+                used_vocab_idx=vqg_config.used_vocab_idx,
                 n_prompts=vqg_config.n_soft_prompts,
                 pooler=pooler,
+                adaptive_pooling=vqg_config.adaptive_pooling,
                 **kwargs
         )
         self.model.encoder.set_input_embeddings(self.enc_prompts)
-
-        self.dec_prompts = SoftEmbeddingForDecoder(
-                wte=self.model.shared, 
-                hidden_size=config.d_model,
-                latent_size=vqg_config.latent_size,
-                n_prompts=1,
-                pooler=pooler,
-                **kwargs
-        )
-        self.model.decoder.set_input_embeddings(self.dec_prompts)
+        self.model.decoder.set_input_embeddings(self.model.shared)
         # self.model.decoder.set_input_embeddings(self.dec_prompts)
 
         # set evaluation sample when inference temp results
@@ -80,6 +77,17 @@ class BartVQG(BartQG):
         self.enc_prompts.set_gaussian_range(self.name_samples)
         print(f'Prompt embedding set finished with \
                 \n{self.n_samples} eval samples: {self.name_samples}.')
+
+        if vqg_config.add_classification_head:
+            self.classification_head = BartClassificationHead(
+                config.d_model,
+                config.d_model,
+                1,
+                config.classifier_dropout,
+            )
+        else:
+            self.classification_head = None
+
 
     def reparam_inputs(self, input_ids, attn_mask, steps=None, clf_labels=None):
         """
@@ -121,7 +129,6 @@ class BartVQG(BartQG):
         return_dict: Optional[bool] = None,
         steps: Optional[int] = None,
         clf_labels: Optional[torch.LongTensor] = None,
-        example_id: Optional[torch.LongTensor] = None,
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
@@ -133,31 +140,12 @@ class BartVQG(BartQG):
             inputs_embeds = None
             attention_mask_new = attention_mask
 
-        if labels is not None:
-            decoder_input_ids = shift_tokens_right(
-                    labels, self.config.pad_token_id, self.config.decoder_start_token_id
-            )
-            decoder_inputs_embeds = self.dec_prompts(decoder_input_ids)
-
-            decoder_attention_mask = torch.ones((
-                labels.size(0), decoder_attention_mask.size(-1) + 1
-            )).to(labels.device)
-
-            labels = torch.cat([
-                torch.full((labels.size(0), 1), -100).to(labels.device), labels
-            ], 1)
-        else:
-            if past_key_values is None:
-                decoder_inputs_embeds = self.dec_prompts(decoder_input_ids)
-            else:
-                decoder_inputs_embeds = self.dec_prompts.orig_embeds(decoder_input_ids)
-
         # standard enc-dec pipeline
         # TODO add classfication task head here
-        return super().forward(
+        outputs = super().forward(
                 input_ids=None, 
                 attention_mask=attention_mask_new,
-                decoder_input_ids=None,
+                decoder_input_ids=decoder_input_ids,
                 decoder_attention_mask=decoder_attention_mask,
                 head_mask=head_mask,
                 cross_attn_head_mask=cross_attn_head_mask,
@@ -168,10 +156,15 @@ class BartVQG(BartQG):
                 labels=labels,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
+                output_hidden_states=True,
+                return_dict=True,
                 **kwargs
         )
+        # add classification head
+        if self.classification_head is not None:
+            outputs['clf_logits'] = outputs['decoder_hidden_states'][-1]
+
+        return outputs
 
     def generate(self, input_ids=None, attention_mask=None, **kwargs):
         inputs_embeds, attention_mask_new = self.reparam_inputs(

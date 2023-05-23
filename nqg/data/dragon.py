@@ -4,6 +4,7 @@ import argparse
 import json
 from datasets import load_dataset
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 def passage_centric_dataset(path):
     print(f"Load data from: {path} ...")
@@ -19,6 +20,8 @@ def convert_to_passage_centric(args):
     from data_utils import load_collection
     triplet = collections.defaultdict(dict)
     collection = load_collection(args.collection)
+
+    mms = MinMaxScaler(feature_range=(0, 1))
 
     with open(args.input_jsonl, 'r') as f:
         for line in tqdm(f):
@@ -85,12 +88,18 @@ def convert_to_passage_centric(args):
                 if n_pos >= args.min_n and n_neg >= args.min_n:
                     p_text, p_score = list(zip(*positives))
                     n_text, n_score = list(zip(*negatives))
+                    # normalizing
+                    def _reshape(x):
+                        return np.array(x).reshape(-1, 1)
+                    mms.fit(_reshape(p_score+n_score))
+                    p_score_norm = mms.transform(_reshape(p_score)).flatten().tolist()
+                    n_score_norm = mms.transform(_reshape(n_score)).flatten().tolist()
                     f.write(json.dumps({
                         "passage": collection[docid],
                         "positive": p_text, 
                         "negative": n_text,
-                        "positive_score": p_score, 
-                        "negative_score": n_score
+                        "positive_score": p_score_norm, 
+                        "negative_score": n_score_norm
                     }, ensure_ascii=False)+'\n')
 
 if __name__ == '__main__':

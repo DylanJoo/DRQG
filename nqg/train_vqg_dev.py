@@ -28,6 +28,7 @@ class OurHFModelArguments:
 @dataclass
 class OurModelArguments:
     pooling: str = field(default='static')
+    adaptive_pooling: Optional[str] = field(default=None)
     n_soft_prompts: int = field(default=1)
     latent_size: int = field(default=128)
     has_compressed_layer: bool = field(default=False)
@@ -38,11 +39,14 @@ class OurModelArguments:
     freeze_embeds: bool = field(default=True)
     freeze_a_layer: bool = field(default=True)
     freeze_cross_attn: bool = field(default=True)
-    initialize_from_vocab: bool = field(default=False)
+    initialize_from_vocab: bool = field(default=True)
+    used_prompt: str = field(default="<s>")
     n: int = field(default=1)
     n_side: int = field(default=None)
     add_attentive_pooler: bool = field(default=False)
+    disable_dropout: bool = field(default=False)
     # random_masking_ratio: Optional[float] = field(default=None)
+    add_classification_head: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
@@ -55,6 +59,7 @@ class OurDataArguments:
     max_p_length: int = field(default=256)
     max_q_length: int = field(default=16)
     m_negative_per_example: int = field(default=1)
+    m_positive_per_example: int = field(default=1)
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -91,16 +96,31 @@ def main():
 
     # Config and Tokenizer
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
+
+    if model_args.disable_dropout:
+        config.activation_dropout=0
+        config.attention_dropout=0
+        config.classif_dropout=0
+        config.classifier_dropout=0
+        config.dropout=0
+
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
-    from models import T5VQG, BartVQG
-    MODELS = {"t5": T5VQG, 'bart': BartVQG}
+    from models import T5VQG, BartVQGDEV
+    MODELS = {"t5": T5VQG, 'bart': BartVQGDEV}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
 
     # Model: Enc-Dec
+    model_args.used_vocab_idx = tokenizer.encode(
+            model_args.used_prompt,
+            add_special_tokens=False
+    )
+    model_args.used_prompt = None
+    print('Used vocab index initialization', model_args.used_vocab_idx)
+
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
@@ -144,10 +164,9 @@ def main():
 
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQG, DataCollatorForSQUAD
+    from datacollator import DataCollatorForVQG
     DATACOLLATORS = {
-            "vl": DataCollatorForVQG,
-            'squad': DataCollatorForSQUAD
+            "vl": DataCollatorForVQG
     }
 
     for key in DATACOLLATORS:
@@ -160,17 +179,20 @@ def main():
             return_tensors='pt',
             is_train=True,
             max_p_length=data_args.max_p_length,
-            m_negatives=data_args.m_negative_per_example
+            m_negatives=data_args.m_negative_per_example,
+            m_positives=data_args.m_positive_per_example
     )
 
     # Data: dataset
-    from data import msmarco, dragon, squad
-    DATASETS = {"msmarco": msmarco, 'dragon': dragon, 'squad': squad}
+    from data import msmarco, dragon, nils, redragon
+    DATASETS = {
+            "msmarco": msmarco, 'redragon': redragon, 
+            'dragon': dragon, 'nils': nils
+    }
 
     for key in DATASETS:
         if key in data_args.train_file.lower():
             dataset_key = key
-
     dataset = DATASETS[dataset_key].passage_centric_dataset(data_args.train_file)
 
     if training_args.do_eval is True:
@@ -185,7 +207,7 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers import TrainerForVQG
+    from trainers_dev import TrainerForVQG
     trainer = TrainerForVQG(
             model=model, 
             args=training_args,

@@ -46,6 +46,7 @@ class OurModelArguments:
     add_attentive_pooler: bool = field(default=False)
     disable_dropout: bool = field(default=False)
     # random_masking_ratio: Optional[float] = field(default=None)
+    add_classification_head: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
