@@ -13,18 +13,17 @@ import copy
 from .questiongenerator import BartQG
 from .prompt import (
         SoftEmbedding, 
+        SoftStaticEmbedding, 
         SoftAdaptiveEmbedding, 
         SoftEmbeddingWithPooler, 
-        SoftResidualEmbedding,
-        SoftEmbeddingBasic
 )
 
 PROMPT_EMBEDS = {
-        'static': SoftEmbedding,
-        'basic': SoftEmbeddingBasic,
+        'basic': SoftEmbedding,
+        'static': SoftStaticEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
         'attentive': SoftEmbeddingWithPooler,
-        'residual': SoftResidualEmbedding
+        # 'residual': SoftResidualEmbedding
 }
 
 class BartVQG(BartQG):
@@ -118,7 +117,7 @@ class BartVQG(BartQG):
         return_dict: Optional[bool] = None,
         steps: Optional[int] = None,
         clf_labels: Optional[torch.LongTensor] = None,
-        example_id: Optional[torch.LongTensor] = None,
+        clf_scores: Optional[torch.LongTensor] = None,
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 

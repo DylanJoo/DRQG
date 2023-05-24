@@ -13,18 +13,19 @@ import copy
 from .questiongenerator import BartQG
 from .prompt import (
         SoftEmbedding, 
+        SoftStaticEmbedding, 
         SoftAdaptiveEmbedding, 
+        SoftAdaptiveEmbedding2,
         SoftEmbeddingWithPooler, 
-        SoftResidualEmbedding,
-        SoftEmbeddingBasic
 )
 
 PROMPT_EMBEDS = {
-        'static': SoftEmbedding,
-        'basic': SoftEmbeddingBasic,
+        'basic': SoftEmbedding,
+        'static': SoftStaticEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
+        'adaptive2': SoftAdaptiveEmbedding2,
         'attentive': SoftEmbeddingWithPooler,
-        'residual': SoftResidualEmbedding
+        # 'residual': SoftResidualEmbedding
 }
 
 def shift_tokens_right_modified(
@@ -153,7 +154,7 @@ class BartVQG(BartQG):
 
         if encoder_outputs is None: # the first momnet when generating 
             inputs_embeds, attention_mask_new = self.reparam_inputs(
-                    input_ids, attention_mask, steps, clf_labels
+                    input_ids, attention_mask, steps, clf_scores
             )
         else:
             inputs_embeds = None

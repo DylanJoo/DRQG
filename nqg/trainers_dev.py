@@ -42,7 +42,13 @@ class TrainerForVQG(TrainerBase):
         # [NOTE] `label_smoother` was tooked out in this trainer. 
         # See HF's trainer for reference if needed.
         clf_labels = inputs.get("clf_labels") #hard label
-        clf_scores = inputs.pop("clf_scores") #soft label
+        clf_scores = inputs.get("clf_scores")#soft label
+
+        # [NOTE] mask the input
+        # mask = (torch.rand(inputs['input_ids'].shape, device=model.device) > 0.1)
+        # mask[clf_labels==1] = False
+        # mask[clf_labels==0] = False
+        # inputs['input_ids'] = inputs['input_ids'].masked_fill(mask, 50264)
 
         # [NOTE] add training steps info 
         training_steps = copy.deepcopy(self.state.global_step)
@@ -51,16 +57,15 @@ class TrainerForVQG(TrainerBase):
         # Calculate losses with customized objectives
         logits = outputs.get("logits")
         labels = inputs.get("labels").to(logits.device)
-        clf_logits = outputs.get("clf_logits")
-        weights = (1-clf_scores.unsqueeze(1).repeat(1, labels.size(-1), 1))
-
-        logits = logits / weights
 
         ## (1) CE loss (MLE using argmax)
-        # loss_gen = outputs.get("loss")
+        loss_gen = outputs.get("loss")
 
-        ### CE loss separataion
-        ### add norm score weight
+        ### labels post processing
+        # rand = torch.rand(labels.shape, device=labels.device) 
+        # masked = (rand.abs() > clf_scores).to(labels.device).view(-1, 1)
+        # labels = labels.masked_fill(masked, -100)
+
         loss_fct = CrossEntropyLoss()
         selected_positive = (clf_labels==1)
         loss_gen_pos = 0
@@ -85,12 +90,13 @@ class TrainerForVQG(TrainerBase):
                 labels.view(-1)
         )
 
-        ## (3) regression loss
-        loss_fct = MSELoss()
-        print(clf_logits)
-        print(clf_scores)
-        loss_clf = loss_fct(clf_logits.squeeze(), clf_scores.squeeze())
+        ## (3) clf labels: regression loss
+        loss_clf = 0
+        # clf_logits = outputs.get("clf_logits")
+        # loss_fct = MSELoss()
+        # loss_clf = loss_fct(clf_logits.squeeze(), clf_scores.squeeze())
 
+        ## (4) KL loss
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
 
@@ -99,7 +105,8 @@ class TrainerForVQG(TrainerBase):
         #     loss = 0.5 * (loss_gen_pos + loss_gen_neg) + loss_reparam 
         # else:
         #     loss = loss_gen_pos + loss_reparam 
-        loss = loss_gen + loss_reparam + loss_clf
+        # loss = loss_gen + loss_reparam + loss_clf
+        loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam + loss_clf
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

@@ -108,9 +108,9 @@ class SoftEmbedding(nn.Module):
             # [reshape] All done
 
             # compute loss
-            loss = kl_loss(logv.view(-1, self.latent_size),
-                           mean.view(-1, self.latent_size)) 
-            self.kld_loss = loss
+            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
+                           mean[clf_labels==1].view(-1, self.latent_size))
+            self.kld_loss = loss / len(clf_labes==1)
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
 
         else: 
@@ -130,6 +130,86 @@ class SoftEmbedding(nn.Module):
             self.kld_weight = 0
 
         # [concat]
+        e_input = torch.cat([e, e_source], 1)
+
+        return e_input
+
+class SoftAdaptiveEmbedding2(SoftEmbedding):
+    """ 
+    Preprocess
+        e_pooled is the average sentence embeddings
+
+    Reparameterization 
+        Convert e_pooled from hidden space into continuous space Z 
+        Convert continuous embedding in Z to hidden space
+    
+    Prompt process
+        Summation of (variational sentence embeddings) and (e_prompt)
+
+    Concat 
+        e (prompt with the mean of variational source) and e_source
+    """
+
+    def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
+        batch_size, seq_length = tokens.shape
+        e_source = self.orig_embeds(tokens)
+        e_prompt = self.prompt_embeds.unsqueeze(0) 
+
+        # [pooling] mean or max
+        if self.adaptive_pooling == 'mean':
+            e_pooled = torch.mean(e_source, dim=1).unsqueeze(1)
+        elif self.adaptive_pooling == 'max':
+            e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
+
+        if self.downproject is not None:
+            e_pooled = self.downproject(e_pooled)
+
+        if is_train: 
+            mean = self.hidden2mean(e_pooled)
+            logv = self.hidden2logv(e_pooled)
+            std = torch.exp(0.5*logv)
+            r = torch.randn(mean.shape, device=e_source.device)
+            w = clf_labels.view(-1, 1, 1).repeat(1, 1, mean.size(-1))
+            z  = mean + r * std * (1-w)
+            if self.upproject is not None:
+                z = self.upproject(z)
+            e = self.latent2hidden(z) 
+
+            # [reshape] All done
+            # (1, N, H) --> (B, N, H)
+            e_prompt = e_prompt.repeat(batch_size, 1, 1)
+            # (B, N, H) + (B, 1, H) = (B, N, H)
+            e = e + e_prompt
+
+            # compute loss
+            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
+                           mean[clf_labels==1].view(-1, self.latent_size))
+            self.kld_loss = loss / len(clf_labes==1)
+            self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
+
+        else: 
+            mean = self.hidden2mean(e_pooled)
+            logv = self.hidden2logv(e_pooled)
+            std = torch.exp(0.5*logv)
+            z = torch.cat([
+                mean+i*std for i in self.std_list
+            ], 0)
+            if self.upproject is not None:
+                z = self.upproject(z)
+            e = self.latent2hidden(z) 
+
+            # [reshape]
+            # (B*std, 1, H)
+            # (1, N, H) --> (B*std, N, H)
+            e_prompt = e_prompt.repeat(len(self.std_list)*batch_size, 1, 1)
+            e = e + e_prompt
+            e_source = e_source.repeat(len(self.std_list), 1, 1)
+
+            # compute loss
+            self.kld_loss = 0
+            self.kld_weight = 0
+
+        # Concat z to original embeddings
         e_input = torch.cat([e, e_source], 1)
 
         return e_input
@@ -182,18 +262,16 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             e = e + e_prompt
 
             # compute loss
-            loss = kl_loss(logv.view(-1, self.latent_size),
-                           mean.view(-1, self.latent_size))
-            self.kld_loss = loss
+            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
+                           mean[clf_labels==1].view(-1, self.latent_size))
+            self.kld_loss = loss / len(clf_labes==1)
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
 
         else: 
             mean = self.hidden2mean(e_pooled)
             logv = self.hidden2logv(e_pooled)
             std = torch.exp(0.5*logv)
-            z = torch.cat([
-                mean+i*std for i in self.std_list
-            ], 0)
+            z = torch.cat([mean+i*std for i in self.std_list], 0)
             if self.upproject is not None:
                 z = self.upproject(z)
             e = self.latent2hidden(z) 
@@ -228,7 +306,7 @@ class SoftEmbeddingWithPooler(SoftEmbedding):
 
         return pooled_output
 
-class SoftEmbeddingBasic(SoftEmbedding):
+class SoftStaticEmbedding(SoftEmbedding):
     """ 
     Reparameterization 
         Convert e_source from hidden space into continuous space Z 
@@ -266,11 +344,10 @@ class SoftEmbeddingBasic(SoftEmbedding):
             e = e_prompt + torch.mean(e, dim=1).unsqueeze(1)
 
             # compute loss
-            loss = kl_loss(logv.view(-1, self.latent_size),
-                           mean.view(-1, self.latent_size)) 
-            self.kld_loss = loss
+            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
+                           mean[clf_labels==1].view(-1, self.latent_size))
+            self.kld_loss = loss / len(clf_labes==1)
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
-
         else: 
             mean = self.hidden2mean(e_repr)
             logv = self.hidden2logv(e_repr)
@@ -336,68 +413,67 @@ class SoftEmbeddingForDecoder(SoftEmbedding):
         e_prompt = self.prompt_embeds.unsqueeze(0) 
         return torch.cat([e_prompt.repeat(e_source.size(0), 1, 1), e_source], 1)
 
-class SoftResidualEmbedding(SoftEmbedding):
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.prompt_embeds_base = nn.Parameter(
-                torch.randn(
-                    (self.n_prompts, self.hidden_size), 
-                    device=self.orig_embeds.weight.device
-                )
-        )
-
-    def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
-        batch_size, seq_length = tokens.shape
-        e_source = self.orig_embeds(tokens)
-        e_prompt = self.prompt_embeds.unsqueeze(0) 
-        if self.downproject is not None:
-            e_prompt = self.downproject(e_prompt)
-
-        if is_train: 
-            mean = self.hidden2mean(e_prompt)
-            logv = self.hidden2logv(e_prompt)
-            std = torch.exp(0.5*logv)
-            z = torch.cat([
-                mean + torch.randn(mean.shape, device=e_source.device)*(1-i)*std \
-                        for i in clf_labels
-            ], 0) 
-            if self.upproject is not None:
-                z = self.upproject(z)
-            e = self.latent2hidden(z) 
-
-            if self.prompt_embeds_base is not None:
-                e = e + self.prompt_embeds_base.unsqueeze(0) 
-            
-            # [reshape] All done
-
-            # compute loss
-            loss = kl_loss(logv.view(-1, self.latent_size),
-                           mean.view(-1, self.latent_size))
-            self.kld_loss = loss
-            self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
-
-        else: 
-            mean = self.hidden2mean(e_prompt)
-            logv = self.hidden2logv(e_prompt)
-            std = torch.exp(0.5*logv)
-            z = torch.cat([mean+i*std for i in self.std_list], 0)
-            if self.upproject is not None:
-                z = self.upproject(z)
-            e = self.latent2hidden(z) 
-
-            if self.prompt_embeds_base is not None:
-                e = e + self.prompt_embeds_base.unsqueeze(0) 
-
-            # [reshape]
-            e = e.repeat_interleave(batch_size, dim=0)
-            e_source = e_source.repeat(len(self.std_list), 1, 1)
-
-            # compute loss
-            self.kld_loss = 0
-            self.kld_weight = 0
-
-        # Concat z to original embeddings
-        e_input = torch.cat([e, e_source], 1)
-
-        return e_input
+# class SoftResidualEmbedding(SoftEmbedding):
+#
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         self.prompt_embeds_base = nn.Parameter(
+#                 torch.randn(
+#                     (self.n_prompts, self.hidden_size), 
+#                     device=self.orig_embeds.weight.device
+#                 )
+#         )
+#     def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
+#         batch_size, seq_length = tokens.shape
+#         e_source = self.orig_embeds(tokens)
+#         e_prompt = self.prompt_embeds.unsqueeze(0) 
+#         if self.downproject is not None:
+#             e_prompt = self.downproject(e_prompt)
+#
+#         if is_train: 
+#             mean = self.hidden2mean(e_prompt)
+#             logv = self.hidden2logv(e_prompt)
+#             std = torch.exp(0.5*logv)
+#             z = torch.cat([
+#                 mean + torch.randn(mean.shape, device=e_source.device)*(1-i)*std \
+#                         for i in clf_labels
+#             ], 0) 
+#             if self.upproject is not None:
+#                 z = self.upproject(z)
+#             e = self.latent2hidden(z) 
+#
+#             if self.prompt_embeds_base is not None:
+#                 e = e + self.prompt_embeds_base.unsqueeze(0) 
+#             
+#             # [reshape] All done
+#
+#             # compute loss
+#             loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
+#                            mean[clf_labels==1].view(-1, self.latent_size))
+#             self.kld_loss = loss / len(clf_labes==1)
+#             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
+#
+#         else: 
+#             mean = self.hidden2mean(e_prompt)
+#             logv = self.hidden2logv(e_prompt)
+#             std = torch.exp(0.5*logv)
+#             z = torch.cat([mean+i*std for i in self.std_list], 0)
+#             if self.upproject is not None:
+#                 z = self.upproject(z)
+#             e = self.latent2hidden(z) 
+#
+#             if self.prompt_embeds_base is not None:
+#                 e = e + self.prompt_embeds_base.unsqueeze(0) 
+#
+#             # [reshape]
+#             e = e.repeat_interleave(batch_size, dim=0)
+#             e_source = e_source.repeat(len(self.std_list), 1, 1)
+#
+#             # compute loss
+#             self.kld_loss = 0
+#             self.kld_weight = 0
+#
+#         # Concat z to original embeddings
+#         e_input = torch.cat([e, e_source], 1)
+#
+#         return e_input
