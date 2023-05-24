@@ -75,8 +75,8 @@ def transform_pred_to_good_read(path_jsonl, path_txt, sigma_map=None):
         data = json.loads(line.strip())
         fw.write(f"passage:\n{data.pop('passage')}\n")
         fw.write(f"groun truth: \n")
-        fw.write(f"+\t{data.pop('positive_truth')}\n")
-        fw.write(f"-\t{data.pop('negative_truth')}\n")
+        fw.write(f"+\t{data.pop('positive_truth')[:2]}\n")
+        fw.write(f"-\t{data.pop('negative_truth')[:2]}\n")
 
         for key in data:
             fw.write(f"{key}:\n")

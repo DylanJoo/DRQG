@@ -53,10 +53,10 @@ def convert_to_passage_centric(args):
                 def _reshape(x):
                     return np.array(x).reshape(-1, 1)
                 q_examples, score_examples = list(zip(*examples))
-                score_norm = mms.fit_transform(_reshape(score_examples))
+                score_norm = mms.fit_transform(_reshape(score_examples)).flatten().tolist()
 
-                p_text, n_text = q_examples[:n//2], q_examples[n//2:]
-                p_score, n_score = score_examples[:n//2], score_examples[n//2:]
+                p_text, n_text = q_examples[:n//2][:args.max_n], q_examples[n//2:]
+                p_score, n_score = score_norm[:n//2][:args.max_n], score_norm[n//2:]
 
                 f.write(json.dumps({
                     "passage": collection[docid],
@@ -74,6 +74,8 @@ if __name__ == '__main__':
 
     # spec for dragon pseudo datasets
     parser.add_argument("--min_n", type=int, default=2, 
+            help='the minumum number of obtained negative query.')
+    parser.add_argument("--max_n", type=int, default=5, 
             help='the minumum number of obtained negative query.')
     args = parser.parse_args()
 

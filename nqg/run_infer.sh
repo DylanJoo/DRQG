@@ -1,15 +1,14 @@
 BASE=bartvqg
-# for MODEL in ${BASE}/*;do
 
-for MODEL in $BASE/*max*;do
-    EVAL_DATA=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.v0.sample.jsonl
+for MODEL in $BASE/*mean*;do
+    EVAL_DATA=/home/jhju/datasets/dragon.pseudo_datasets/colbertv2.pcentric.train.sample.vL.jsonl 
     DIR=evaluation/$MODEL
     mkdir -p $DIR
     python3 inference.py \
         --model_name facebook/bart-base \
         --model_path $MODEL/checkpoint-20000 \
         --input_jsonl $EVAL_DATA \
-        --output_jsonl $DIR/triples.eval.small.v0.pred.jsonl \
+        --output_jsonl $DIR/dragon.colbertv2.sample.pred.jsonl \
         --generation_type gaussian \
         --flags prediction  \
         --device cuda:2 \
@@ -21,7 +20,7 @@ for MODEL in $BASE/*max*;do
         --n_side_tail 5  \
         --n_soft_prompts 10 \
         --pooling adaptive \
-        --adaptive_pooling max \
+        --adaptive_pooling mean \
         --add_attentive_pooler false \
         --has_compressed_layer true \
         # --do_sample --top_k 10 

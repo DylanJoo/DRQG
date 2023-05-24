@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from transformers import T5ForConditionalGeneration
-from datacollator import DataCollatorForVQG
 from utils import interpolate
 
 class QuestionGenerator:
@@ -143,13 +142,14 @@ if __name__ == "__main__":
     dataset = load_dataset("json", data_files=args.input_jsonl)['train']
 
     # Data: datacollator
-    from datacollator import DataCollatorForVQGSPT
-    data_collator = DataCollatorForVQGSPT(
+    from datacollator import DataCollatorForVQG
+    data_collator = DataCollatorForVQG(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
             max_p_length=args.max_p_length,
             max_q_length=args.max_q_length,
+            use_clf_score=False,
             is_eval=True # to check the ground truth
     )
 

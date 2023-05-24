@@ -123,7 +123,7 @@ class DataCollatorForVQG(DataCollatorBase):
     is_eval: Union[bool, str] = False
     m_negatives: int = 2
     m_positives: int = 2
-    # use_clf_score: bool = False
+    use_clf_score: bool = True
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -139,26 +139,29 @@ class DataCollatorForVQG(DataCollatorBase):
                 texts_p += [batch['passage']]
                 texts_q += [batch_pos]
                 clf_labels += [1]
-                clf_scores += [batch['positive_score'][i]]
+                if self.use_clf_score:
+                    clf_scores += [batch['positive_score'][i]]
 
             for i, batch_neg in enumerate(batch['negative'][::-1][:self.m_negatives]):
                 texts_p += [batch['passage']]
                 texts_q += [batch_neg]
                 clf_labels += [0]
-                clf_scores += [batch['negative_score'][::-1][i]]
+                if self.use_clf_score:
+                    clf_scores += [batch['negative_score'][::-1][i]]
 
         if self.is_train:
             inputs = self.tokenizer(
                     texts_p,
                     max_length=self.max_p_length,
                     truncation=True,
-                    padding=True,
+                    padding='max_length',
                     return_tensors=self.return_tensors
             )
 
             targets = self.tokenizer(
                     texts_q,
-                    padding=True,
+                    padding='max_length',
+                    truncation=True,
                     return_tensors=self.return_tensors,
                     max_length=self.max_q_length
             )
@@ -179,11 +182,12 @@ class DataCollatorForVQG(DataCollatorBase):
                     truncation=True,
                     return_tensors=self.return_tensors
             )
-            inputs['passage'] = batch['passage']
+            inputs['passage'] = [batch['passage'] for batch in features]
 
             if self.is_eval:
-                inputs['positive'] = [batch['positive'][0] for batch in features]
-                inputs['negative'] = [batch['negative'][0] for batch in features]
+                inputs['positive'] = [batch['positive'] for batch in features]
+                inputs['negative'] = [batch['negative'] for batch in features]
+
         return inputs
 
 @dataclass

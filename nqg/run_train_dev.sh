@@ -1,6 +1,6 @@
 export CUDA_VISIBLE_DEVICES=1
 BASE=bartvqg-test
-MODEL=nils-warm-adamax-B_444
+MODEL=redragon-warm-adamax-B_444
 
 rm -rvf $BASE/$MODEL
 PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000

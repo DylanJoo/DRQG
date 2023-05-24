@@ -207,7 +207,10 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers_dev import TrainerForVQG
+    if model_args.add_classification_head:
+        from trainers_dev import TrainerForVQG
+    else:
+        from trainers import TrainerForVQG
     trainer = TrainerForVQG(
             model=model, 
             args=training_args,

@@ -2,7 +2,7 @@ import torch
 import inspect
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig, BartModel
-from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead
+from transformers.models.bart.modeling_bart import BartClassificationHead
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from torch import nn
@@ -26,6 +26,24 @@ PROMPT_EMBEDS = {
         'attentive': SoftEmbeddingWithPooler,
         'residual': SoftResidualEmbedding
 }
+
+def shift_tokens_right_modified(
+        input_ids: torch.Tensor, 
+        pad_token_id: int, 
+        decoder_start_token_id: int
+    ):
+    """
+    Shift input ids one token to the right.
+    """
+    shifted_input_ids = input_ids.new_zeros(input_ids.shape)
+    shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
+    shifted_input_ids[:, 0] = pad_token_id 
+    # since we focus the eos token at the sequence end, use pad instead.
+
+    # replace possible -100 values in labels by `pad_token_id`
+    shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
+
+    return shifted_input_ids
 
 class BartVQG(BartQG):
     base_model_prefix = "model"
@@ -129,6 +147,7 @@ class BartVQG(BartQG):
         return_dict: Optional[bool] = None,
         steps: Optional[int] = None,
         clf_labels: Optional[torch.LongTensor] = None,
+        clf_scores: Optional[torch.FloatTensor] = None,
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
@@ -160,9 +179,16 @@ class BartVQG(BartQG):
                 return_dict=True,
                 **kwargs
         )
+
         # add classification head
-        if self.classification_head is not None:
-            outputs['clf_logits'] = outputs['decoder_hidden_states'][-1]
+        if self.classification_head is not None and labels is not None:
+            hidden_states = outputs['decoder_hidden_states'][-1]
+            decoder_input_ids = shift_tokens_right_modified(
+                    labels, self.config.pad_token_id, self.config.pad_token_id
+            )
+            eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
+            sentence_representation = hidden_states[eos_mask, :]
+            outputs['clf_logits'] = self.classification_head(sentence_representation)
 
         return outputs
 

@@ -164,12 +164,8 @@ def main():
 
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQGSPT, DataCollatorForVQG
-    DATACOLLATORS = {
-            "v0": DataCollatorForVQGSPT, 
-            "v1": DataCollatorForVQGSPT, 
-            "vl": DataCollatorForVQG
-    }
+    from datacollator import DataCollatorForVQG
+    DATACOLLATORS = {"vl": DataCollatorForVQG }
 
     for key in DATACOLLATORS:
         if key in data_args.train_file.lower():

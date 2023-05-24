@@ -52,11 +52,15 @@ class TrainerForVQG(TrainerBase):
         logits = outputs.get("logits")
         labels = inputs.get("labels").to(logits.device)
         clf_logits = outputs.get("clf_logits")
+        weights = (1-clf_scores.unsqueeze(1).repeat(1, labels.size(-1), 1))
+
+        logits = logits / weights
 
         ## (1) CE loss (MLE using argmax)
-        loss_gen = outputs.get("loss")
+        # loss_gen = outputs.get("loss")
 
         ### CE loss separataion
+        ### add norm score weight
         loss_fct = CrossEntropyLoss()
         selected_positive = (clf_labels==1)
         loss_gen_pos = 0
@@ -83,6 +87,8 @@ class TrainerForVQG(TrainerBase):
 
         ## (3) regression loss
         loss_fct = MSELoss()
+        print(clf_logits)
+        print(clf_scores)
         loss_clf = loss_fct(clf_logits.squeeze(), clf_scores.squeeze())
 
         encoder = model.get_encoder()
