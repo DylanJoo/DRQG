@@ -71,7 +71,6 @@ if __name__ == '__main__':
     parser.add_argument("--input_jsonl", type=str, default=None)
     parser.add_argument("--collection", type=str, default=None)
     parser.add_argument("--output_jsonl", type=str, default=None)
-
     # spec for dragon pseudo datasets
     parser.add_argument("--min_n", type=int, default=2, 
             help='the minumum number of obtained negative query.')

@@ -2,7 +2,7 @@ import torch
 import inspect
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig, BartModel
-from transformers.models.bart.modeling_bart import shift_tokens_right
+from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead
 from transformers.modeling_outputs import Seq2SeqLMOutput
 
 from torch import nn
@@ -16,6 +16,7 @@ from .prompt import (
         SoftStaticEmbedding, 
         SoftAdaptiveEmbedding, 
         SoftEmbeddingWithPooler, 
+        SoftAdaptiveEmbedding2, 
 )
 
 PROMPT_EMBEDS = {
@@ -23,8 +24,30 @@ PROMPT_EMBEDS = {
         'static': SoftStaticEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
         'attentive': SoftEmbeddingWithPooler,
+        'adaptive2': SoftAdaptiveEmbedding2,
         # 'residual': SoftResidualEmbedding
 }
+
+def shift_tokens_right_modified(
+        input_ids: torch.Tensor, 
+        pad_token_id: int, 
+        eos_token_id: int
+    ):
+    """
+    Shift input ids one token to the right.
+    """
+    shifted_input_ids = input_ids.new_zeros(input_ids.shape)
+    shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
+    shifted_input_ids[:, 0] = pad_token_id 
+
+    # sometimes the last token is eos; thus, replace the last one by eos then.
+    shifted_input_ids[input_ids[:, -1].eq(eos_token_id), -1] = eos_token_id
+    # since we focus the eos token at the sequence end, use pad instead.
+
+    # replace possible -100 values in labels by `pad_token_id`
+    shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
+
+    return shifted_input_ids
 
 class BartVQG(BartQG):
     base_model_prefix = "model"
@@ -60,7 +83,7 @@ class BartVQG(BartQG):
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
                 initialize_from_vocab=vqg_config.initialize_from_vocab,
-                used_vocab_idx=vqg_config.used_vocab_idx,
+                used_prompt_idx=vqg_config.used_prompt_idx,
                 n_prompts=vqg_config.n_soft_prompts,
                 pooler=pooler,
                 adaptive_pooling=vqg_config.adaptive_pooling,
@@ -68,7 +91,6 @@ class BartVQG(BartQG):
         )
         self.model.encoder.set_input_embeddings(self.enc_prompts)
         self.model.decoder.set_input_embeddings(self.model.shared)
-        # self.model.decoder.set_input_embeddings(self.dec_prompts)
 
         # set evaluation sample when inference temp results
         # attrs: (1) n_samples (2) name_samples
@@ -76,6 +98,16 @@ class BartVQG(BartQG):
         self.enc_prompts.set_gaussian_range(self.name_samples)
         print(f'Prompt embedding set finished with \
                 \n{self.n_samples} eval samples: {self.name_samples}.')
+
+        if vqg_config.add_classification_head:
+            self.classification_head = BartClassificationHead(
+                config.d_model,
+                config.d_model,
+                1,
+                config.classifier_dropout,
+            )
+        else:
+            self.classification_head = None
 
     def reparam_inputs(self, input_ids, attn_mask, steps=None, clf_labels=None):
         """
@@ -122,8 +154,9 @@ class BartVQG(BartQG):
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
         if encoder_outputs is None: # the first momnet when generating 
+            # [NOTE] change clf labels to clf scores
             inputs_embeds, attention_mask_new = self.reparam_inputs(
-                    input_ids, attention_mask, steps, clf_labels
+                    input_ids, attention_mask, steps, clf_scores
             )
         else:
             inputs_embeds = None
@@ -131,7 +164,7 @@ class BartVQG(BartQG):
 
         # standard enc-dec pipeline
         # TODO add classfication task head here
-        return super().forward(
+        outputs = super().forward(
                 input_ids=None, 
                 attention_mask=attention_mask_new,
                 decoder_input_ids=decoder_input_ids,
@@ -145,10 +178,22 @@ class BartVQG(BartQG):
                 labels=labels,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
+                output_hidden_states=True,
+                return_dict=True,
                 **kwargs
         )
+        if self.classification_head is not None and labels is not None:
+            hidden_states = outputs['decoder_hidden_states'][-1]
+            decoder_input_ids = shift_tokens_right_modified(
+                    labels, 
+                    self.config.pad_token_id, 
+                    self.config.eos_token_id
+            )
+            # sanity check for eos tokens
+            eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
+            sentence_representation = hidden_states[eos_mask, :]
+            outputs['clf_logits'] = self.classification_head(sentence_representation)
+        return outputs
 
     def generate(self, input_ids=None, attention_mask=None, **kwargs):
         inputs_embeds, attention_mask_new = self.reparam_inputs(

@@ -39,11 +39,12 @@ def convert_to_passage_centric(args):
         pos.append(len(triplet[pid]['positive']))
         neg.append(len(triplet[pid]['negative']))
 
-    print(f"# passages: {len(triplet)}")
-    print(f"# avg. positive (query): {np.mean(pos)}")
-    print(f"# avg. negative (query): {np.mean(neg)}")
-    print(f"# passages has zero positive: {(np.array(pos) == 0).sum()}")
-    print(f"# passages has zero negative: {(np.array(neg) == 0).sum()}")
+    with open(f"{args.output_jsonl.replace('json', 'stats.txt')}", w) as fstat:
+        fstat.write(f"# passages: {len(triplet)}\n")
+        fstat.write(f"# avg. positive (query): {np.mean(pos)}\n")
+        fstat.write(f"# avg. negative (query): {np.mean(neg)}\\n")
+        fstat.write(f"# passages has zero positive: {(np.array(pos) == 0).sum()}\n")
+        fstat.write(f"# passages has zero negative: {(np.array(neg) == 0).sum()}\n")
 
     # reverse the mapping for output jsonl
     with open(args.output_jsonl, 'w') as f:

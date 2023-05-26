@@ -191,6 +191,79 @@ class DataCollatorForVQG(DataCollatorBase):
         return inputs
 
 @dataclass
+class DataCollatorForVQG2(DataCollatorBase):
+    is_train: Union[bool, str] = False
+    is_eval: Union[bool, str] = False
+    m_negatives: int = 2
+    m_positives: int = 2
+    use_clf_score: bool = True
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        # text and id info 
+        texts_p = []
+        texts_q = []
+        clf_labels = []
+        clf_scores = []
+
+        for i, batch in enumerate(features):
+
+            for i, batch_pos in enumerate(batch['positive'][:self.m_positives]):
+                texts_p += [f"{batch['passage']} | {batch_pos}"]
+                texts_q += [batch_pos]
+                clf_labels += [1]
+                if self.use_clf_score:
+                    clf_scores += [batch['positive_score'][i]]
+
+            for i, batch_neg in enumerate(batch['negative'][::-1][:self.m_negatives]):
+                texts_p += [f"{batch['passage']} | {texts_q[0]}"]
+                texts_q += [batch_neg]
+                clf_labels += [0]
+                if self.use_clf_score:
+                    clf_scores += [batch['negative_score'][::-1][i]]
+
+        if self.is_train:
+            inputs = self.tokenizer(
+                    texts_p,
+                    max_length=self.max_p_length,
+                    truncation=True,
+                    padding='max_length',
+                    return_tensors=self.return_tensors
+            )
+
+            targets = self.tokenizer(
+                    texts_q,
+                    padding='max_length',
+                    truncation=True,
+                    return_tensors=self.return_tensors,
+                    max_length=self.max_q_length
+            )
+
+            target_ids = targets['input_ids']
+            target_mask = targets['attention_mask'].bool()
+            target_ids = target_ids.masked_fill(~target_mask, -100)
+
+            inputs['labels'] = target_ids
+            inputs['decoder_attention_mask'] = target_mask
+            inputs['clf_labels'] = torch.LongTensor(clf_labels)
+            inputs['clf_scores'] = torch.Tensor(clf_scores)
+
+        else:
+            inputs = self.tokenizer(
+                    [batch['passage'] for batch in features],
+                    max_length=self.max_p_length,
+                    truncation=True,
+                    return_tensors=self.return_tensors
+            )
+            inputs['passage'] = [batch['passage'] for batch in features]
+
+            if self.is_eval:
+                inputs['positive'] = [batch['positive'] for batch in features]
+                inputs['negative'] = [batch['negative'] for batch in features]
+
+        return inputs
+
+@dataclass
 class DataCollatorForSQUAD(DataCollatorBase):
     is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False

@@ -1,6 +1,6 @@
 import torch
 import inspect
-from typing import Optional, Tuple, Union, Dict, Any
+from typing import Optional, Tuple, Union, Dict, Any, List
 from torch import nn
 from utils import kl_weight, kl_loss, PairwiseCELoss
 import copy
@@ -15,6 +15,9 @@ class SoftEmbedding(nn.Module):
     def set_gaussian_range(self, std_list):
         self.std_list = std_list
 
+    def post_init(self):
+        pass
+
     def __init__(
             self,
             wte: nn.Embedding,
@@ -22,7 +25,7 @@ class SoftEmbedding(nn.Module):
             latent_size: int = 128, 
             n_prompts: int = 1,
             initialize_from_vocab: bool = False, 
-            used_vocab_idx: str = None, 
+            used_prompt_idx: List[int] = None, 
             pooler: Optional[object] = None,
             adaptive_pooling: Optional[str] = None,
             **kwargs
@@ -33,16 +36,16 @@ class SoftEmbedding(nn.Module):
         self.orig_embeds = wte
 
         if initialize_from_vocab:
-            if isinstance(used_vocab_idx, list):
-                used_vocab_idx = used_vocab_idx*self.n_prompts
-                used_vocab_idx = used_vocab_idx[:self.n_prompts]
+            if isinstance(used_prompt_idx, list):
+                used_prompt_idx = used_prompt_idx*self.n_prompts
+                used_prompt_idx = used_prompt_idx[:self.n_prompts]
             else:
                 vocab_size = wte.weight.size(-1) - 1
-                used_vocab_idx = list(
+                used_prompt_idx = list(
                         range(vocab_size-self.n_prompts, vocab_size, 1)
                 )
             self.prompt_embeds = nn.Parameter(
-                    self.orig_embeds.weight[used_vocab_idx].clone().detach()
+                    self.orig_embeds.weight[used_prompt_idx].clone().detach()
             )
         else:
             self.prompt_embeds = nn.Parameter(
@@ -68,6 +71,7 @@ class SoftEmbedding(nn.Module):
         self.pooler = pooler
         self.adaptive_pooling = adaptive_pooling
         self.kld_kwargs = kwargs
+        self.post_init()
 
     def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         """ `training` and `evaluation/prediction` phrases have diff setups. 
@@ -101,6 +105,7 @@ class SoftEmbedding(nn.Module):
                 mean+torch.randn(mean.shape, device=mean.device)*(1-i)*std \
                     for i in clf_labels
             ], 0)
+            # z = mean + r * std
             if self.upproject is not None:
                 z = self.upproject(z)
             e = self.latent2hidden(z) 
@@ -108,9 +113,9 @@ class SoftEmbedding(nn.Module):
             # [reshape] All done
 
             # compute loss
-            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
-                           mean[clf_labels==1].view(-1, self.latent_size))
-            self.kld_loss = loss / len(clf_labes==1)
+            loss = kl_loss(logv.view(-1, self.latent_size),
+                           mean.view(-1, self.latent_size))
+            self.kld_loss = loss
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
 
         else: 
@@ -136,6 +141,7 @@ class SoftEmbedding(nn.Module):
 
 class SoftAdaptiveEmbedding2(SoftEmbedding):
     """ 
+    [TODO] revise this doc
     Preprocess
         e_pooled is the average sentence embeddings
 
@@ -150,6 +156,16 @@ class SoftAdaptiveEmbedding2(SoftEmbedding):
         e (prompt with the mean of variational source) and e_source
     """
 
+    def post_init(self, **kwargs):
+        self.downproject = nn.Linear(
+                self.hidden_size+2, self.latent_size*2,
+                bias=False
+        )
+        self.upproject = nn.Linear(
+                self.latent_size+2, self.latent_size*2, 
+                bias=False
+        )
+
     def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens)
@@ -161,16 +177,23 @@ class SoftAdaptiveEmbedding2(SoftEmbedding):
         elif self.adaptive_pooling == 'max':
             e_pooled = torch.max(e_source, dim=1).values.unsqueeze(1)
 
-        if self.downproject is not None:
-            e_pooled = self.downproject(e_pooled)
-
         if is_train: 
+            # add the contditional tokens
+            # B 2
+            cond = torch.cat([(1-clf_labels).view(-1, 1), clf_labels.view(-1, 1)], 1)
+            cond = cond.unsqueeze(1)
+            # B 1 2, B 1 H
+            e_pooled = torch.cat([e_pooled, cond], -1)
+            if self.downproject is not None:
+                e_pooled = self.downproject(e_pooled)
+
             mean = self.hidden2mean(e_pooled)
             logv = self.hidden2logv(e_pooled)
             std = torch.exp(0.5*logv)
             r = torch.randn(mean.shape, device=e_source.device)
-            w = clf_labels.view(-1, 1, 1).repeat(1, 1, mean.size(-1))
-            z  = mean + r * std * (1-w)
+            z = mean + r * std 
+
+            z = torch.cat([z, cond], -1)
             if self.upproject is not None:
                 z = self.upproject(z)
             e = self.latent2hidden(z) 
@@ -179,21 +202,31 @@ class SoftAdaptiveEmbedding2(SoftEmbedding):
             # (1, N, H) --> (B, N, H)
             e_prompt = e_prompt.repeat(batch_size, 1, 1)
             # (B, N, H) + (B, 1, H) = (B, N, H)
-            e = e + e_prompt
+            e = e_prompt + e 
 
             # compute loss
-            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
-                           mean[clf_labels==1].view(-1, self.latent_size))
-            self.kld_loss = loss / len(clf_labes==1)
+            loss = kl_loss(logv.view(-1, self.latent_size),
+                           mean.view(-1, self.latent_size))
+            self.kld_loss = loss / len(clf_labels)
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
-
         else: 
+            clf_labels = torch.range(0, len(self.std_list)-1, 1)/(len(self.std_list)-1)
+            # N 2
+            cond = torch.cat([(1-clf_labels).view(-1, 1), clf_labels.view(-1, 1)], 1)
+            cond = cond.unsqueeze(1).to(e_pooled.device)
+            # BN 2
+            cond = cond.repeat_interleave(batch_size, dim=0)
+            # BN 1 H
+            e_pooled = e_pooled.repeat(len(self.std_list), 1, 1)
+            # BN 1 H + BN 1 2
+            e_pooled = torch.cat([e_pooled, cond], -1)
+            if self.downproject is not None:
+                e_pooled = self.downproject(e_pooled)
+
             mean = self.hidden2mean(e_pooled)
-            logv = self.hidden2logv(e_pooled)
-            std = torch.exp(0.5*logv)
-            z = torch.cat([
-                mean+i*std for i in self.std_list
-            ], 0)
+            z = mean 
+
+            z = torch.cat([z, cond], -1)
             if self.upproject is not None:
                 z = self.upproject(z)
             e = self.latent2hidden(z) 
@@ -202,7 +235,7 @@ class SoftAdaptiveEmbedding2(SoftEmbedding):
             # (B*std, 1, H)
             # (1, N, H) --> (B*std, N, H)
             e_prompt = e_prompt.repeat(len(self.std_list)*batch_size, 1, 1)
-            e = e + e_prompt
+            e = e_prompt + e
             e_source = e_source.repeat(len(self.std_list), 1, 1)
 
             # compute loss
@@ -213,6 +246,69 @@ class SoftAdaptiveEmbedding2(SoftEmbedding):
         e_input = torch.cat([e, e_source], 1)
 
         return e_input
+
+    # def forward(self, tokens, is_train=False, steps=1, clf_labels=None):
+    #     batch_size, seq_length = tokens.shape
+    #     e_source = self.orig_embeds(tokens)
+    #     e_prompt = self.prompt_embeds.unsqueeze(0) 
+    #
+    #     if is_train:
+    #         # simple onehot
+    #         cond = torch.cat([(1-clf_labels).view(-1, 1), clf_labels.view(-1, 1)], 1)
+    #         e_cond = (cond @ self.condition_embeds.to(cond.device)).unsqueeze(1)
+    #         # (1, Np, H)-->(1, Np, Hz)-->(1*2, Np, H)
+    #         e_prompt = e_prompt.repeat(batch_size, 1, 1)
+    #         e_prompt = torch.cat([e_prompt, e_cond], 1)
+    #         if self.downproject is not None:
+    #             e_prompt = self.downproject(e_prompt)
+    #
+    #         mean = self.hidden2mean(e_prompt)
+    #         logv = self.hidden2logv(e_prompt)
+    #         std = torch.exp(0.5*logv)
+    #         r = torch.randn(mean.shape, device=e_source.device)
+    #         z = mean + r * std
+    #         if self.upproject is not None:
+    #             z = self.upproject(z)
+    #         z = torch.cat([z, e_cond], 1)
+    #         e = self.latent2hidden(z) 
+    #
+    #         # [reshape] All done
+    #
+    #         # compute loss
+    #         loss = kl_loss(logv.view(-1, self.latent_size),
+    #                        mean.view(-1, self.latent_size))
+    #         self.kld_loss = loss
+    #         self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
+    #
+    #     else: 
+    #         clf_labels = torch.range(0, len(self.std_list)-1, 1)/(len(self.std_list)-1)
+    #         cond = torch.cat([(1-clf_labels).view(-1, 1), clf_labels.view(-1, 1)], 1)
+    #         e_cond = (cond @ self.condition_embeds.to(cond.device)).unsqueeze(1)
+    #         if self.downproject is not None:
+    #             e_prompt = self.downproject(e_prompt)
+    #
+    #         mean = self.hidden2mean(e_prompt)
+    #         logv = self.hidden2logv(e_prompt)
+    #         std = torch.exp(0.5*logv)
+    #         z = torch.cat([
+    #             torch.cat([mean+std, e_cond], 1) for i in self.std_list
+    #         ], 0)
+    #         if self.upproject is not None:
+    #             z = self.upproject(z)
+    #         z = torch.cat([z, e_cond], 1)
+    #         e = self.latent2hidden(z)
+    #
+    #         # [reshape]
+    #         e = e.repeat_interleave(batch_size, dim=0)
+    #         e_source = e_source.repeat(len(self.std_list), 1, 1)
+    #
+    #         self.kld_loss = 0
+    #         self.kld_weight = 0
+    #
+    #     # [concat]
+    #     e_input = torch.cat([e, e_source], 1)
+    #
+    #     return e_input
 
 class SoftAdaptiveEmbedding(SoftEmbedding):
     """ 
@@ -249,8 +345,7 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             logv = self.hidden2logv(e_pooled)
             std = torch.exp(0.5*logv)
             r = torch.randn(mean.shape, device=e_source.device)
-            r[(clf_labels==1)] = 0
-            z  = mean + r * std
+            z  = mean + r * std 
             if self.upproject is not None:
                 z = self.upproject(z)
             e = self.latent2hidden(z) 
@@ -259,14 +354,14 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             # (1, N, H) --> (B, N, H)
             e_prompt = e_prompt.repeat(batch_size, 1, 1)
             # (B, N, H) + (B, 1, H) = (B, N, H)
-            e = e + e_prompt
+            scales = clf_labels.view(-1, 1, 1).repeat(1, e.size(1), e.size(2))
+            e = e_prompt + e * (1-scales)
 
             # compute loss
-            loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
-                           mean[clf_labels==1].view(-1, self.latent_size))
-            self.kld_loss = loss / len(clf_labes==1)
+            loss = kl_loss(logv.view(-1, self.latent_size),
+                           mean.view(-1, self.latent_size))
+            self.kld_loss = loss / len(clf_labels)
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
-
         else: 
             mean = self.hidden2mean(e_pooled)
             logv = self.hidden2logv(e_pooled)
@@ -280,7 +375,7 @@ class SoftAdaptiveEmbedding(SoftEmbedding):
             # (B*std, 1, H)
             # (1, N, H) --> (B*std, N, H)
             e_prompt = e_prompt.repeat(len(self.std_list)*batch_size, 1, 1)
-            e = e + e_prompt
+            e = e_prompt + e
             e_source = e_source.repeat(len(self.std_list), 1, 1)
 
             # compute loss
@@ -346,7 +441,7 @@ class SoftStaticEmbedding(SoftEmbedding):
             # compute loss
             loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
                            mean[clf_labels==1].view(-1, self.latent_size))
-            self.kld_loss = loss / len(clf_labes==1)
+            self.kld_loss = loss / len(clf_labels==1)
             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
         else: 
             mean = self.hidden2mean(e_repr)
@@ -450,7 +545,7 @@ class SoftEmbeddingForDecoder(SoftEmbedding):
 #             # compute loss
 #             loss = kl_loss(logv[clf_labels==1].view(-1, self.latent_size),
 #                            mean[clf_labels==1].view(-1, self.latent_size))
-#             self.kld_loss = loss / len(clf_labes==1)
+#             self.kld_loss = loss / len(clf_labels==1)
 #             self.kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
 #
 #         else: 

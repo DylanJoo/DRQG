@@ -161,12 +161,11 @@ def main():
             else:
                 param.requires_grad = False
 
-
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQG
+    from datacollator import DataCollatorForVQG2
     DATACOLLATORS = {
-            "vl": DataCollatorForVQG
+            "vl": DataCollatorForVQG2
     }
 
     for key in DATACOLLATORS:

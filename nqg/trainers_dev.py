@@ -40,11 +40,18 @@ class TrainerForVQG(TrainerBase):
     def compute_loss(self, model, inputs, return_outputs=False):
 
         # [NOTE] `label_smoother` was tooked out in this trainer. 
-        # See HF's trainer for reference if needed.
+        # Take out inputs
+        labels = inputs.get("labels").to(model.device)
         clf_labels = inputs.get("clf_labels") #hard label
-        clf_scores = inputs.get("clf_scores")#soft label
+        clf_scores = inputs.get("clf_scores") #soft label
 
-        # [NOTE] mask the input
+        ### [masking] 
+        #### mask labels post processing
+        # rand = torch.rand(labels.shape, device=labels.device) 
+        # masked = (rand.abs() > clf_scores).to(labels.device).view(-1, 1)
+        # labels = labels.masked_fill(masked, -100)
+
+        #### mask the input
         # mask = (torch.rand(inputs['input_ids'].shape, device=model.device) > 0.1)
         # mask[clf_labels==1] = False
         # mask[clf_labels==0] = False
@@ -54,37 +61,29 @@ class TrainerForVQG(TrainerBase):
         training_steps = copy.deepcopy(self.state.global_step)
         outputs = model(**inputs, steps=training_steps)
 
-        # Calculate losses with customized objectives
-        logits = outputs.get("logits")
-        labels = inputs.get("labels").to(logits.device)
-
         ## (1) CE loss (MLE using argmax)
-        loss_gen = outputs.get("loss")
+        # loss_gen = outputs.get("loss")
 
-        ### labels post processing
-        # rand = torch.rand(labels.shape, device=labels.device) 
-        # masked = (rand.abs() > clf_scores).to(labels.device).view(-1, 1)
-        # labels = labels.masked_fill(masked, -100)
-
-        loss_fct = CrossEntropyLoss()
+        ## (1) CE Loss (but separate positive/negative)
+        loss_gen_pos, loss_gen_neg = 0
+        logits = outputs.get("logits")
+        loss_fct = CrossEntropyLoss(reduction='sum')
         selected_positive = (clf_labels==1)
-        loss_gen_pos = 0
         loss_gen_pos = loss_fct(
                 logits[selected_positive].view(-1, model.config.vocab_size), 
                 labels[selected_positive].view(-1)
-        )
+        ) 
         selected_negative = (clf_labels<1)
-        loss_gen_neg = 0
         loss_gen_neg = loss_fct(
                 logits[selected_negative].view(-1, model.config.vocab_size), 
                 labels[selected_negative].view(-1)
         )
 
         ## (2) CE loss (MLE using Gumbel softmax)
-        loss_fct = NLLLoss()
+        loss_fct = NLLLoss(reduction='sum')
+        loss_gen_gumbel = 0
         tau_hp = max(0.5, math.exp(-1*1e-5*training_steps))
         probs_gumbel = F.gumbel_softmax(logits, tau=tau_hp, hard=False)
-        loss_gen_gumbel = 0
         loss_gen_gumbel = loss_fct(
                 probs_gumbel.log().view(-1, model.config.vocab_size), 
                 labels.view(-1)
@@ -100,17 +99,12 @@ class TrainerForVQG(TrainerBase):
         encoder = model.get_encoder()
         loss_reparam = encoder.embed_tokens.get_KL_loss()
 
-        # reweight the positive and negative
-        # if loss_gen_neg > loss_gen_pos:
-        #     loss = 0.5 * (loss_gen_pos + loss_gen_neg) + loss_reparam 
-        # else:
-        #     loss = loss_gen_pos + loss_reparam 
-        # loss = loss_gen + loss_reparam + loss_clf
-        loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam + loss_clf
+        loss = (loss_gen_pos + loss_gen_neg + loss_reparam + loss_clf) / labels.size(0)
+        # loss = 0.5 * (loss_gen_pos+loss_gen_neg) + loss_reparam + loss_clf
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
-            print(f"\nNLL: {loss_gen} (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
+            print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
                     \n(mse): {loss_clf} \nKLD: {loss_reparam}")
             selected = (inputs['clf_labels'] == 1)
             if selected.sum() == 0:

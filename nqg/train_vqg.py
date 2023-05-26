@@ -1,7 +1,7 @@
 import sys
 import multiprocessing
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from transformers import (
     AutoConfig,
@@ -40,7 +40,7 @@ class OurModelArguments:
     freeze_a_layer: bool = field(default=True)
     freeze_cross_attn: bool = field(default=True)
     initialize_from_vocab: bool = field(default=True)
-    used_prompt: str = field(default="<s>")
+    used_prompt: Optional[str] = field(default=None)
     n: int = field(default=1)
     n_side: int = field(default=None)
     add_attentive_pooler: bool = field(default=False)
@@ -114,12 +114,22 @@ def main():
             model_key = key
 
     # Model: Enc-Dec
-    model_args.used_vocab_idx = tokenizer.encode(
-            model_args.used_prompt,
-            add_special_tokens=False
-    )
-    model_args.used_prompt = None
-    print('Used vocab index initialization', model_args.used_vocab_idx)
+    if model_args.used_prompt:
+        model_args.used_prompt_idx = tokenizer.encode(
+                model_args.used_prompt,
+                add_special_tokens=False
+        )
+        model_args.used_prompt = True
+        print('Used prompt index:', model_args.used_prompt_idx)
+
+    # Model: Enc-Dec
+    # if model_args.used_condition:
+    #     model_args.used_condition_idx = tokenizer.encode(
+    #             [str(i) for i in model_args.used_condition], 
+    #             add_special_tokens=False
+    #     )
+    #     model_args.used_condition = True
+    #     print('Used conditional index:', model_args.used_condition_idx)
 
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
