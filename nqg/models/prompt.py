@@ -56,15 +56,14 @@ class SoftEmbedding(nn.Module):
             self.hidden2mean = nn.Linear(2*latent_size, latent_size, bias=False)
             self.hidden2logv = nn.Linear(2*latent_size, latent_size, bias=False)
             self.latent2hidden = nn.Linear(latent_size*2, hidden_size, bias=False)
-
             self.downproject = nn.Linear(hidden_size, latent_size*2, bias=False)
             self.upproject = nn.Linear(latent_size, latent_size*2, bias=False)
         else:
             self.hidden2mean = nn.Linear(hidden_size, latent_size, bias=False)
             self.hidden2logv = nn.Linear(hidden_size, latent_size, bias=False)
             self.latent2hidden = nn.Linear(latent_size, hidden_size, bias=False)
-            self.upproject = None
             self.downproject = None
+            self.upproject = None
 
         self.latent_size = latent_size
         self.hidden_size = hidden_size
@@ -88,7 +87,6 @@ class SoftEmbedding(nn.Module):
         Concat 
             e (variational prompt) and e_source
         """
-
         batch_size, seq_length = tokens.shape
         e_source = self.orig_embeds(tokens)
         e_prompt = self.prompt_embeds.unsqueeze(0) 
@@ -156,7 +154,7 @@ class SoftAdaptiveEmbedding2(SoftEmbedding):
         e (prompt with the mean of variational source) and e_source
     """
 
-    def post_init(self, **kwargs):
+    def post_init(self):
         self.downproject = nn.Linear(
                 self.hidden_size+2, self.latent_size*2,
                 bias=False

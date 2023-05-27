@@ -1,7 +1,7 @@
 import sys
 import multiprocessing
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from transformers import (
     AutoConfig,
@@ -40,7 +40,7 @@ class OurModelArguments:
     freeze_a_layer: bool = field(default=True)
     freeze_cross_attn: bool = field(default=True)
     initialize_from_vocab: bool = field(default=True)
-    used_prompt: str = field(default="<s>")
+    used_prompt: Optional[str] = field(default=None)
     n: int = field(default=1)
     n_side: int = field(default=None)
     add_attentive_pooler: bool = field(default=False)
@@ -107,19 +107,29 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
-    from models import T5VQG, BartVQGDEV
-    MODELS = {"t5": T5VQG, 'bart': BartVQGDEV}
+    from models import T5VQG, BartVQG, BartCVQG
+    MODELS = {"t5": T5VQG, 'bart': BartCVQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
 
     # Model: Enc-Dec
-    model_args.used_vocab_idx = tokenizer.encode(
-            model_args.used_prompt,
-            add_special_tokens=False
-    )
-    model_args.used_prompt = None
-    print('Used vocab index initialization', model_args.used_vocab_idx)
+    if model_args.used_prompt:
+        model_args.used_prompt_idx = tokenizer.encode(
+                model_args.used_prompt,
+                add_special_tokens=False
+        )
+        model_args.used_prompt = True
+        print('Used prompt index:', model_args.used_prompt_idx)
+
+    # Model: Enc-Dec
+    # if model_args.used_condition:
+    #     model_args.used_condition_idx = tokenizer.encode(
+    #             [str(i) for i in model_args.used_condition], 
+    #             add_special_tokens=False
+    #     )
+    #     model_args.used_condition = True
+    #     print('Used conditional index:', model_args.used_condition_idx)
 
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
@@ -143,7 +153,7 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['embed_tokens']
+    optimized_prefix = ['embed_tokens', 'classification']
 
     if model_args.freeze_embeds is False:
         optimized_prefix.append('shared')
@@ -161,12 +171,11 @@ def main():
             else:
                 param.requires_grad = False
 
+
     # Data: collator
     ### TODO Change the name `v0/v1` since the models have same setups
-    from datacollator import DataCollatorForVQG2
-    DATACOLLATORS = {
-            "vl": DataCollatorForVQG2
-    }
+    from datacollator import DataCollatorForVQG
+    DATACOLLATORS = {"vl": DataCollatorForVQG }
 
     for key in DATACOLLATORS:
         if key in data_args.train_file.lower():
@@ -183,11 +192,8 @@ def main():
     )
 
     # Data: dataset
-    from data import msmarco, dragon, nils, redragon
-    DATASETS = {
-            "msmarco": msmarco, 'redragon': redragon, 
-            'dragon': dragon, 'nils': nils
-    }
+    from data import msmarco, dragon, nils
+    DATASETS = {"msmarco": msmarco, 'dragon': dragon, 'nils': nils}
 
     for key in DATASETS:
         if key in data_args.train_file.lower():
@@ -206,8 +212,8 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers_dev import TrainerForVQG
-    trainer = TrainerForVQG(
+    from trainers_dev import TrainerForCVQG
+    trainer = TrainerForCVQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
