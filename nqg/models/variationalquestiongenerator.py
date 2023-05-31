@@ -12,20 +12,17 @@ from utils import kl_weight, kl_loss
 import copy
 from .questiongenerator import BartQG
 from .prompt import (
-        SoftEmbedding, 
+        SoftBasicEmbedding, 
         SoftStaticEmbedding, 
         SoftAdaptiveEmbedding, 
-        SoftEmbeddingWithPooler, 
         SoftAdaptiveEmbedding2, 
 )
 
 PROMPT_EMBEDS = {
-        'basic': SoftEmbedding,
+        'basic': SoftBasicEmbedding,
         'static': SoftStaticEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
-        'attentive': SoftEmbeddingWithPooler,
         'adaptive2': SoftAdaptiveEmbedding2,
-        # 'residual': SoftResidualEmbedding
 }
 
 def shift_tokens_right_modified(

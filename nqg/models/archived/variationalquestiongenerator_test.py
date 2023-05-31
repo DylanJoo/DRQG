@@ -14,6 +14,7 @@ from utils import kl_weight, kl_loss
 import copy
 from .questiongenerator import BartQG
 from .prompt import (
+        SoftEmbedding, 
         SoftBasicEmbedding, 
         SoftStaticEmbedding, 
         SoftAdaptiveEmbedding, 
@@ -21,15 +22,18 @@ from .prompt import (
 )
 
 PROMPT_EMBEDS = {
+        'none': SoftEmbedding,
         'basic': SoftBasicEmbedding,
         'static': SoftStaticEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
         'adaptive2': SoftAdaptiveEmbedding2,
 }
 
+
 @dataclass
 class Seq2SeqLMOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
+    loss_reparam: Optional[torch.FloatTensor] = None
     logits: torch.FloatTensor = None
     clf_logits: torch.FloatTensor = None
     past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
@@ -87,7 +91,7 @@ class BartCVQG(BartQG):
             self.classification_head = BartClassificationHead(
                 config.d_model,
                 config.d_model,
-                1,
+                2,
                 config.classifier_dropout,
             )
         else:
@@ -100,8 +104,7 @@ class BartCVQG(BartQG):
         self.n_soft_prompts = vqg_config.n_soft_prompts
 
         # soft prompting
-        ## config
-        kwargs = {
+        kld_kwargs = {
                 'annealing_fn': vqg_config.annealing_fn, 
                 'k': vqg_config.k, 'x0': vqg_config.x0,
                 'has_compressed_layer': vqg_config.has_compressed_layer
@@ -116,13 +119,29 @@ class BartCVQG(BartQG):
                 used_prompt_idx=vqg_config.used_prompt_idx,
                 n_prompts=vqg_config.n_soft_prompts,
                 adaptive_pooling=vqg_config.adaptive_pooling,
-                **kwargs
+                **kld_kwargs
         )
         self.model.encoder.set_input_embeddings(self.enc_prompts)
         self.model.decoder.set_input_embeddings(self.model.shared)
 
+        ## variational layers
+        if vqg_config.pooling == 'none':
+            if kld_kwargs.pop('has_compressed_layer'):
+                self.downproject = nn.Linear(2+config.d_model, vqg_config.latent_size*2, bias=False)
+                self.hidden2mean = nn.Linear(vqg_config.latent_size*2, vqg_config.latent_size, bias=False)
+                self.hidden2logv = nn.Linear(vqg_config.latent_size*2, vqg_config.latent_size, bias=False)
+                self.upproject = nn.Linear(2+vqg_config.latent_size, vqg_config.latent_size*2, bias=False)
+                self.latent2hidden = nn.Linear(vqg_config.latent_size*2, config.d_model, bias=False)
+            else:
+                self.hidden2mean = nn.Linear(config.d_model+2, vqg_config.latent_size, bias=False)
+                self.hidden2logv = nn.Linear(config.d_model+2, vqg_config.latent_size, bias=False)
+                self.latent2hidden = nn.Linear(vqg_config.latent_size, config.d_model, bias=False)
+
+            self.hidden_size = config.d_model
+            self.latent_size = vqg_config.latent_size
+            self.kld_kwargs = kld_kwargs
+
         # set evaluation sample when inference temp results
-        # attrs: (1) n_samples (2) name_samples
         self.set_n_eval_samples(n=vqg_config.n, n_side=vqg_config.n_side)
         self.enc_prompts.set_gaussian_range(self.name_samples)
         print(f'Prompt embedding set finished with \
@@ -172,7 +191,7 @@ class BartCVQG(BartQG):
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
-        # Bart Model
+        # Parameters
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -192,7 +211,7 @@ class BartCVQG(BartQG):
         if encoder_outputs is None:
             # [NOTE] change clf labels to clf scores
             inputs_embeds, attention_mask_new = self.reparam_inputs(
-                    input_ids, attention_mask, steps, clf_labels
+                    input_ids, attention_mask, steps, clf_scores
             )
             encoder_outputs = self.model.encoder(
                 input_ids=input_ids if inputs_embeds is None else None,
@@ -217,12 +236,48 @@ class BartCVQG(BartQG):
             inputs_embeds = None
             attention_mask_new = attention_mask
 
+        # [Variational encoding]
+        if type(self.model.encoder.embed_tokens) == SoftEmbedding:
+            pooled_enc_hidden = torch.mean(encoder_outputs[0][:, self.n_soft_prompts:, :], dim=1).unsqueeze(1)
+
+            if clf_labels is None:
+                clf_labels = torch.range(0, self.n_samples-1, 1)/(self.n_samples-1)
+                r = 1
+                cond = torch.cat([(1-clf_labels).view(-1, 1), clf_labels.view(-1, 1)], 1)
+                n = pooled_enc_hidden.size(0) // self.n_samples
+                cond = cond.repeat_interleave(n, dim=0)
+            else:
+                clf_labels = clf_scores
+                r = torch.randn([
+                    pooled_enc_hidden.size(0), 
+                    pooled_enc_hidden.size(1),
+                    self.latent_size
+                ], device=self.device)
+                cond = torch.cat([(1-clf_labels).view(-1, 1), clf_labels.view(-1, 1)], 1)
+
+            cond = cond.view(-1, 1, 2).to(self.device)
+
+            hidden_cond = torch.cat([pooled_enc_hidden, cond], -1)
+            hidden_cond = self.downproject(hidden_cond)
+            mean = self.hidden2mean(hidden_cond)
+            logv = self.hidden2logv(hidden_cond)
+            std = torch.exp(0.5*logv)
+            z = mean + r * std
+            z = torch.cat([z, cond], -1)
+            z = self.upproject(z)
+            e = self.latent2hidden(z) 
+
+            # prompt = encoder_outputs[0][:, :self.n_soft_prompts, :] + e
+            prompt = e
+            passage = encoder_outputs[0][:, self.n_soft_prompts:, :] 
+            encoder_hidden_states = torch.cat([prompt, passage], 1)
+
         # [Bart decoder] 
         # outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
         decoder_outputs = self.model.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
-            encoder_hidden_states=encoder_outputs[0],
+            encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=attention_mask_new,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
@@ -245,6 +300,14 @@ class BartCVQG(BartQG):
             loss_fct = CrossEntropyLoss()
             masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
 
+            if type(self.model.encoder.embed_tokens) == SoftEmbedding:
+                kld_loss = kl_loss(
+                        logv.view(-1, self.latent_size),
+                        mean.view(-1, self.latent_size)
+                ) / cond.size(0)
+                kld_weight = kl_weight(**self.kld_kwargs, steps=steps)
+                loss_reparam = kld_loss * kld_weight
+
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state
                 decoder_input_ids = shift_tokens_right_modified(
@@ -263,6 +326,7 @@ class BartCVQG(BartQG):
 
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,
+            loss_reparam=loss_reparam,
             logits=lm_logits,
             clf_logits=clf_logits,
             past_key_values=decoder_outputs.past_key_values,
