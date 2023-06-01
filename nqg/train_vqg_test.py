@@ -28,25 +28,18 @@ class OurHFModelArguments:
 @dataclass
 class OurModelArguments:
     pooling: str = field(default='static')
-    adaptive_pooling: Optional[str] = field(default=None)
-    n_soft_prompts: int = field(default=1)
+    n_prompts: int = field(default=1)
+    n_labels: int = field(default=1)
     latent_size: int = field(default=128)
     has_compressed_layer: bool = field(default=False)
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
     annealing_fn: str = field(default='logistic')
     freeze_LM: bool = field(default=True)
-    freeze_embeds: bool = field(default=True)
-    freeze_a_layer: bool = field(default=True)
-    freeze_cross_attn: bool = field(default=True)
-    initialize_from_vocab: bool = field(default=True)
     used_prompt: Optional[str] = field(default=None)
-    n: int = field(default=1)
-    n_side: int = field(default=None)
-    add_attentive_pooler: bool = field(default=False)
-    disable_dropout: bool = field(default=False)
-    # random_masking_ratio: Optional[float] = field(default=None)
+    used_label: Optional[str] = field(default=None)
     add_classification_head: bool = field(default=False)
+    head_size: int = field(default=64)
 
 @dataclass
 class OurDataArguments:
@@ -97,13 +90,6 @@ def main():
     # Config and Tokenizer
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
 
-    if model_args.disable_dropout:
-        config.activation_dropout=0
-        config.attention_dropout=0
-        config.classif_dropout=0
-        config.classifier_dropout=0
-        config.dropout=0
-
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
@@ -120,23 +106,24 @@ def main():
                 add_special_tokens=False
         )
         model_args.used_prompt = True
-        print('Used prompt index:', model_args.used_prompt_idx)
-
-    # Model: Enc-Dec
-    # if model_args.used_condition:
-    #     model_args.used_condition_idx = tokenizer.encode(
-    #             [str(i) for i in model_args.used_condition], 
-    #             add_special_tokens=False
-    #     )
-    #     model_args.used_condition = True
-    #     print('Used conditional index:', model_args.used_condition_idx)
+    
+    if model_args.used_label:
+        model_args.used_label_idx = tokenizer.encode(
+                model_args.used_label,
+                add_special_tokens=False
+        )
+        model_args.used_label = True
 
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             vqg_config=model_args
     )
+
+    # Model: Initialization
     model.set_tokenizer(tokenizer)
+    model.encdec_iwprompts.set_embeddings()
+    model.encdec_vae.set_embeddings()
     
     # Model: generation config
     try:
@@ -144,7 +131,6 @@ def main():
                 hfmodel_args.config_name,
                 _from_model_config=False,
                 num_beams=1,
-                max_length=data_args.max_q_length
         )
     except:
         if 'bart' in hfmodel_args.config_name:
@@ -153,25 +139,17 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['embed_tokens', 'classification']
+    optimized_prefix = ['encdec_iwprompts']
     optimized_prefix += ['hidden2mean', 'hidden2logv', 'latent2hidden']
     optimized_prefix += ['upproject', 'downproject']
 
-    if model_args.freeze_embeds is False:
-        optimized_prefix.append('shared')
-    if model_args.freeze_a_layer is False:
-        optimized_prefix.append('encoder.layers.0') # first
-    if model_args.freeze_cross_attn is False:
-        optimized_prefix.append('encoder_attn')
-
-    if model_args.freeze_LM:
-        print('\nThe fine-tuned components:\n')
-        for name, param in model.named_parameters():
-            if any([p in name for p in optimized_prefix]):
-                print('param {}: {}'.format(name, param.grad))
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
+    print('\nThe fine-tuned components:\n')
+    for name, param in model.named_parameters():
+        if any([p in name for p in optimized_prefix]):
+            print('Param {}: {}'.format(name, param.grad))
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
 
 
     # Data: collator
@@ -214,7 +192,7 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers_dev import TrainerForCVQG
+    from trainers_test import TrainerForCVQG
     trainer = TrainerForCVQG(
             model=model, 
             args=training_args,

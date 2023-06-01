@@ -10,12 +10,12 @@ def interpolate(A, B, n):
     return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
 
 def kl_weight(annealing_fn, steps, k, x0):
+    if steps is None:
+        return 1
     if annealing_fn == 'logistic':
         return float(1/(1+np.exp(-k*(steps-x0))))
     elif annealing_fn == 'linear':
         return min(1, steps/x0)
-    else:
-        return 1
 
 def sim_loss(a, b, metric='cosine'):
     loss_fct = CosineEmbeddingLoss()
