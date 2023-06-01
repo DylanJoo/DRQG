@@ -53,46 +53,29 @@ def convert_to_passage_centric(args):
         pos.append(len(triplet[pid]['positive']))
         neg.append(len(triplet[pid]['negative']))
 
-    print(f"# passages: {len(triplet)}")
-    print(f"# avg. positive (query): {np.mean(pos)}")
-    print(f"# avg. negative (query): {np.mean(neg)}")
-    print(f"# passages has zero positive: {(np.array(pos) == 0).sum()}")
-    print(f"# passages has zero negative: {(np.array(neg) == 0).sum()}")
+    with open(f"{args.output_jsonl.replace('json', 'stats.txt')}", 'w') as fstat:
+        fstat.write(f"# passages: {len(triplet)}\n")
+        fstat.write(f"# avg. positive (query): {np.mean(pos)}\n")
+        fstat.write(f"# avg. negative (query): {np.mean(neg)}\\n")
+        fstat.write(f"# passages has zero positive: {(np.array(pos) == 0).sum()}\n")
+        fstat.write(f"# passages has zero negative: {(np.array(neg) == 0).sum()}\n")
 
     # reverse the mapping for output jsonl
     collection = {v: k for k, v in collection.items()}
     # output jsonl
     with open(args.output_jsonl, 'w') as f:
-        for docid, queries in triplet.items():
+        for pid, queries in triplet.items():
             positives = list(queries['positive'])
             negatives = list(queries['negative'])
             n_pos = len(positives)
             n_neg = len(negatives)
 
-            # Setting1: neatives inner-join 
-            # each p contains at most n_neg instances with same positive
-            if 'v1' in args.output_jsonl:
-                if (n_pos > 0) and (n_pos < n_neg):
-                    positives = (positives * n_neg)[:n_neg]
-
-            # Setting0: inner join (each p contains at most min(n_pos, n_neg))
-            if 'v0' in args.output_jsonl or 'v1' in args.output_jsonl:
-                for pos, neg in zip(positives, negatives):
-                    f.write(json.dumps({
-                        "passage": collection[docid],
-                        "positive": pos, 
-                        "negative": neg
-                    }, ensure_ascii=False)+'\n')
-
-            # Setting-L: join a list of postives and negative. 
-            # Additionally, put them into a list for making sure there are in-batch
-            if 'vL' in args.output_jsonl:
-                if n_pos >= args.min_n and n_neg >= args.min_n:
-                    f.write(json.dumps({
-                        "passage": collection[docid],
-                        "positive": positives, 
-                        "negative": negatives
-                    }, ensure_ascii=False)+'\n')
+            if n_pos >= args.min_n and n_neg >= args.min_n:
+                f.write(json.dumps({
+                    "passage": collection[pid],
+                    "positive": positives, 
+                    "negative": negatives
+                }, ensure_ascii=False)+'\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

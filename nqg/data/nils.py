@@ -5,12 +5,16 @@ import json
 import pickle
 from datasets import load_dataset
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 
 def passage_centric_dataset(path):
     print(f"Load data from: {path} ...")
     dataset = load_dataset('json', data_files=path)
     print(f"Number of examples: {len(dataset['train'])}")
     return dataset
+
+def _reshape(x):
+    return np.array(x).reshape(-1, 1)
 
 def convert_to_passage_centric(args):
     data=pickle.load(open(args.input_pkl, 'rb'))
@@ -20,26 +24,28 @@ def convert_to_passage_centric(args):
     collection = load_collection(args.collection)
     queries = load_queries(args.queries)
 
+    mms = MinMaxScaler(feature_range=(0, 1))
+
     for qid, ranklist in tqdm(data.items()):
         query = queries[str(qid)]
 
-        for pid, score in ranklist.items():
-            if pid not in triplet:
-                triplet[pid]['positive'] = []
-                triplet[pid]['negative'] = []
+        for docid, score in ranklist.items():
+            if docid not in triplet:
+                triplet[docid]['positive'] = []
+                triplet[docid]['negative'] = []
 
             if score <= 0:
-                triplet[pid]['negative'].append((query, score))
+                triplet[docid]['negative'].append((query, score))
             else:
-                triplet[pid]['positive'].append((query, score))
+                triplet[docid]['positive'].append((query, score))
 
     # calculate stats
     pos, neg = [], []
-    for pid in triplet:
-        pos.append(len(triplet[pid]['positive']))
-        neg.append(len(triplet[pid]['negative']))
+    for docid in triplet:
+        pos.append(len(triplet[docid]['positive']))
+        neg.append(len(triplet[docid]['negative']))
 
-    with open(f"{args.output_jsonl.replace('json', 'stats.txt')}", w) as fstat:
+    with open(f"{args.output_jsonl.replace('json', 'stats.txt')}", 'w') as fstat:
         fstat.write(f"# passages: {len(triplet)}\n")
         fstat.write(f"# avg. positive (query): {np.mean(pos)}\n")
         fstat.write(f"# avg. negative (query): {np.mean(neg)}\\n")
@@ -48,28 +54,26 @@ def convert_to_passage_centric(args):
 
     # reverse the mapping for output jsonl
     with open(args.output_jsonl, 'w') as f:
-        for pid, queries in triplet.items():
+        for docid, queries in tqdm(triplet.items()):
             positives = list(queries['positive'])
             negatives = list(queries['negative'])
             n_pos = len(positives)
             n_neg = len(negatives)
             # sort them 
-            positives = sorted(positives, key=lambda x: x[1], reverse=True)[:args.max_n]
-            negatives = sorted(negatives, key=lambda x: x[1], reverse=True)[:args.max_n]
+            positives = sorted(positives, key=lambda x: x[1], reverse=True)
+            negatives = sorted(negatives, key=lambda x: x[1], reverse=True)
 
-            # Setting-L: join a list of postives and negative. 
-            # Additionally, put them into a list for making sure there are in-batch
-            if 'vL' in args.output_jsonl:
-                if n_pos >= args.min_n and n_neg >= args.min_n:
-                    p_text, p_score = list(zip(*positives))
-                    n_text, n_score = list(zip(*negatives))
-                    f.write(json.dumps({
-                        "passage": collection[str(pid)],
-                        "positive": p_text, 
-                        "positive_score": p_score, 
-                        "negative": n_text,
-                        "negative_score": n_score
-                    }, ensure_ascii=False)+'\n')
+            if n_pos >= args.min_n and n_neg >= args.min_n:
+                p_text, p_score = list(zip(*positives))
+                n_text, n_score = list(zip(*negatives))
+                mms.fit(_reshape(p_score+n_score))
+                f.write(json.dumps({
+                    "passage": collection[str(docid)],
+                    "positive": p_text[:args.max_n], 
+                    "negative": n_text[:args.max_n],
+                    "positive_score": mms.transform(_reshape(p_score[:args.max_n])).flatten().tolist(),
+                    "negative_score": mms.transform(_reshape(n_score[:args.max_n])).flatten().tolist(),
+                }, ensure_ascii=False)+'\n')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
