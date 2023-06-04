@@ -1,13 +1,14 @@
 export CUDA_VISIBLE_DEVICES=0
 BASE=bartcvqg
-MODEL=redragon-cold-444
+MODEL=nils-warm-mean-444-hard-temp-5w1h
 
 rm -rvf $BASE/$MODEL
 # PRT_MODEL=facebook/bart-base
-PRT_MODEL=bartqg-d2q/relevant/checkpoint-8000
+PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 
-TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
+# TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
+TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
 
 python3 train_vqg_test.py \
   --model_name_or_path $PRT_MODEL \
@@ -26,16 +27,16 @@ python3 train_vqg_test.py \
   --save_steps 2000 \
   --eval_steps 500 \
   --add_classification_head true \
-  --pooling 'max' \
+  --num_labels 2 \
+  --pooling 'mean' \
   --latent_size 128 \
   --has_compressed_layer true \
+  --freeze_LM true \
   --n_prompts 10 \
-  --n_labels 2 \
   --used_prompt 'generate positive or negative question for this passage' \
+  --n_labels 2 \
   --used_label 'false true' \
-  --k 0.025 \
-  --x0 1000 \
-  --warmup_ratio 0.1 \
-  --annealing logistic \
+  --warmup_ratio 0.2 \
+  --annealing cyclic \
   --do_train \
   --do_eval 

@@ -172,7 +172,7 @@ class DataCollatorForVQG(DataCollatorBase):
 
             inputs['labels'] = target_ids
             inputs['decoder_attention_mask'] = target_mask
-            inputs['clf_labels'] = torch.LongTensor(clf_labels)
+            inputs['clf_labels'] = torch.Tensor(clf_labels)
             inputs['clf_scores'] = torch.Tensor(clf_scores)
 
         else:

@@ -29,6 +29,7 @@ class TrainerBase(Trainer):
                     input_ids, 
                     attention_mask=attention_mask, 
                     clf_scores=clf_scores,
+                    clf_labels=clf_scores,
                     return_dict_in_generate=True,
                     num_beams=1
             )
@@ -67,25 +68,29 @@ class TrainerForCVQG(TrainerBase):
         # labels = labels.masked_fill(masked, model.tokenizer.mask_token_id)
 
         ## weighted by power
-        w = clf_scores.square().view(-1, 1).expand(labels.shape)
         ## (1) CE Loss (but separate positive/negative)
         loss_gen_pos, loss_gen_neg = 0, 0
+        length_size = labels.size(-1)
         logits = outputs.get("logits")
         selected_positive = (clf_labels==1)
         loss_fct = CrossEntropyLoss(reduction='none')
         loss_gen_pos = loss_fct(
                 lm_logits[selected_positive].view(-1, model.config.vocab_size), 
                 labels[selected_positive].view(-1)
-        ) * w[selected_positive].view(-1)
-        selected_negative = (clf_labels<1)
+        )
+        selected_negative = (clf_labels!=1)
         loss_fct = CrossEntropyLoss(reduction='none')
         loss_gen_neg = loss_fct(
                 lm_logits[selected_negative].view(-1, model.config.vocab_size), 
                 labels[selected_negative].view(-1)
-        )  * w[selected_negative].view(-1)
+        )
 
-        loss_gen_pos = loss_gen_pos.sum()
-        loss_gen_neg = loss_gen_neg.sum()
+        # w = clf_scores.exp().view(-1, 1).expand(labels.shape)
+        # loss_gen_pos = (loss_gen_pos * w[selected_positive].view(-1)).mean()
+        # loss_gen_neg = (loss_gen_neg * w[selected_negative].view(-1)).mean()
+
+        loss_gen_pos = loss_gen_pos.mean()
+        loss_gen_neg = loss_gen_neg.mean()
 
         ## (2) relevance kl loss
         loss_fct = KLDivLoss(reduction='sum')
@@ -99,7 +104,7 @@ class TrainerForCVQG(TrainerBase):
         loss_reparam = outputs.get('reparam_loss')
 
         ### reweight
-        loss_gen = (loss_gen_pos+loss_gen_neg) / labels.size(0)
+        loss_gen = (loss_gen_pos+loss_gen_neg) / 2
         loss_reparam = loss_reparam / 1 # reweighting has been done `prompt`
         loss_rel = loss_rel / labels.size(0)
 

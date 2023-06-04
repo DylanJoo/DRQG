@@ -13,7 +13,7 @@ from torch.nn import CrossEntropyLoss
 from utils import kl_weight, kl_loss
 import copy
 from .questiongenerator import BartQG
-from .modules import EncDecVAE, InstanceWisePrompt
+from .modules import EncDecCVAE, InstanceWisePrompt, RelevancePrompt
 
 @dataclass
 class Seq2SeqLMOutput(ModelOutput):
@@ -85,14 +85,16 @@ class BartCVQG(BartQG):
         self.post_init()
 
         # soft prompting
-        kld_kwargs = {
-                'annealing_fn': vqg_config.annealing_fn, 
-                'k': vqg_config.k, 'x0': vqg_config.x0,
-        }
+        kld_kwargs = {'annealing_fn': vqg_config.annealing_fn}
+
+        if kld_kwargs['annealing_fn'] != 'cyclic':
+            kld_kwargs.update({'k': vqg_config.k, 'x0': vqg_config.x0})
+        else:
+            kld_kwargs.update({'n_total': vqg_config.total_iter, 'n_cycle': vqg_config.n_cycle})
 
         ## [prompt] 
         self.n_prompts = vqg_config.n_prompts
-        self.encdec_iwprompts = InstanceWisePrompt(
+        self.enc_iwprompts = InstanceWisePrompt(
                 wte=self.model.shared,
                 hidden_size=config.d_model,
                 head_size=vqg_config.head_size,
@@ -101,16 +103,16 @@ class BartCVQG(BartQG):
         )
 
         ## [variational]
-        self.n_labels = vqg_config.n_labels
-        self.encdec_vae = EncDecVAE(
+        self.encdec_cvae = EncDecCVAE(
                 wte=self.model.shared,
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
                 length=vqg_config.n_labels,
+                prefix_length=vqg_config.n_prompts,
                 has_compressed_layer=vqg_config.has_compressed_layer,
                 pooling=vqg_config.pooling,
+                init_idx=vqg_config.used_label_idx,
                 kld_kwargs=kld_kwargs, 
-                init_idx=vqg_config.used_label_idx
         )
 
     def forward(
@@ -155,10 +157,11 @@ class BartCVQG(BartQG):
 
         ## [Bart encoder]
         if encoder_outputs is None:
-            # [NOTE] change clf labels to clf scores
-            # inputs_embeds, attention_mask = self.reparam_inputs(
-            #         input_ids, attention_mask
-            # )
+            inputs_embeds = torch.cat([
+                self.enc_iwprompts(tokens=input_ids),
+                self.model.encoder.embed_tokens(input_ids)
+            ], 1)
+            attention_mask = self.enc_iwprompts.expand_mask(attention_mask) 
             encoder_outputs = self.model.encoder(
                 input_ids=input_ids if inputs_embeds is None else None,
                 attention_mask=attention_mask,
@@ -178,22 +181,10 @@ class BartCVQG(BartQG):
             )
 
         # [Prompting with variational encoding]
-        prompt_generate = self.encdec_iwprompts(encoder_outputs[0])
-        prompt_labels, reparam_loss = self.encdec_vae(
+        hidden_state_prime, reparam_loss = self.encdec_cvae(
                 encoder_outputs[0], clf_scores.to(self.device), steps
         )
-
-        # encoder_hidden_states = torch.cat([
-        #     prompt_generate, prompt_labels, encoder_outputs[0]
-        # ], 1)
-        encoder_hidden_states = torch.cat([
-            prompt_generate+prompt_labels, encoder_outputs[0]+prompt_labels
-        ], 1)
-        additional_mask = torch.ones(
-                (attention_mask.size(0), self.n_prompts), 
-                device=attention_mask.device
-        )
-        attention_mask = torch.cat([additional_mask, attention_mask], 1)
+        encoder_hidden_states = encoder_outputs[0] + hidden_state_prime
 
         # [Bart decoder] 
         # outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)

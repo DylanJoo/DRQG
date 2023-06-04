@@ -24,6 +24,7 @@ class OurHFModelArguments:
     cache_dir: Optional[str] = field(default=None)
     use_fast_tokenizer: bool = field(default=True)
     use_auth_token: bool = field(default=False)
+    num_labels: int = field(default=1)
 
 @dataclass
 class OurModelArguments:
@@ -32,9 +33,14 @@ class OurModelArguments:
     n_labels: int = field(default=1)
     latent_size: int = field(default=128)
     has_compressed_layer: bool = field(default=False)
+    annealing_fn: str = field(default='logistic')
+    # for logistic/linear annealing
     k: float = field(default=0.0025)
     x0: int = field(default=2500)
-    annealing_fn: str = field(default='logistic')
+    # for cyclic annealing
+    total_iter: Optional[int] = field(default=10000)
+    n_cycle: Optional[int] = field(default=4)
+    # other model args
     freeze_LM: bool = field(default=True)
     used_prompt: Optional[str] = field(default=None)
     used_label: Optional[str] = field(default=None)
@@ -88,7 +94,7 @@ def main():
         hfmodel_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Config and Tokenizer
-    config = AutoConfig.from_pretrained(hfmodel_args.config_name)
+    config = AutoConfig.from_pretrained(hfmodel_args.config_name, num_labels=hfmodel_args.num_labels)
 
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
@@ -122,8 +128,9 @@ def main():
 
     # Model: Initialization
     model.set_tokenizer(tokenizer)
-    model.encdec_iwprompts.set_embeddings()
-    model.encdec_vae.set_embeddings()
+    # model.enc_lprompt.set_embeddings()
+    model.enc_iwprompts.set_embeddings()
+    model.encdec_cvae.set_embeddings()
     
     # Model: generation config
     try:
@@ -139,17 +146,21 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['encdec_iwprompts']
-    optimized_prefix += ['hidden2mean', 'hidden2logv', 'latent2hidden']
-    optimized_prefix += ['upproject', 'downproject']
+    optimized_prefix = ['encdec_', 'enc_']
+    not_optimized_prefix = ['label_embeds']
 
-    print('\nThe fine-tuned components:\n')
-    for name, param in model.named_parameters():
-        if any([p in name for p in optimized_prefix]):
-            print('Param {}: {}'.format(name, param.grad))
-            param.requires_grad = True
-        else:
-            param.requires_grad = False
+    if model_args.freeze_LM:
+        print('\nThe fine-tuned components:\n')
+        for name, param in model.named_parameters():
+            if any([p in name for p in optimized_prefix]):
+                print('Param (O) {}: {}'.format(name, param.grad))
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+
+            if any([p in name for p in not_optimized_prefix]):
+                print('Param (X) {}: {}'.format(name, param.grad))
+                param.requires_grad = False
 
 
     # Data: collator

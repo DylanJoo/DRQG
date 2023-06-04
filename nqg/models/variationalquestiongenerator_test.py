@@ -75,7 +75,7 @@ class BartCVQG(BartQG):
             self.classification_head = BartClassificationHead(
                 config.d_model,
                 config.d_model,
-                2,
+                config.num_labels,
                 config.classifier_dropout,
             )
         else:
@@ -155,10 +155,6 @@ class BartCVQG(BartQG):
 
         ## [Bart encoder]
         if encoder_outputs is None:
-            # [NOTE] change clf labels to clf scores
-            # inputs_embeds, attention_mask = self.reparam_inputs(
-            #         input_ids, attention_mask
-            # )
             encoder_outputs = self.model.encoder(
                 input_ids=input_ids if inputs_embeds is None else None,
                 attention_mask=attention_mask,
@@ -183,19 +179,25 @@ class BartCVQG(BartQG):
                 encoder_outputs[0], clf_scores.to(self.device), steps
         )
 
+        # add prompt at encdec
         encoder_hidden_states = torch.cat([
-            prompt_generate, prompt_labels, encoder_outputs[0]
+            prompt_generate+prompt_labels, encoder_outputs[0]+prompt_labels
         ], 1)
         additional_mask = torch.ones(
-                (attention_mask.size(0), self.n_prompts+1), 
+                (attention_mask.size(0), self.n_prompts), 
                 device=attention_mask.device
         )
         attention_mask = torch.cat([additional_mask, attention_mask], 1)
 
+        # add condition to encdec
+        # encoder_hidden_states = encoder_outputs[0] + prompt_labels
+
+        decoder_inputs_embeds = self.model.decoder.embed_tokens(decoder_input_ids)
+
         # [Bart decoder] 
         # outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
         decoder_outputs = self.model.decoder(
-            input_ids=decoder_input_ids,
+            input_ids=None,
             attention_mask=decoder_attention_mask,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=attention_mask,
