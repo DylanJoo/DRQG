@@ -36,11 +36,9 @@ class TrainerBase(Trainer):
             temp = out.sequences
             labels_reformulate = [l for l in labels[0] if l != -100]
             print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
-            for i in range(model.n_samples):
+            for i in range(m):
                 print(f"D2Q ({i:<3}):", 
-                        model.tokenizer.decode(
-                            temp[i*n], skip_special_tokens=True
-                        )
+                        model.tokenizer.decode(temp[i], skip_special_tokens=True)
                 )
             model.train()
 
@@ -60,27 +58,28 @@ class TrainerForVQG(TrainerBase):
         lm_logits = outputs.get("logits")
         clf_logits = outputs.get("clf_logits")
 
-        ## (1) CE Loss (but separate positive/negative)
+        ## (1) CE Loss (same as built-in but separate positive/negative)
         loss_gen_pos, loss_gen_neg = 0, 0
         loss_fct = CrossEntropyLoss(reduction='none')
-        select_pos = (clf_labels==1)
-        loss_gen_pos = loss_fct(
-                lm_logits[select_pos].view(-1, model.config.vocab_size), 
-                labels[selec_post].view(-1)
-        ).mean()
-        select_neg = (clf_labels<1)
+
+        selected = (clf_labels<1)
         loss_gen_neg = loss_fct(
-                lm_logits[select_neg].view(-1, model.config.vocab_size), 
-                labels[select_neg].view(-1)
+                lm_logits[selected].view(-1, model.config.vocab_size), 
+                labels[selected].view(-1)
+        ).mean()
+        selected = (clf_labels==1)
+        loss_gen_pos = loss_fct(
+                lm_logits[selected].view(-1, model.config.vocab_size), 
+                labels[selected].view(-1)
         ).mean()
         loss_gen = (loss_gen_pos+loss_gen_neg) / 2
 
         ## (2) KL loss (relevance)
         loss_clf = 0
         loss_fct = KLDivLoss(reduction='sum')
-        clf_logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
-        target_p = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
-        loss_rel = loss_fct(clf_logp, target_p)
+        logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
+        target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
+        loss_rel = loss_fct(logp, target)
         loss_rel = loss_rel / labels.size(0)
 
         ## (4) KL loss (reparam)
@@ -93,8 +92,6 @@ class TrainerForVQG(TrainerBase):
             print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
                     \nKL: (reparam) {loss_reparam} (rel) {loss_rel}")
 
-            if select_pos.sum() == 0:
-                select_pos[0] = True
             inputs_for_eval = {
                     "input_ids": inputs['input_ids'][select_pos],
                     "attention_mask": inputs['attention_mask'][select_pos],
