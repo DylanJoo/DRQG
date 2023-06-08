@@ -5,7 +5,6 @@ from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig
 from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead, BartEncoder, BartDecoder, BartModel
 from transformers.modeling_outputs import BaseModelOutput
-from transformers.utils import ModelOutput
 
 from torch import nn
 from torch.nn import CrossEntropyLoss
@@ -13,23 +12,12 @@ from torch.nn import CrossEntropyLoss
 from utils import kl_weight, kl_loss
 import copy
 from .questiongenerator import BartQG
-from .prompt import (
-        SoftBasicEmbedding, 
-        SoftStaticEmbedding, 
-        SoftAdaptiveEmbedding, 
-        SoftAdaptiveEmbedding2, 
-)
-
-PROMPT_EMBEDS = {
-        'basic': SoftBasicEmbedding,
-        'static': SoftStaticEmbedding,
-        'adaptive': SoftAdaptiveEmbedding,
-        'adaptive2': SoftAdaptiveEmbedding2,
-}
+from .modules import EncDecCVAE, InstanceWisePrompt, RelevancePrompt
 
 @dataclass
 class Seq2SeqLMOutput(ModelOutput):
     loss: Optional[torch.FloatTensor] = None
+    reparam_loss: Optional[torch.FloatTensor] = None
     logits: torch.FloatTensor = None
     clf_logits: torch.FloatTensor = None
     past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
@@ -75,7 +63,6 @@ class BartCVQG(BartQG):
 
         # [Bart encoder-decoder]
         padding_idx, vocab_size = config.pad_token_id, config.vocab_size
-        self.shared = nn.Embedding(vocab_size, config.d_model, padding_idx)
         self.model = BartModel(config)
 
         # [Generation]
@@ -87,7 +74,7 @@ class BartCVQG(BartQG):
             self.classification_head = BartClassificationHead(
                 config.d_model,
                 config.d_model,
-                1,
+                config.num_labels,
                 config.classifier_dropout,
             )
         else:
@@ -96,57 +83,36 @@ class BartCVQG(BartQG):
         # Initialize weights and apply final processing
         self.post_init()
 
-        # Reparameterized initialization
-        self.n_soft_prompts = vqg_config.n_soft_prompts
-
         # soft prompting
-        ## config
-        kwargs = {
-                'annealing_fn': vqg_config.annealing_fn, 
-                'k': vqg_config.k, 'x0': vqg_config.x0,
-                'has_compressed_layer': vqg_config.has_compressed_layer
-        }
+        kld_kwargs = {'annealing_fn': vqg_config.annealing_fn}
 
-        ## prompt layer
-        self.enc_prompts = PROMPT_EMBEDS[vqg_config.pooling](
-                wte=self.model.shared, 
+        if kld_kwargs['annealing_fn'] != 'cyclic':
+            kld_kwargs.update({'k': vqg_config.k, 'x0': vqg_config.x0})
+        else:
+            kld_kwargs.update({'n_total': vqg_config.total_iter, 'n_cycle': vqg_config.n_cycle})
+
+        ## [prompt] 
+        self.n_prompts = vqg_config.n_prompts
+        self.enc_iwprompts = InstanceWisePrompt(
+                wte=self.model.shared,
+                hidden_size=config.d_model,
+                head_size=vqg_config.head_size,
+                length=vqg_config.n_prompts,
+                init_idx=vqg_config.used_prompt_idx
+        )
+
+        ## [variational]
+        self.encdec_cvae = EncDecCVAE(
+                wte=self.model.shared,
                 hidden_size=config.d_model,
                 latent_size=vqg_config.latent_size,
-                initialize_from_vocab=vqg_config.initialize_from_vocab,
-                used_prompt_idx=vqg_config.used_prompt_idx,
-                n_prompts=vqg_config.n_soft_prompts,
-                adaptive_pooling=vqg_config.adaptive_pooling,
-                **kwargs
+                length=vqg_config.n_labels,
+                prefix_length=vqg_config.n_prompts,
+                has_compressed_layer=vqg_config.has_compressed_layer,
+                pooling=vqg_config.pooling,
+                init_idx=vqg_config.used_label_idx,
+                kld_kwargs=kld_kwargs, 
         )
-        self.model.encoder.set_input_embeddings(self.enc_prompts)
-        self.model.decoder.set_input_embeddings(self.model.shared)
-
-        # set evaluation sample when inference temp results
-        # attrs: (1) n_samples (2) name_samples
-        self.set_n_eval_samples(n=vqg_config.n, n_side=vqg_config.n_side)
-        self.enc_prompts.set_gaussian_range(self.name_samples)
-        print(f'Prompt embedding set finished with \
-                \n{self.n_samples} eval samples: {self.name_samples}.')
-
-    def reparam_inputs(self, input_ids, attn_mask, steps=None, clf_labels=None):
-        """
-        Transform the inputs to reparemterized inputs.
-        input_ids --> add variational prompts
-        attn_mask --> add prompt-length attention
-        """
-        # input_ids --> input_embeds 
-        inputs_embeds = self.model.encoder.embed_tokens(
-                input_ids.view(-1, input_ids.size()[-1]),
-                is_train=(steps is not None), 
-                steps=steps,
-                clf_labels=clf_labels
-        ) 
-        soft_attn_mask = torch.cat([
-            torch.ones((attn_mask.size(0), self.n_soft_prompts)).to(attn_mask.device),
-            attn_mask
-        ], 1)
-
-        return inputs_embeds, soft_attn_mask
 
     def forward(
         self,
@@ -172,7 +138,7 @@ class BartCVQG(BartQG):
         **kwargs
     ) -> Union[Tuple, Seq2SeqLMOutput]:
 
-        # Bart Model
+        # Parameters
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -190,13 +156,14 @@ class BartCVQG(BartQG):
 
         ## [Bart encoder]
         if encoder_outputs is None:
-            # [NOTE] change clf labels to clf scores
-            inputs_embeds, attention_mask_new = self.reparam_inputs(
-                    input_ids, attention_mask, steps, clf_labels
-            )
+            inputs_embeds = torch.cat([
+                self.enc_iwprompts(tokens=input_ids),
+                self.model.encoder.embed_tokens(input_ids)
+            ], 1)
+            attention_mask = self.enc_iwprompts.expand_mask(attention_mask) 
             encoder_outputs = self.model.encoder(
                 input_ids=input_ids if inputs_embeds is None else None,
-                attention_mask=attention_mask_new,
+                attention_mask=attention_mask,
                 head_mask=head_mask,
                 inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
@@ -211,19 +178,20 @@ class BartCVQG(BartQG):
                 hidden_states=encoder_outputs[1] if len(encoder_outputs) > 1 else None,
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
-            inputs_embeds = None
-            attention_mask_new = attention_mask
-        else:
-            inputs_embeds = None
-            attention_mask_new = attention_mask
+
+        # [Prompting with variational encoding]
+        hidden_state_prime, reparam_loss = self.encdec_cvae(
+                encoder_outputs[0], clf_scores.to(self.device), steps
+        )
+        encoder_hidden_states = encoder_outputs[0] + hidden_state_prime
 
         # [Bart decoder] 
         # outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
         decoder_outputs = self.model.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
-            encoder_hidden_states=encoder_outputs[0],
-            encoder_attention_mask=attention_mask_new,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             past_key_values=past_key_values,
@@ -264,24 +232,80 @@ class BartCVQG(BartQG):
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,
             logits=lm_logits,
+            reparam_loss=reparam_loss,
             clf_logits=clf_logits,
             past_key_values=decoder_outputs.past_key_values,
             decoder_hidden_states=decoder_outputs.hidden_states,
             decoder_attentions=decoder_outputs.attentions,
             cross_attentions=decoder_outputs.cross_attentions,
-            encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+            encoder_last_hidden_state=encoder_hidden_states,
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
 
-    def generate(self, input_ids=None, attention_mask=None, **kwargs):
-        inputs_embeds, attention_mask_new = self.reparam_inputs(
-                input_ids, attention_mask, steps=None
-        )
-        attention_mask_new = attention_mask_new.repeat(self.n_samples, 1)
-        return super().generate(
-                inputs_embeds=inputs_embeds, 
-                attention_mask=attention_mask_new, 
-                **kwargs
-        )
+    def _prepare_encoder_decoder_kwargs_for_generation(
+        self, inputs_tensor: torch.Tensor, model_kwargs, model_input_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        # 1. get encoder
+        encoder = self.get_encoder()
+
+        # 2. Prepare encoder args and encoder kwargs from model kwargs.
+        irrelevant_prefix = ["decoder_", "cross_attn", "use_cache"]
+        encoder_kwargs = {
+            argument: value
+            for argument, value in model_kwargs.items()
+            if not any(argument.startswith(p) for p in irrelevant_prefix)
+        }
+        encoder_signature = set(inspect.signature(encoder.forward).parameters)
+        encoder_signature.add('clf_labels')
+        encoder_signature.add('clf_scores')
+        encoder_accepts_wildcard = "kwargs" in encoder_signature or "model_kwargs" in encoder_signature
+        if not encoder_accepts_wildcard:
+            encoder_kwargs = {
+                argument: value for argument, value in encoder_kwargs.items() if argument in encoder_signature
+            }
+
+        # 3. make sure that encoder returns `ModelOutput`
+        model_input_name = model_input_name if model_input_name is not None else self.main_input_name
+        encoder_kwargs["return_dict"] = True
+        encoder_kwargs[model_input_name] = inputs_tensor
+
+        # 3+. 
+        model_kwargs['clf_labels'] = encoder_kwargs.pop('clf_labels', None)
+        model_kwargs['clf_scores'] = encoder_kwargs.pop('clf_scores', None)
+        model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)
+
+        return model_kwargs
+
+    def prepare_inputs_for_generation(
+        self,
+        decoder_input_ids,
+        past_key_values=None,
+        attention_mask=None,
+        decoder_attention_mask=None,
+        head_mask=None,
+        decoder_head_mask=None,
+        cross_attn_head_mask=None,
+        use_cache=None,
+        encoder_outputs=None,
+        **kwargs,
+    ):
+        # cut decoder_input_ids if past_key_values is used
+        if past_key_values is not None:
+            decoder_input_ids = decoder_input_ids[:, -1:]
+
+        return {
+            "input_ids": None,  # encoder_outputs is defined. input_ids not needed
+            "clf_labels": kwargs.pop('clf_labels', None),
+            "clf_scores": kwargs.pop('clf_scores', None),
+            "encoder_outputs": encoder_outputs,
+            "past_key_values": past_key_values,
+            "decoder_input_ids": decoder_input_ids,
+            "attention_mask": attention_mask,
+            "decoder_attention_mask": decoder_attention_mask,
+            "head_mask": head_mask,
+            "decoder_head_mask": decoder_head_mask,
+            "cross_attn_head_mask": cross_attn_head_mask,
+            "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
+        }
 

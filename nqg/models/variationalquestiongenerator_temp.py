@@ -3,9 +3,8 @@ import inspect
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig
-from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead, BartEncoder, BartDecoder, BartModel
+from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead, BartModel
 from transformers.modeling_outputs import BaseModelOutput
-from transformers.utils import ModelOutput
 
 from torch import nn
 from torch.nn import CrossEntropyLoss

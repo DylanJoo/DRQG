@@ -6,46 +6,64 @@ from torch.nn import functional as F
 from utils import kl_weight, kl_loss
 import copy
 
-class RelevancePrompt(nn.Module):
+class DocRelPrompt(nn.Module):
     def __init__(
             self, 
             wte: nn.Embedding,
             hidden_size: int = 768,
+            lbl_init_idx: Optional[List] = None,
             init_idx: Optional[List] = None,
-            length: int = 1,
         ):
         super(RelevancePrompt, self).__init__()
         self.orig_embeds = wte
+        self.lbl_init_idx = lbl_init_idx
         self.init_idx = init_idx
-        self.length = length
-        self.prompt_embeds = nn.Parameter(
-                torch.randn((len(init_idx), hidden_size), device=wte.weight.device)
+        self.length = len(lbl_init_idx) + len(init_idx)
+
+        self.prompts = nn.Parameter(torch.randn(
+            (len(init_idx), hidden_size), device=wte.weight.device
+        ))
+        self.label_prompts = nn.Parameter(torch.randn(
+            (len(lbl_init_idx), hidden_size), device=wte.weight.device
+        ))
+
+        self.adapter = InstanceWisePrompt(
+                wte=None,
+                hidden_size=hidden_size,
+                head_size=head_size
         )
+        self.label_adapter = InstanceWisePrompt(
+                wte=None,
+                hidden_size=hidden_size,
+                head_size=head_size
+        )
+
     def set_embeddings(self):
-        self.prompt_embeds = nn.Parameter(
+        self.prompts = nn.Parameter(
                 self.orig_embeds.weight[self.init_idx].clone().detach()
         )
-        print("Set embeddings to", self.init_idx)
-
-    def forward(self, input_ids, relevance=None, steps=None):
-        # B L / NB L --> B L H / NB L H
-        n_samples = len(relevance) // input_ids.size(0)
-        h_source = self.orig_embeds(input_ids)
-        h_source = h_source.repeat(n_samples, 1, 1)
-
-        # B / NB --> B 2/ NB 2--> B 1 H / NB 1 H
-        relevance = torch.cat([(1-relevance).view(-1, 1), relevance.view(-1, 1)], 1)
-        h_relevance = torch.matmul(relevance, self.prompt_embeds).unsqueeze(1) 
-
-        return torch.cat([h_relevance, h_source], 1)
-    
-    def expand_mask(self, mask, relevance):
-        additional_mask = torch.ones(
-                (mask.size(0), self.length),
-                device=mask.device
+        self.label_prompts = nn.Parameter(
+                self.orig_embeds.weight[self.lbl_init_idx].clone().detach()
         )
+        print("{self.__class__.__name__} embeddings set: ", self.init_idx, self.lbl_init_idx)
+
+    def forward(self, relevance, input_ids, steps=None):
+        # [TODO] Try different way to model relevance
+        self.n_samples = len(relevance) // tokens.size(0)
+        input_ids = input_ids.expand(relevance.size(0), 1, 1)
+        hidden_states_src = self.orig_embeds(input_ids)
+        relevance = torch.cat([(1-relevance).view(-1, 1), relevance.view(-1, 1)], 1)
+        hidden_states_rel = torch.matmul(relevance, self.prompt_embeds).unsqueeze(1) 
+
+        lbl_prompts = self.label_adapter(hidden_states_rel, self.label_prompts)
+        doc_prompts = self.label_adapter(hidden_states_src, self.prompts)
+
+        return torch.cat([lbl_prompts, doc_prompts, hidden_states_src], 1)
+    
+    def expand_mask(self, mask):
+        mask = mask.repeat(self.n_samples, mask.size(1))
+        additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
         mask = torch.cat([additional_mask, mask], 1)
-        mask = mask.expand(relevance.size(0), mask.size(1))
         return mask
 
 class InstanceWisePrompt(nn.Module):
@@ -65,10 +83,11 @@ class InstanceWisePrompt(nn.Module):
         self.q_proj = nn.Linear(hidden_size, head_size, bias=True)
         self.k_proj = nn.Linear(hidden_size, head_size, bias=True)
 
-        self.prompt_embeds = nn.Parameter(
-                torch.randn((length, hidden_size), device=wte.weight.device)
-        )
-        self.init_idx = (init_idx*length)[:length]
+        if init_idx is not None:
+            self.init_idx = (init_idx*length)[:length]
+            self.prompt_embeds = nn.Parameter(
+                    torch.randn((length, hidden_size), device=wte.weight.device)
+            )
 
     def set_embeddings(self):
         self.prompt_embeds = nn.Parameter(
@@ -76,15 +95,18 @@ class InstanceWisePrompt(nn.Module):
         )
         print("Set embeddings to", self.init_idx)
 
-    def forward(self, hidden_states=None, tokens=None):
+    def forward(self, hidden_states=None, prompt_embeds, input_ids=None):
         """
-        prompr_embeds: N H --> B N H
-        hidden_states: B 1 H 
+        hidden_states: B L H  (input_ids B L)
+        prompt_embeds: N H 
         """
-        if tokens is not None:
-            hidden_states = self.orig_embeds(tokens)
-        V = self.prompt_embeds.unsqueeze(0).repeat(hidden_states.size(0), 1, 1)
-        Q = self.q_proj(self.prompt_embeds) 
+        if input_ids is not None:
+            hidden_states = self.orig_embeds(input_ids)
+        if prompt_embeds is None:
+            prompt_embeds = self.prompt_embeds
+
+        V = prompt_embeds.unsqueeze(0).repeat(hidden_states.size(0), 1, 1)
+        Q = self.q_proj(prompt_embeds) 
         K = self.k_proj(hidden_states) 
         K = torch.transpose(K, 1, 2)
         scores = torch.matmul(Q, K)   
@@ -117,10 +139,6 @@ class EncDecVAE(nn.Module):
             **kwargs
         ):
         super(EncDecVAE, self).__init__()
-        """ 
-        This class is used for traditional CVAE. `length` indicates the number of 
-        encoder prompts (at the static embedding layer)
-        """
         self.orig_embeds = wte
 
         if has_compressed_layer:
@@ -221,7 +239,6 @@ class EncDecCVAE(nn.Module):
         self.orig_embeds = wte
 
         if has_compressed_layer:
-            times=2
             self.down_proj = nn.Linear(hidden_size+hidden_size, latent_size*2, bias=False)
             self.down_proj_pri = nn.Linear(hidden_size, latent_size*2, bias=False)
             self.h2mean = nn.Linear(latent_size*2, latent_size, bias=False)
@@ -254,27 +271,22 @@ class EncDecCVAE(nn.Module):
         print("Set embeddings to", self.init_idx)
 
     def forward(self, enc_last_hidden_state, relevance=None, steps=None):
-        """
-        Condition on feature concatenation
-        """
-        h_aspect = enc_last_hidden_state[:, :self.prefix_length]
+        h_prompt = enc_last_hidden_state[:, :self.prefix_length]
         h_source = enc_last_hidden_state[:, self.prefix_length:]
         # B N H / B L H --> B 1 H 
         if self.pooling == 'mean':
-            h_aspect = torch.mean(h_aspect, dim=1).unsqueeze(1)
+            h_prompt = torch.mean(h_prompt, dim=1).unsqueeze(1)
             h_source = torch.mean(h_source, dim=1).unsqueeze(1)
         if self.pooling == 'max':
-            h_aspect = torch.max(h_aspect, dim=1).values.unsqueeze(1)
+            h_prompt = torch.max(h_prompt, dim=1).values.unsqueeze(1)
             h_source = torch.max(h_source, dim=1).values.unsqueeze(1)
 
         # vae (encoder)
         ## condition 1
         ## label encoding 
-        condition = torch.cat(
-                [1-relevance.view(-1, 1), relevance.view(-1, 1)], 1
-        )
+        condition = torch.cat([1-relevance.view(-1, 1), relevance.view(-1, 1)], 1)
         h_cond = torch.matmul(condition, self.label_embeds).unsqueeze(1)
-        h_post = torch.cat([h_aspect+h_source, h_cond], -1)
+        h_post = torch.cat([h_prompt+h_source, h_cond], -1)
         h_pri = h_cond 
         # h_pri = F.normalize(h_cond, dim=-1)
 

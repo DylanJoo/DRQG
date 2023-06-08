@@ -6,6 +6,7 @@ from .config import VQG_CONFIG, VQG_OLD_CONFIG
 
 # move this into variationalquestiongenerator
 from .vqg_t5 import T5VQG as T5VQG
+from .variationalquestiongenerator import BartCVQG 
 # from .variationalquestiongenerator_dev import BartCVQG 
 # from .variationalquestiongenerator_test import BartCVQG 
-from .variationalquestiongenerator_temp import BartCVQG 
+# from .variationalquestiongenerator_temp import BartCVQG 

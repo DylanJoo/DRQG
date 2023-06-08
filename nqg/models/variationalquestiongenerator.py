@@ -1,50 +1,22 @@
-import torch
-import inspect
 from typing import List, Optional, Tuple, Union, Dict, Any
-from transformers import BartForConditionalGeneration, BartConfig, BartModel
-from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead
-from transformers.modeling_outputs import Seq2SeqLMOutput
 
+import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
-from utils import kl_weight, kl_loss
-import copy
-from .questiongenerator import BartQG
-from .prompt import (
-        SoftBasicEmbedding, 
-        SoftStaticEmbedding, 
-        SoftAdaptiveEmbedding, 
-        SoftAdaptiveEmbedding2, 
+from transformers import BartConfig 
+from transformers.models.bart.modeling_bart import (
+        BartModel,
+        shift_tokens_right, 
+        BartClassificationHead
 )
 
-PROMPT_EMBEDS = {
-        'basic': SoftBasicEmbedding,
-        'static': SoftStaticEmbedding,
-        'adaptive': SoftAdaptiveEmbedding,
-        'adaptive2': SoftAdaptiveEmbedding2,
-}
+from .outputs import Seq2SeqCVQGOutput
+from .questiongenerator import BartQG
+from .module import InstanceWisePrompt, RelevancePrompt, EncDecCVAE
 
-def shift_tokens_right_modified(
-        input_ids: torch.Tensor, 
-        pad_token_id: int, 
-        eos_token_id: int
-    ):
-    """
-    Shift input ids one token to the right.
-    """
-    shifted_input_ids = input_ids.new_zeros(input_ids.shape)
-    shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
-    shifted_input_ids[:, 0] = pad_token_id 
-
-    # sometimes the last token is eos; thus, replace the last one by eos then.
-    shifted_input_ids[input_ids[:, -1].eq(eos_token_id), -1] = eos_token_id
-    # since we focus the eos token at the sequence end, use pad instead.
-
-    # replace possible -100 values in labels by `pad_token_id`
-    shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
-
-    return shifted_input_ids
+from utils import kl_weight, kl_loss
+import copy
 
 class BartVQG(BartQG):
     base_model_prefix = "model"
@@ -54,77 +26,55 @@ class BartVQG(BartQG):
         "encoder.embed_tokens.weight",
         "decoder.embed_tokens.weight",
     ]
-
     def __init__(self, config: BartConfig, vqg_config=None):
         super().__init__(config)
+        # self.n_soft_prompts = vqg_config.n_soft_prompts
 
-        # Reparameterized initialization
-        self.n_soft_prompts = vqg_config.n_soft_prompts
+        self.model = BartModel(config)
 
-        # soft prompting
-        ## config
-        kwargs = {
-                'annealing_fn': vqg_config.annealing_fn, 
-                'k': vqg_config.k, 'x0': vqg_config.x0,
-                'has_compressed_layer': vqg_config.has_compressed_layer
-        }
-        ## pooler
-        if vqg_config.add_attentive_pooler:
-            pooler = self.get_pooler(config)
-        else:
-            pooler = None
+        # [generation] 
+        self.register_buffer("final_logits_bias", torch.zeros((1, self.model.shared.num_embeddings)))
+        self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)   
 
-        ## prompt layer
-        self.enc_prompts = PROMPT_EMBEDS[vqg_config.pooling](
-                wte=self.model.shared, 
-                hidden_size=config.d_model,
-                latent_size=vqg_config.latent_size,
-                initialize_from_vocab=vqg_config.initialize_from_vocab,
-                used_prompt_idx=vqg_config.used_prompt_idx,
-                n_prompts=vqg_config.n_soft_prompts,
-                pooler=pooler,
-                adaptive_pooling=vqg_config.adaptive_pooling,
-                **kwargs
-        )
-        self.model.encoder.set_input_embeddings(self.enc_prompts)
-        self.model.decoder.set_input_embeddings(self.model.shared)
-
-        # set evaluation sample when inference temp results
-        # attrs: (1) n_samples (2) name_samples
-        self.set_n_eval_samples(n=vqg_config.n, n_side=vqg_config.n_side)
-        self.enc_prompts.set_gaussian_range(self.name_samples)
-        print(f'Prompt embedding set finished with \
-                \n{self.n_samples} eval samples: {self.name_samples}.')
-
-        if vqg_config.add_classification_head:
+        # [classification]
+        if cvqg_config.add_classification_head:
             self.classification_head = BartClassificationHead(
-                config.d_model,
-                config.d_model,
-                1,
+                config.d_model, config.d_model, 1,
                 config.classifier_dropout,
             )
         else:
             self.classification_head = None
 
-    def reparam_inputs(self, input_ids, attn_mask, steps=None, clf_labels=None):
-        """
-        Transform the inputs to reparemterized inputs.
-        input_ids --> add variational prompts
-        attn_mask --> add prompt-length attention
-        """
-        # input_ids --> input_embeds 
-        inputs_embeds = self.model.encoder.embed_tokens(
-                input_ids.view(-1, input_ids.size()[-1]),
-                is_train=(steps is not None), 
-                steps=steps,
-                clf_labels=clf_labels
-        ) 
-        soft_attn_mask = torch.cat([
-            torch.ones((attn_mask.size(0), self.n_soft_prompts)).to(attn_mask.device),
-            attn_mask
-        ], 1)
+        self.post_init()
 
-        return inputs_embeds, soft_attn_mask
+        # [conditional vae]
+        kld_kwargs = {'annealing_fn': cvqg_Config.annealing_fn}
+        if kld_kwargs['annealing_fn'] != 'cyclic':
+            kld_kwargs.update({
+                'k': cvqg_config.k, 'x0': cvqg_config.x0
+            })
+        else:
+            kld_kwargs.update({
+                'total_iter': cvqg_config.total_iter, 
+                'n_cycle': cvqg_config.n_cycle
+            }) 
+
+        # [prompt] 
+        self.prompts = DocRelPrompt(
+                wte=self.model.shared, 
+                hidden_size=config.d_model,
+                init_idx=cvqg_config.used_prompt_idx,
+                lbl_init_idx=cvqg_config.used_label_idx,
+        )
+
+        # [condition]
+        self.encdec_cvae = EncDecCVAE(
+                wte=self.model.shared,
+                hidden_size=config.d_model,
+                latent_size=cvqg_config.latent_size,
+                prefix_length=len(cvqg_config.used_label_idx),
+                has_compressed_layer=cvqg_config.has_compressed_layer,
+        )
 
     def forward(
         self,
@@ -148,20 +98,53 @@ class BartVQG(BartQG):
         clf_labels: Optional[torch.LongTensor] = None,
         clf_scores: Optional[torch.LongTensor] = None,
         **kwargs
-    ) -> Union[Tuple, Seq2SeqLMOutput]:
+    ) -> Union[Tuple, Seq2SeqCVQGOutput]:
 
-        if encoder_outputs is None: # the first momnet when generating 
-            # [NOTE] change clf labels to clf scores
-            inputs_embeds, attention_mask_new = self.reparam_inputs(
-                    input_ids, attention_mask, steps, clf_scores
+        # [parameters]
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None \
+                    else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # [decoder inputs] 
+        if labels is not None:
+            use_cache = False
+            if decoder_input_ids is None and decoder_inputs_embeds is None:
+                decoder_input_ids = shift_tokens_right(
+                    labels, self.config.pad_token_id, self.config.decoder_start_token_id
+                )
+
+        # [Bart encoding]
+        if encoder_outputs is None:
+            ## [Encoder prompt wrapper]
+            inputs_embeds = self.prompts(clf_scores, input_ids)
+            attention_mask = self.prompts.expand(attention_mask)
+
+            ## [Bart encoder]
+            encoder_outputs = self.model.encoder(
+                input_ids=None,
+                attention_mask=attention_mask,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
             )
-        else:
-            inputs_embeds = None
-            attention_mask_new = attention_mask
+
+        # wrapper for BaseModelOutput when return_dict=True
+        elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
+            encoder_outputs = BaseModelOutput(
+                last_hidden_state=encoder_outputs[0],
+                hidden_states=encoder_outputs[1] if len(encoder_outputs) > 1 else None,
+                attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
+            )
 
         # standard enc-dec pipeline
-        # TODO add classfication task head here
-        outputs = super().forward(
+        decoder_inputs_embeds = self.model.decoder.embed_tokens(decoder_input_ids)
+        decoder_outputs = super().forward(
                 input_ids=None, 
                 attention_mask=attention_mask_new,
                 decoder_input_ids=decoder_input_ids,
@@ -179,27 +162,58 @@ class BartVQG(BartQG):
                 return_dict=True,
                 **kwargs
         )
-        if self.classification_head is not None and labels is not None:
-            hidden_states = outputs['decoder_hidden_states'][-1]
-            decoder_input_ids = shift_tokens_right_modified(
-                    labels, 
-                    self.config.pad_token_id, 
-                    self.config.eos_token_id
-            )
-            # sanity check for eos tokens
-            eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
-            sentence_representation = hidden_states[eos_mask, :]
-            outputs['clf_logits'] = self.classification_head(sentence_representation)
-        return outputs
+        lm_logits = self.lm_head(decoder_outputs[0])
+        lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-    def generate(self, input_ids=None, attention_mask=None, **kwargs):
-        inputs_embeds, attention_mask_new = self.reparam_inputs(
-                input_ids, attention_mask, steps=None
+        mased_lm_loss, reparam_loss = 0, 0
+        if labels is not None:
+            labels = labels.to(lm_logits.device)
+            loss_fct = CrossEntropyLoss()
+            masked_lm_loss = loss_fct(
+                    lm_logits.view(-1, self.config.vocab_size), 
+                    labels.view(-1)
+            )
+
+            if self.classification_head is not None:
+                hidden_states = decoder_outputs.last_hidden_states
+                decoder_input_ids = shift_tokens_right_modified(
+                        labels, 
+                        self.config.pad_token_id, 
+                        self.config.eos_token_id
+                )
+                eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
+                sentence_representation = hidden_states[eos_mask, :]
+                clf_logits = self.classification_head(sentence_representation)
+
+        return Seq2SeqCVQGOutput(
+                loss=masked_lm_loss, 
+                reparam_loss=reparam_loss,
+                logits=lm_logits, 
+                clf_logits=clf_logits,
+                past_key_values=outputs.past_key_values, 
+                decoder_hidden_states=outputs.decoder_hidden_states, 
+                decoder_attentions=outputs.decoder_attentions, 
+                cross_attentions=outputs.cross_attentions, 
+                encoder_last_hidden_state=outputs.encoder_last_hidden_state, 
+                encoder_hidden_states=outputs.encoder_hidden_states, 
+                encoder_attentions=outputs.encoder_attentions,
         )
-        attention_mask_new = attention_mask_new.repeat(self.n_samples, 1)
-        return super().generate(
-                inputs_embeds=inputs_embeds, 
-                attention_mask=attention_mask_new, 
-                **kwargs
-        )
+
+def shift_tokens_right_modified(
+        input_ids: torch.Tensor, 
+        pad_token_id: int, 
+        eos_token_id: int
+    ):
+    shifted_input_ids = input_ids.new_zeros(input_ids.shape)
+    shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
+    shifted_input_ids[:, 0] = pad_token_id 
+
+    # sometimes the last token is eos; thus, replace the last one by eos then.
+    shifted_input_ids[input_ids[:, -1].eq(eos_token_id), -1] = eos_token_id
+    # since we focus the eos token at the sequence end, use pad instead.
+
+    # replace possible -100 values in labels by `pad_token_id`
+    shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
+
+    return shifted_input_ids
 
