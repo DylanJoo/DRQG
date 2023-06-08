@@ -47,6 +47,9 @@ class OurModelArguments:
     disable_dropout: bool = field(default=False)
     # random_masking_ratio: Optional[float] = field(default=None)
     add_classification_head: bool = field(default=False)
+    # for cyclic annealing
+    total_iter: Optional[int] = field(default=10000)
+    n_cycle: Optional[int] = field(default=4)
 
 @dataclass
 class OurDataArguments:
@@ -137,6 +140,7 @@ def main():
             vqg_config=model_args
     )
     model.set_tokenizer(tokenizer)
+    model.enc_prompts.set_embeddings()
     
     # Model: generation config
     try:

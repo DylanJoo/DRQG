@@ -46,6 +46,7 @@ class OurModelArguments:
     used_label: Optional[str] = field(default=None)
     add_classification_head: bool = field(default=False)
     head_size: int = field(default=64)
+    learnable_prior: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:

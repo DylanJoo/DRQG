@@ -111,6 +111,7 @@ class BartCVQG(BartQG):
                 has_compressed_layer=vqg_config.has_compressed_layer,
                 pooling=vqg_config.pooling,
                 init_idx=vqg_config.used_label_idx,
+                learnable_prior=vqg_config.learnable_prior,
                 kld_kwargs=kld_kwargs, 
         )
 
