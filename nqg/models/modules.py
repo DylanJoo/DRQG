@@ -12,14 +12,15 @@ class DocRelPrompt(nn.Module):
             self, 
             wte: nn.Embedding,
             hidden_size: int = 768,
+            head_size: int = 64,
             lbl_init_idx: Optional[List] = None,
             init_idx: Optional[List] = None,
         ):
-        super(RelevancePrompt, self).__init__()
+        super(DocRelPrompt, self).__init__()
         self.orig_embeds = wte
         self.lbl_init_idx = lbl_init_idx
         self.init_idx = init_idx
-        self.length = len(lbl_init_idx) + len(init_idx)
+        self.length = len(init_idx) + len(init_idx)
 
         self.prompts = nn.Parameter(torch.randn(
             (len(init_idx), hidden_size), device=wte.weight.device
@@ -46,25 +47,25 @@ class DocRelPrompt(nn.Module):
         self.label_prompts = nn.Parameter(
                 self.orig_embeds.weight[self.lbl_init_idx].clone().detach()
         )
-        print("{self.__class__.__name__} embeddings set: ", self.init_idx, self.lbl_init_idx)
+        print(f"{self.__class__.__name__} embeddings set: ", self.init_idx, self.lbl_init_idx)
 
     def forward(self, relevance, input_ids, steps=None):
         # [TODO] Try different way to model relevance
-        self.n_samples = len(relevance) // tokens.size(0)
-        input_ids = input_ids.expand(relevance.size(0), 1, 1)
+        self.n_samples = len(relevance) // input_ids.size(0)
+        # input_ids = input_ids.expand(relevance.size(0), 1, 1)
         hidden_states_src = self.orig_embeds(input_ids)
         relevance = torch.cat([(1-relevance).view(-1, 1), relevance.view(-1, 1)], 1)
-        hidden_states_rel = torch.matmul(relevance, self.prompt_embeds).unsqueeze(1) 
+        hidden_states_rel = torch.matmul(relevance, self.label_prompts).unsqueeze(1) 
 
-        lbl_prompts = self.label_adapter(hidden_states_rel, self.label_prompts)
-        doc_prompts = self.label_adapter(hidden_states_src, self.prompts)
+        lbl_prompts = self.label_adapter(hidden_states_rel, self.prompts)
+        doc_prompts = self.adapter(hidden_states_src, self.prompts)
 
         return torch.cat([lbl_prompts, doc_prompts, hidden_states_src], 1)
     
     def expand_mask(self, mask):
-        mask = mask.repeat(self.n_samples, mask.size(1))
+        mask = mask.repeat(self.n_samples, 1)
         additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
-        mask = torch.cat([additional_mask, mask], 1)
+        mask = torch.cat([additional_mask, mask], -1)
         return mask
 
 class InstanceWisePrompt(nn.Module):
@@ -96,7 +97,7 @@ class InstanceWisePrompt(nn.Module):
         )
         print("Set embeddings to", self.init_idx)
 
-    def forward(self, hidden_states=None, prompt_embeds, input_ids=None):
+    def forward(self, hidden_states=None, prompt_embeds=None, input_ids=None):
         """
         hidden_states: B L H  (input_ids B L)
         prompt_embeds: N H 
@@ -121,10 +122,7 @@ class InstanceWisePrompt(nn.Module):
         return iw_prompts
     
     def expand_mask(self, mask):
-        additional_mask = torch.ones(
-                (mask.size(0), self.length),
-                device=mask.device
-        )
+        additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
         mask = torch.cat([additional_mask, mask], 1)
         return mask
 

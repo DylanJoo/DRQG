@@ -28,7 +28,7 @@ class TrainerBase(Trainer):
                     input_ids, 
                     attention_mask=attention_mask, 
                     clf_scores=clf_scores,
-                    clf_labels=clf_labels,
+                    clf_labels=clf_scores,
                     return_dict_in_generate=True,
                     output_scores=True,
                     num_beams=1
@@ -42,7 +42,7 @@ class TrainerBase(Trainer):
                 )
             model.train()
 
-class TrainerForVQG(TrainerBase):
+class TrainerForQG(TrainerBase):
 
     def compute_loss(self, model, inputs, return_outputs=False):
 
@@ -50,7 +50,7 @@ class TrainerForVQG(TrainerBase):
         outputs = model(**inputs, steps=training_steps)
 
         # inputs
-        # labels = inputs.get("labels").to(model.device)
+        labels = inputs.get("labels").to(model.device)
         clf_labels = inputs.get("clf_labels") #hard label
         clf_scores = inputs.get("clf_scores") #soft label
 
@@ -93,9 +93,9 @@ class TrainerForVQG(TrainerBase):
                     \nKL: (reparam) {loss_reparam} (rel) {loss_rel}")
 
             inputs_for_eval = {
-                    "input_ids": inputs['input_ids'][select_pos],
-                    "attention_mask": inputs['attention_mask'][select_pos],
-                    "labels": inputs['labels'][select_pos]
+                    "input_ids": inputs['input_ids'][selected],
+                    "attention_mask": inputs['attention_mask'][selected],
+                    "labels": inputs['labels'][selected]
             }
             self._verbose_prediction(model, **inputs_for_eval)
 

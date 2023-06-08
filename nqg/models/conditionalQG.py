@@ -1,6 +1,7 @@
 from typing import List, Optional, Tuple, Union, Dict, Any
 
 import torch
+import inspect
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
@@ -10,15 +11,16 @@ from transformers.models.bart.modeling_bart import (
         shift_tokens_right, 
         BartClassificationHead
 )
+from transformers.modeling_outputs import BaseModelOutput
 
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
-from .module import InstanceWisePrompt, RelevancePrompt, EncDecCVAE
+from .modules import InstanceWisePrompt, EncDecCVAE, DocRelPrompt
 
 from utils import kl_weight, kl_loss
 import copy
 
-class BartVQG(BartQG):
+class DocRelBartQG(BartQG):
     base_model_prefix = "model"
     _keys_to_ignore_on_load_missing = [
         r"final_logits_bias",
@@ -26,7 +28,7 @@ class BartVQG(BartQG):
         "encoder.embed_tokens.weight",
         "decoder.embed_tokens.weight",
     ]
-    def __init__(self, config: BartConfig, vqg_config=None):
+    def __init__(self, config: BartConfig, cvqg_config=None):
         super().__init__(config)
         # self.n_soft_prompts = vqg_config.n_soft_prompts
 
@@ -39,7 +41,7 @@ class BartVQG(BartQG):
         # [classification]
         if cvqg_config.add_classification_head:
             self.classification_head = BartClassificationHead(
-                config.d_model, config.d_model, 1,
+                config.d_model, config.d_model, 2,
                 config.classifier_dropout,
             )
         else:
@@ -47,34 +49,32 @@ class BartVQG(BartQG):
 
         self.post_init()
 
-        # [conditional vae]
-        kld_kwargs = {'annealing_fn': cvqg_Config.annealing_fn}
-        if kld_kwargs['annealing_fn'] != 'cyclic':
-            kld_kwargs.update({
-                'k': cvqg_config.k, 'x0': cvqg_config.x0
-            })
-        else:
-            kld_kwargs.update({
-                'total_iter': cvqg_config.total_iter, 
-                'n_cycle': cvqg_config.n_cycle
-            }) 
-
         # [prompt] 
         self.prompts = DocRelPrompt(
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
-                init_idx=cvqg_config.used_prompt_idx,
-                lbl_init_idx=cvqg_config.used_label_idx,
+                init_idx=cvqg_config.prompts_idx,
+                lbl_init_idx=cvqg_config.label_prompts_idx,
         )
 
         # [condition]
-        self.encdec_cvae = EncDecCVAE(
-                wte=self.model.shared,
-                hidden_size=config.d_model,
-                latent_size=cvqg_config.latent_size,
-                prefix_length=len(cvqg_config.used_label_idx),
-                has_compressed_layer=cvqg_config.has_compressed_layer,
-        )
+        # kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
+        # if kld_kwargs['annealing_fn'] != 'cyclic':
+        #     kld_kwargs.update({
+        #         'k': cvqg_config.k, 'x0': cvqg_config.x0
+        #     })
+        # else:
+        #     kld_kwargs.update({
+        #         'total_iter': cvqg_config.total_iter, 
+        #         'n_cycle': cvqg_config.n_cycle
+        #     }) 
+        # self.encdec_cvae = EncDecCVAE(
+        #         wte=self.model.shared,
+        #         hidden_size=config.d_model,
+        #         latent_size=cvqg_config.latent_size,
+        #         prefix_length=len(cvqg_config.used_label_idx),
+        #         has_compressed_layer=cvqg_config.has_compressed_layer,
+        # )
 
     def forward(
         self,
@@ -121,7 +121,7 @@ class BartVQG(BartQG):
         if encoder_outputs is None:
             ## [Encoder prompt wrapper]
             inputs_embeds = self.prompts(clf_scores, input_ids)
-            attention_mask = self.prompts.expand(attention_mask)
+            attention_mask = self.prompts.expand_mask(attention_mask)
 
             ## [Bart encoder]
             encoder_outputs = self.model.encoder(
@@ -143,29 +143,25 @@ class BartVQG(BartQG):
             )
 
         # standard enc-dec pipeline
-        decoder_inputs_embeds = self.model.decoder.embed_tokens(decoder_input_ids)
-        decoder_outputs = super().forward(
-                input_ids=None, 
-                attention_mask=attention_mask_new,
-                decoder_input_ids=decoder_input_ids,
-                decoder_attention_mask=decoder_attention_mask,
-                head_mask=head_mask,
+        decoder_outputs = self.model.decoder(
+                input_ids=decoder_input_ids,
+                attention_mask=decoder_attention_mask,
+                encoder_hidden_states=encoder_outputs[0],
+                encoder_attention_mask=attention_mask,
+                head_mask=decoder_head_mask,
                 cross_attn_head_mask=cross_attn_head_mask,
-                encoder_outputs=encoder_outputs,
                 past_key_values=past_key_values,
-                inputs_embeds=inputs_embeds,
-                decoder_inputs_embeds=decoder_inputs_embeds,
-                labels=labels,
+                inputs_embeds=decoder_inputs_embeds,
                 use_cache=use_cache,
                 output_attentions=output_attentions,
-                output_hidden_states=True,
-                return_dict=True,
-                **kwargs
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
         )
         lm_logits = self.lm_head(decoder_outputs[0])
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-        mased_lm_loss, reparam_loss = 0, 0
+        masked_lm_loss, reparam_loss = 0, 0
+        clf_logits = None
         if labels is not None:
             labels = labels.to(lm_logits.device)
             loss_fct = CrossEntropyLoss()
@@ -175,7 +171,7 @@ class BartVQG(BartQG):
             )
 
             if self.classification_head is not None:
-                hidden_states = decoder_outputs.last_hidden_states
+                hidden_states = decoder_outputs.last_hidden_state
                 decoder_input_ids = shift_tokens_right_modified(
                         labels, 
                         self.config.pad_token_id, 
@@ -183,27 +179,96 @@ class BartVQG(BartQG):
                 )
                 eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
                 sentence_representation = hidden_states[eos_mask, :]
-                clf_logits = self.classification_head(sentence_representation)
+                clf_logits = self.classification_head(sentence_representation) # B 2
 
         return Seq2SeqCVQGOutput(
                 loss=masked_lm_loss, 
                 reparam_loss=reparam_loss,
                 logits=lm_logits, 
                 clf_logits=clf_logits,
-                past_key_values=outputs.past_key_values, 
-                decoder_hidden_states=outputs.decoder_hidden_states, 
-                decoder_attentions=outputs.decoder_attentions, 
-                cross_attentions=outputs.cross_attentions, 
-                encoder_last_hidden_state=outputs.encoder_last_hidden_state, 
-                encoder_hidden_states=outputs.encoder_hidden_states, 
-                encoder_attentions=outputs.encoder_attentions,
+                past_key_values=decoder_outputs.past_key_values, 
+                decoder_hidden_states=decoder_outputs.hidden_states, 
+                decoder_attentions=decoder_outputs.attentions, 
+                cross_attentions=decoder_outputs.cross_attentions, 
+                encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+                encoder_hidden_states=encoder_outputs.hidden_states, 
+                encoder_attentions=encoder_outputs.attentions,
         )
 
-def shift_tokens_right_modified(
-        input_ids: torch.Tensor, 
-        pad_token_id: int, 
-        eos_token_id: int
+    # tune for encoder-decoder when generation
+    def _prepare_encoder_decoder_kwargs_for_generation(
+        self, 
+        inputs_tensor: torch.Tensor, 
+        model_kwargs, 
+        model_input_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        # 1. get encoder
+        encoder = self.get_encoder()
+
+        # 2. Prepare encoder args and encoder kwargs from model kwargs.
+        irrelevant_prefix = ["decoder_", "cross_attn", "use_cache"]
+        encoder_kwargs = {
+            argument: value
+            for argument, value in model_kwargs.items()
+            if not any(argument.startswith(p) for p in irrelevant_prefix)
+        }
+        encoder_signature = set(inspect.signature(encoder.forward).parameters)
+        encoder_signature.add('clf_labels')
+        encoder_signature.add('clf_scores')
+        encoder_accepts_wildcard = "kwargs" in encoder_signature or "model_kwargs" in encoder_signature
+        if not encoder_accepts_wildcard:
+            encoder_kwargs = {
+                argument: value for argument, value in encoder_kwargs.items() if argument in encoder_signature
+            }
+
+        # 3. make sure that encoder returns `ModelOutput`
+        model_input_name = model_input_name if model_input_name is not None else self.main_input_name
+        encoder_kwargs["return_dict"] = True
+        encoder_kwargs[model_input_name] = inputs_tensor
+
+        # 3+. retrieva labels and scores
+        model_kwargs['clf_labels'] = encoder_kwargs.pop('clf_labels', None)
+        model_kwargs['clf_scores'] = encoder_kwargs.pop('clf_scores', None)
+        model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)
+
+        return model_kwargs
+
+    def prepare_inputs_for_generation(
+        self,
+        decoder_input_ids,
+        past_key_values=None,
+        attention_mask=None,
+        decoder_attention_mask=None,
+        head_mask=None,
+        decoder_head_mask=None,
+        cross_attn_head_mask=None,
+        use_cache=None,
+        encoder_outputs=None,
+        **kwargs,
     ):
+        # cut decoder_input_ids if past_key_values is used
+        if past_key_values is not None:
+            decoder_input_ids = decoder_input_ids[:, -1:]
+
+        return {
+            "input_ids": None,  # encoder_outputs is defined. input_ids not needed
+            "clf_labels": kwargs.pop('clf_labels', None),
+            "clf_scores": kwargs.pop('clf_scores', None),
+            "encoder_outputs": encoder_outputs,
+            "past_key_values": past_key_values,
+            "decoder_input_ids": decoder_input_ids,
+            "attention_mask": attention_mask,
+            "decoder_attention_mask": decoder_attention_mask,
+            "head_mask": head_mask,
+            "decoder_head_mask": decoder_head_mask,
+            "cross_attn_head_mask": cross_attn_head_mask,
+            "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
+        }
+def shift_tokens_right_modified(
+    input_ids: torch.Tensor, 
+    pad_token_id: int, 
+    eos_token_id: int
+):
     shifted_input_ids = input_ids.new_zeros(input_ids.shape)
     shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = pad_token_id 

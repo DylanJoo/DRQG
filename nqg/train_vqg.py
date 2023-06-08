@@ -27,36 +27,23 @@ class OurHFModelArguments:
 
 @dataclass
 class OurModelArguments:
-    pooling: str = field(default='static')
-    adaptive_pooling: Optional[str] = field(default=None)
-    n_soft_prompts: int = field(default=1)
+    # disable_dropout: bool = field(default=False)
     latent_size: int = field(default=128)
     has_compressed_layer: bool = field(default=False)
-    k: float = field(default=0.0025)
-    x0: int = field(default=2500)
-    annealing_fn: str = field(default='logistic')
     freeze_LM: bool = field(default=True)
-    freeze_embeds: bool = field(default=True)
-    freeze_a_layer: bool = field(default=True)
-    freeze_cross_attn: bool = field(default=True)
-    initialize_from_vocab: bool = field(default=True)
-    used_prompt: Optional[str] = field(default=None)
-    n: int = field(default=1)
-    n_side: int = field(default=None)
-    add_attentive_pooler: bool = field(default=False)
-    disable_dropout: bool = field(default=False)
-    # random_masking_ratio: Optional[float] = field(default=None)
+    prompts: Optional[str] = field(default=None)
+    prompt_length: int = field(default=1)
+    label_prompts: Optional[str] = field(default=None)
     add_classification_head: bool = field(default=False)
-    # for cyclic annealing
-    total_iter: Optional[int] = field(default=10000)
-    n_cycle: Optional[int] = field(default=4)
+    # placeholder
+    prompts_idx = None
+    label_prompts_idx = None
 
 @dataclass
 class OurDataArguments:
     dataset_config_name: Optional[str] = field(default=None)
     overwrite_cache: bool = field(default=False)
     preprocessing_num_workers: Optional[int] = field(default=None)
-    # Customized arguments
     train_file: Optional[str] = field(default=None)
     eval_file: Optional[str] = field(default=None)
     max_p_length: int = field(default=256)
@@ -99,50 +86,43 @@ def main():
 
     # Config and Tokenizer
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
-
-    if model_args.disable_dropout:
-        config.activation_dropout=0
-        config.attention_dropout=0
-        config.classif_dropout=0
-        config.classifier_dropout=0
-        config.dropout=0
-
+    # if model_args.disable_dropout:
+    #     config.activation_dropout=0
+    #     config.attention_dropout=0
+    #     config.classif_dropout=0
+    #     config.classifier_dropout=0
+    #     config.dropout=0
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
-    from models import T5VQG, BartVQG
-    MODELS = {"t5": T5VQG, 'bart': BartVQG}
+    # [Enc-Dec]
+    if model_args.prompts is not None:
+        model_args.prompts_idx = tokenizer.encode(
+                model_args.prompts, add_special_tokens=False
+        )
+        print('Used prompt index:', model_args.prompts_idx)
+
+    if model_args.label_prompts is not None:
+        model_args.label_prompts_idx = tokenizer.encode(
+                model_args.label_prompts, add_special_tokens=False
+        )
+        print('Used label prompt index:', model_args.label_prompts_idx)
+
+    from models import T5VQG, DocRelBartQG
+    MODELS = {"t5": T5VQG, 'bart': DocRelBartQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
 
-    # Model: Enc-Dec
-    if model_args.used_prompt:
-        model_args.used_prompt_idx = tokenizer.encode(
-                model_args.used_prompt,
-                add_special_tokens=False
-        )
-        model_args.used_prompt = True
-        print('Used prompt index:', model_args.used_prompt_idx)
-
-    # Model: Enc-Dec
-    # if model_args.used_condition:
-    #     model_args.used_condition_idx = tokenizer.encode(
-    #             [str(i) for i in model_args.used_condition], 
-    #             add_special_tokens=False
-    #     )
-    #     model_args.used_condition = True
-    #     print('Used conditional index:', model_args.used_condition_idx)
-
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
-            vqg_config=model_args
+            cvqg_config=model_args
     )
     model.set_tokenizer(tokenizer)
-    model.enc_prompts.set_embeddings()
+    model.prompts.set_embeddings()
     
-    # Model: generation config
+    # [generation config]
     try:
         generation_config = GenerationConfig.from_pretrained(
                 hfmodel_args.config_name,
@@ -157,27 +137,19 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['embed_tokens']
-
-    if model_args.freeze_embeds is False:
-        optimized_prefix.append('shared')
-    if model_args.freeze_a_layer is False:
-        optimized_prefix.append('encoder.layers.0') # first
-    if model_args.freeze_cross_attn is False:
-        optimized_prefix.append('encoder_attn')
+    optimized_prefix = ['prompt']
 
     if model_args.freeze_LM:
         print('\nThe fine-tuned components:\n')
         for name, param in model.named_parameters():
             if any([p in name for p in optimized_prefix]):
-                print('param {}: {}'.format(name, param.grad))
+                print('param {} will be optimized.'.format(name))
                 param.requires_grad = True
             else:
                 param.requires_grad = False
 
 
     # Data: collator
-    ### TODO Change the name `v0/v1` since the models have same setups
     from datacollator import DataCollatorForVQG
     DATACOLLATORS = {"vl": DataCollatorForVQG }
 
@@ -207,17 +179,17 @@ def main():
     if training_args.do_eval is True:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
-                    test_size=99, train_size=min(len(dataset['train'])-99, 400000)
+                    test_size=99, train_size=min(len(dataset['train'])-99, 400000), 
+                    seed=1997
             )
         else:
-            dataset['test'] = \
-                    load_dataset('json', data_files=data_args.eval_file)['train']
+            dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
     else:
         dataset['test'] = None
 
     # Trainer
-    from trainers import TrainerForVQG
-    trainer = TrainerForVQG(
+    from trainers import TrainerForQG
+    trainer = TrainerForQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
