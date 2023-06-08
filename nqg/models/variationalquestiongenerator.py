@@ -15,14 +15,12 @@ from .prompt import (
         SoftBasicEmbedding, 
         SoftStaticEmbedding, 
         SoftAdaptiveEmbedding, 
-        SoftAdaptiveEmbedding2, 
 )
 
 PROMPT_EMBEDS = {
         'basic': SoftBasicEmbedding,
         'static': SoftStaticEmbedding,
         'adaptive': SoftAdaptiveEmbedding,
-        'adaptive2': SoftAdaptiveEmbedding2,
 }
 
 def shift_tokens_right_modified(
@@ -30,9 +28,6 @@ def shift_tokens_right_modified(
         pad_token_id: int, 
         eos_token_id: int
     ):
-    """
-    Shift input ids one token to the right.
-    """
     shifted_input_ids = input_ids.new_zeros(input_ids.shape)
     shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = pad_token_id 
@@ -62,17 +57,12 @@ class BartVQG(BartQG):
         self.n_soft_prompts = vqg_config.n_soft_prompts
 
         # soft prompting
-        ## config
-        kwargs = {
-                'annealing_fn': vqg_config.annealing_fn, 
-                'k': vqg_config.k, 'x0': vqg_config.x0,
-                'has_compressed_layer': vqg_config.has_compressed_layer
-        }
-        ## pooler
-        if vqg_config.add_attentive_pooler:
-            pooler = self.get_pooler(config)
+        kld_kwargs = {'annealing_fn': vqg_config.annealing_fn}
+
+        if kld_kwargs['annealing_fn'] != 'cyclic':
+            kld_kwargs.update({'k': vqg_config.k, 'x0': vqg_config.x0})
         else:
-            pooler = None
+            kld_kwargs.update({'n_total': vqg_config.total_iter, 'n_cycle': vqg_config.n_cycle})
 
         ## prompt layer
         self.enc_prompts = PROMPT_EMBEDS[vqg_config.pooling](
@@ -84,7 +74,8 @@ class BartVQG(BartQG):
                 n_prompts=vqg_config.n_soft_prompts,
                 pooler=pooler,
                 adaptive_pooling=vqg_config.adaptive_pooling,
-                **kwargs
+                has_compressed_layer=vqg_config.has_compressed_layer,
+                **kld_kwargs
         )
         self.model.encoder.set_input_embeddings(self.enc_prompts)
         self.model.decoder.set_input_embeddings(self.model.shared)
@@ -98,20 +89,13 @@ class BartVQG(BartQG):
 
         if vqg_config.add_classification_head:
             self.classification_head = BartClassificationHead(
-                config.d_model,
-                config.d_model,
-                1,
-                config.classifier_dropout,
+                config.d_model, config.d_model,
+                2, config.classifier_dropout,
             )
         else:
             self.classification_head = None
 
     def reparam_inputs(self, input_ids, attn_mask, steps=None, clf_labels=None):
-        """
-        Transform the inputs to reparemterized inputs.
-        input_ids --> add variational prompts
-        attn_mask --> add prompt-length attention
-        """
         # input_ids --> input_embeds 
         inputs_embeds = self.model.encoder.embed_tokens(
                 input_ids.view(-1, input_ids.size()[-1]),

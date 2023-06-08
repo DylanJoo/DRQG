@@ -70,7 +70,6 @@ class TrainerForCVQG(TrainerBase):
         ## weighted by power
         ## (1) CE Loss (but separate positive/negative)
         loss_gen_pos, loss_gen_neg = 0, 0
-        length_size = labels.size(-1)
         logits = outputs.get("logits")
         selected_positive = (clf_labels==1)
         loss_fct = CrossEntropyLoss(reduction='none')

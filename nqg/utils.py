@@ -19,7 +19,7 @@ def kl_weight(annealing_fn, steps, k=None, x0=None, n_total=None, n_cycle=None):
     elif annealing_fn == 'cyclic':
         return frange_cycle_linear(n_total, steps, n_cycle=n_cycle)
 
-def frange_cycle_linear(n_total, curr, start=0.0, stop=1.0, n_cycle=4, ratio=0.5):
+def frange_cycle_linear(n_total, curr, start=0.0, stop=1.0, n_cycle=4, ratio=1.0):
     L = np.ones(n_total) * stop
     period = n_total/n_cycle
     step = (stop-start)/(period*ratio) # linear schedule

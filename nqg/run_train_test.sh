@@ -4,7 +4,7 @@ MODEL=nils-warm-mean-444-hard-temp-5w1h
 
 rm -rvf $BASE/$MODEL
 # PRT_MODEL=facebook/bart-base
-PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000
+PRT_MODEL=bartqg-d2q/relevant/checkpoint-8000
 PRT_CONFIG=facebook/bart-base
 
 # TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
@@ -21,16 +21,18 @@ python3 train_vqg_test.py \
   --m_negative_per_example 4 \
   --m_positive_per_example 4 \
   --evaluation_strategy steps \
-  --learning_rate 1e-3 \
+  --learning_rate 1e-4 \
+  --lr_scheduler_type constant \
   --train_file $TRAIN_FILE \
   --max_steps 10000 \
   --save_steps 2000 \
   --eval_steps 500 \
   --add_classification_head true \
   --num_labels 2 \
-  --pooling 'mean' \
+  --pooling mean \
   --latent_size 128 \
   --has_compressed_layer true \
+  --learnable_prior false \
   --freeze_LM true \
   --n_prompts 10 \
   --used_prompt 'generate positive or negative question for this passage' \
@@ -38,5 +40,6 @@ python3 train_vqg_test.py \
   --used_label 'false true' \
   --warmup_ratio 0.2 \
   --annealing cyclic \
+  --n_cycle 10 \
   --do_train \
   --do_eval 
