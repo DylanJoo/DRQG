@@ -23,7 +23,7 @@ class TrainerBase(Trainer):
             input_ids = input_ids.repeat_interleave(m, 0)
             attention_mask = attention_mask.repeat_interleave(m, 0)
             clf_scores = torch.arange(0, m, 1)/(m-1)
-            clf_scores = clf_scores.repeat(n, 1)
+            clf_scores = clf_scores.repeat(n)
             out = model.generate(
                     input_ids, 
                     attention_mask=attention_mask, 

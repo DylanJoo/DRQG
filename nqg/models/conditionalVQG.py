@@ -15,12 +15,12 @@ from transformers.modeling_outputs import BaseModelOutput
 
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
-from .modules import InstanceWisePrompt, EncDecCVAE, DocRelPrompt
+from .modules import InstanceWisePrompt, EncDecCVAE, RelPrompt
 
 from utils import kl_weight, kl_loss
 import copy
 
-class DocRelBartQG(BartQG):
+class DocRelBartVQG(BartQG):
     base_model_prefix = "model"
     _keys_to_ignore_on_load_missing = [
         r"final_logits_bias",
@@ -50,24 +50,23 @@ class DocRelBartQG(BartQG):
         self.post_init()
 
         # [prompt] 
-        self.prompts = DocRelPrompt(
+        self.prompts = RelPrompt(
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
-                init_idx=cvqg_config.prompts_idx,
-                lbl_init_idx=cvqg_config.label_prompts_idx,
+                head_size=64,
+                pos_init_idx=cvqg_config.prompts_idx,
+                neg_init_idx=cvqg_config.prompts_idx
         )
+        self.prompts.set_embeddings()
 
         # [condition]
         # kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
-        # if kld_kwargs['annealing_fn'] != 'cyclic':
-        #     kld_kwargs.update({
-        #         'k': cvqg_config.k, 'x0': cvqg_config.x0
-        #     })
+        # if kld_kwargs['annealing_fn'] == 'cyclic':
+        #     kld_kwargs.update({'total_iter': cvqg_config.total_iter, 
+        #                        'n_cycle': cvqg_config.n_cycle}) 
         # else:
-        #     kld_kwargs.update({
-        #         'total_iter': cvqg_config.total_iter, 
-        #         'n_cycle': cvqg_config.n_cycle
-        #     }) 
+        #     kld_kwargs.update({'k': cvqg_config.k, 'x0': cvqg_config.x0})
+
         # self.encdec_cvae = EncDecCVAE(
         #         wte=self.model.shared,
         #         hidden_size=config.d_model,
@@ -119,9 +118,6 @@ class DocRelBartQG(BartQG):
 
         # [Bart encoding]
         if encoder_outputs is None:
-            # ## [Encoder prompt wrapper]
-            # inputs_embeds = self.prompts(clf_scores, input_ids)
-            # attention_mask = self.prompts.expand_mask(attention_mask)
 
             ## [Bart encoder]
             encoder_outputs = self.model.encoder(
@@ -142,13 +138,13 @@ class DocRelBartQG(BartQG):
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
 
-        ## [Encoder prompt wrapper]
+        # [Enc-dec VAE]
         encoder_hidden_states = self.prompts(
                 clf_scores, None, encoder_outputs[0]
         )
-        attention_mask = self.prompts.expand_mask(attention_mask)
+        # encoder_hidden_states = encoder_outputs[0]
 
-        # standard enc-dec pipeline
+        # [Bart decoding]
         decoder_outputs = self.model.decoder(
                 input_ids=decoder_input_ids,
                 attention_mask=decoder_attention_mask,

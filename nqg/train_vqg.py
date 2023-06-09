@@ -108,8 +108,8 @@ def main():
         )
         print('Used label prompt index:', model_args.label_prompts_idx)
 
-    from models import T5VQG, DocRelBartQG
-    MODELS = {"t5": T5VQG, 'bart': DocRelBartQG}
+    from models import T5VQG, DocRelBartQG, DocRelBartVQG
+    MODELS = {"t5": T5VQG, 'bart': DocRelBartVQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
@@ -120,7 +120,7 @@ def main():
             cvqg_config=model_args
     )
     model.set_tokenizer(tokenizer)
-    model.prompts.set_embeddings()
+    # model.prompts.set_embeddings()
     
     # [generation config]
     try:
@@ -138,14 +138,18 @@ def main():
 
     # Model: freezing LM
     optimized_prefix = ['prompt']
+    freezed_prefix = []
 
     if model_args.freeze_LM:
-        print('\nThe fine-tuned components:\n')
         for name, param in model.named_parameters():
             if any([p in name for p in optimized_prefix]):
                 print('param {} will be optimized.'.format(name))
                 param.requires_grad = True
             else:
+                param.requires_grad = False
+
+            if any([p in name for p in freezed_prefix]):
+                print('param {} wont be optimized.'.format(name))
                 param.requires_grad = False
 
 
