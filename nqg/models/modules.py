@@ -8,6 +8,13 @@ import copy
 from transformers.activations import gelu
 
 class DocRelPrompt(nn.Module):
+    """ Document-relevance-awared prompt for confitionalQG.
+    Used components include 'document-wise' and 'relevant-wise' prompts.
+    In addition to prompt, the decoder injection is performed using
+    
+    [TODO] 
+        Try different relevance modeling for relevant-wise prompts.
+    """
     def __init__(
             self, 
             wte: nn.Embedding,
@@ -20,7 +27,6 @@ class DocRelPrompt(nn.Module):
         self.orig_embeds = wte
         self.lbl_init_idx = lbl_init_idx
         self.init_idx = init_idx
-        self.length = len(init_idx) 
 
         self.prompts = nn.Parameter(torch.randn(
             (len(init_idx), hidden_size), device=wte.weight.device
@@ -29,12 +35,12 @@ class DocRelPrompt(nn.Module):
             (len(lbl_init_idx), hidden_size), device=wte.weight.device
         ))
 
-        self.adapter = InstanceWisePrompt(
+        self.reformulator = InstanceWisePrompt(
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size
         )
-        self.label_adapter = InstanceWisePrompt(
+        self.label_reformulator = InstanceWisePrompt(
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size
@@ -49,26 +55,26 @@ class DocRelPrompt(nn.Module):
         )
         print(f"{self.__class__.__name__} embeddings set: ", self.init_idx, self.lbl_init_idx)
 
-    def forward(self, relevance, input_ids=None, hidden_states_src=None, steps=None):
-        # [TODO] Try different way to model relevance
+    def forward(self, relevance, hidden_states_src=None, input_ids=None, steps=None):
         if hidden_states_src is None:
-            self.n_samples = len(relevance) // input_ids.size(0)
             hidden_states_src = self.orig_embeds(input_ids)
-        else:
-            self.n_samples = len(relevance) // hidden_states_src.size(0)
+        self.n_samples = len(relevance) // hidden_states_src.size(0)
 
         relevance = torch.cat([(1-relevance).view(-1, 1), relevance.view(-1, 1)], 1)
         relevance = relevance.to(self.label_prompts.device)
         hidden_states_rel = torch.matmul(relevance, self.label_prompts).unsqueeze(1) 
 
-        lbl_prompts = self.label_adapter(hidden_states_rel, self.prompts)
-        doc_prompts = self.adapter(hidden_states_src, self.prompts)
+        rel_prompts = self.label_reformulator(hidden_states_rel, self.prompts)
+        doc_prompts = self.reformulator(hidden_states_src, self.prompts)
 
         # [NOTE]
         # Generally, hidden state injection is much more effective
-        # However, naive prompt can not help the variaety
-        # Best: return torch.cat([doc_prompts, hidden_states_src+hidden_states_rel], 1)
-        return torch.cat([lbl_prompts, hidden_states_src+hidden_states_rel], 1)
+        # And naive prompt can not help the variaety
+        self.length = len(self.init_idx) # output should fit the mask
+        return torch.cat([doc_prompts, hidden_states_src+hidden_states_rel], 1)
+
+        # self.length = len(self.init_idx) + len(self.lbl_init_idx) # output should fit the mask
+        # return torch.cat([doc_prompts, rel_prompts, hidden_states_src+hidden_states_rel], 1)
     
     def expand_mask(self, mask):
         mask = mask.repeat(self.n_samples, 1)
@@ -76,7 +82,13 @@ class DocRelPrompt(nn.Module):
         mask = torch.cat([additional_mask, mask], -1)
         return mask
 
-class RelPrompt(nn.Module):
+class RelAdapter(nn.Module):
+    """ Relevance adapter for confitionalVQG.
+    Used components include 'document-wise' and 'relevant-wise' prompts.
+    
+    [TODO] 
+        Try different relevance modeling for relevant-wise prompts.
+    """
     def __init__(
             self, 
             wte: nn.Embedding,
@@ -84,12 +96,14 @@ class RelPrompt(nn.Module):
             head_size: int = 64,
             pos_init_idx: Optional[List] = None,
             neg_init_idx: Optional[List] = None,
+            **kwargs
         ):
-        super(RelPrompt, self).__init__()
+        super(RelAdapter, self).__init__()
         self.orig_embeds = wte
         self.pos_init_idx = pos_init_idx
         self.neg_init_idx = neg_init_idx
-        # self.length = len(init_idx) 
+        self.pooling = kwargs.pop('pooling', 'mean')
+        self.activation = kwargs.pop('activation', 'sigmoid')
 
         self.pos_prompts = nn.Parameter(torch.randn(
             (len(pos_init_idx), hidden_size), device=wte.weight.device
@@ -102,7 +116,8 @@ class RelPrompt(nn.Module):
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size,
-                pooling='max'
+                pooling=self.pooling,
+                activation=self.activation
         )
 
     def set_embeddings(self):
@@ -115,33 +130,27 @@ class RelPrompt(nn.Module):
         print(f"{self.__class__.__name__} embeddings set: ", \
                 self.pos_init_idx, self.neg_init_idx)
 
-    def forward(self, relevance, input_ids=None, hidden_states_src=None, steps=None):
+    def forward(self, relevance, hidden_states_src=None, residual=False, mask=None):
         batch_size = hidden_states_src.size(0)
-        if hidden_states_src is None:
-            self.n_samples = len(relevance) // input_ids.size(0)
-            hidden_states_src = self.orig_embeds(input_ids)
-        else:
-            self.n_samples = len(relevance) // hidden_states_src.size(0)
-
         # [relevance conditioned]
-        ## B N H
         relevance = relevance.to(self.pos_prompts.device)
         pos_prompts = self.pos_prompts.unsqueeze(0).repeat(batch_size, 1, 1)
         neg_prompts = self.neg_prompts.unsqueeze(0).repeat(batch_size, 1, 1)
         rel_prompts = (relevance.view(-1, 1, 1) * pos_prompts + \
                        (1-relevance).view(-1, 1, 1) * neg_prompts) / 2
 
-        # [NOTE]
-        ## Setting 1: add hidden_states_src directly to encoder_outputs
-        rel_hidden_states_src = self.adapter(rel_prompts, hidden_states_src) 
-        return rel_hidden_states_src
+        residual = 0 if residual is None else residual
+        rel_hidden_states = self.adapter(
+                rel_prompts+residual, hidden_states_src, 
+                mask=mask
+        )
+
+        return rel_hidden_states
 
     def expand_mask(self, mask):
-        mask = mask.repeat(self.n_samples, 1)
         additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
         mask = torch.cat([additional_mask, mask], -1)
         return mask
-
 
 class InstanceWisePrompt(nn.Module):
     """
@@ -156,6 +165,7 @@ class InstanceWisePrompt(nn.Module):
             length: int = 1,
             init_idx: Optional[List] = None,
             pooling: str = 'mean',
+            activation: str = 'sigmoid',
         ):
         super(InstanceWisePrompt, self).__init__()
         self.orig_embeds = wte
@@ -165,6 +175,7 @@ class InstanceWisePrompt(nn.Module):
         self.q_proj = nn.Linear(hidden_size, head_size, bias=True)
         self.k_proj = nn.Linear(hidden_size, head_size, bias=True)
         self.pooling = pooling
+        self.activation = activation
 
         if init_idx is not None:
             self.init_idx = (init_idx*length)[:length]
@@ -178,37 +189,41 @@ class InstanceWisePrompt(nn.Module):
         )
         print("Set embeddings to", self.init_idx)
 
-    def forward(self, hidden_states=None, base=None, input_ids=None):
-        """
-        instance-aware/hidden_states: B L H  (input_ids B L)
-        base: N H 
-        """
-        if input_ids is not None:
+    def forward(self, hidden_states=None, base=None, input_ids=None, mask=None):
+        if hidden_states is None:
             hidden_states = self.orig_embeds(input_ids)
-        if base is None:
-            base = self.prompt_embeds
+        base = self.prompt_embeds if base is None else base
 
         if base.size(0) == hidden_states.size(0):
+            # Reformulator (prompt as base, hidden as anchor)
             V = base
-        else:
+        else: 
+            # Adapter (hidden as base, prompt as anchor)
             V = base.unsqueeze(0).repeat(hidden_states.size(0), 1, 1)
 
-        Q = self.q_proj(base) 
-        K = self.k_proj(hidden_states) 
+        Q = self.q_proj(V) # N H' or B L H'
+        K = self.k_proj(hidden_states) # B L H' or B N H'
         K = torch.transpose(K, 1, 2)
-        # scores: B N L
         scores = torch.matmul(Q, K)   
-        # scores: B N
-        if self.pooling == 'mean':
-            scores = torch.mean(scores / math.sqrt(self.head_size), dim=-1)
-        else:
+
+        # scores: B N L or B L N --> B N or B L
+        if self.pooling == 'max':
             scores = torch.max(scores / math.sqrt(self.head_size), dim=-1).values
-        probs = torch.sigmoid(scores)
-        # B N H * B N 1
-        scores = torch.mean(scores / math.sqrt(self.head_size), dim=-1)
-        iw_prompts = torch.mul(V, probs.unsqueeze(-1))
-        return iw_prompts
-    
+        elif self.pooling == 'mean':
+            scores = torch.mean(scores / math.sqrt(self.head_size), dim=-1)
+
+        if mask is not None:
+            scores.masked_fill_(~mask, 1e-5)
+
+        # converage mechanism
+        if self.activation == 'tanh':
+            probs = torch.tanh(scores)
+        elif self.activation == 'sigmoid':
+            probs = torch.sigmoid(scores)
+
+        # B N H * B N or B L H * B L
+        return torch.mul(V, probs.unsqueeze(-1))
+
     def expand_mask(self, mask):
         additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
         mask = torch.cat([additional_mask, mask], 1)
@@ -219,80 +234,60 @@ class VAE(nn.Module):
             self,
             hidden_size: int = 768, 
             latent_size: int = 128, 
-            length: int = 1,
+            learnable_prior: bool = False,
             prefix_length: int = 0,
-            device: Optional[str] = 'cpu',
             **kwargs
         ):
-        super(EncDecVAE, self).__init__()
-        self.orig_embeds = wte
-
-        cond_size = hidden_size
-        self.downproject = nn.Linear(cond_size+hidden_size, latent_size*2, bias=False)
+        super(VAE, self).__init__()
+        cond_size = 0
+        self.proj_down = nn.Linear(cond_size+hidden_size, latent_size*2, bias=False)
         self.hidden2mean = nn.Linear(latent_size*2, latent_size, bias=False)
         self.hidden2logv = nn.Linear(latent_size*2, latent_size, bias=False)
-        self.upproject = nn.Linear(cond_size+latent_size, latent_size*2, bias=False)
+        self.proj_up = nn.Linear(cond_size+latent_size, latent_size*2, bias=False)
         self.latent2hidden = nn.Linear(latent_size*2, hidden_size, bias=False)
 
-        self.downproject_pri = nn.Linear(hidden_size, latent_size*2, bias=False)
-        self.hidden2mean_pri = nn.Linear(latent_size*2, latent_size, bias=False)
-        self.hidden2logv_pri = nn.Linear(latent_size*2, latent_size, bias=False)
+        if learnable_prior:
+            self.proj_down_pri = nn.Linear(hidden_size, latent_size*2, bias=False)
+            self.hidden2mean_pri = nn.Linear(latent_size*2, latent_size, bias=False)
+            self.hidden2logv_pri = nn.Linear(latent_size*2, latent_size, bias=False)
 
         # attr
         self.hidden_size = hidden_size
         self.latent_size = latent_size
-        self.length = length
         self.prefix_length = prefix_length
-        self.device = device
         self.kld_kwargs = kwargs.pop('kld_kwargs')
 
-    def forward(self, enc_last_hidden_state, relevance=None, steps=None):
-        h_prompt = enc_last_hidden_state[:, :self.prefix_length]
-        h_source = enc_last_hidden_state[:, self.prefix_length:]
+    def forward(self, rel_hidden_state, hidden_state=None, steps=None):
+        # h_sent_prefix = rel_hidden_state[:, :self.prefix_length]
+        # h_sent_rel = rel_hidden_state[:, self.prefix_length:]
+        h_sent_rel = rel_hidden_state
 
-        sent_source = torch.mean(h_source, dim=1).unsqueeze(1)
-        sent_prompt = torch.mean(h_prompt, dim=1).unsqueeze(1)
-        # if self.pooling == 'max':
-        #     h_sent = torch.max(h_source, dim=1).values.unsqueeze(1)
-
-        # vae (encoder)
-        ## label encoding 
-        condition = torch.cat([(1-relevance).view(-1, 1), relevance.view(-1, 1)], 1)
-        h_enc = torch.cat((h_sent, h_cond), -1) # B 1 H / B L H
-
-        if self.downproject is not None:
-            h_enc = self.downproject(h_enc)
-            h_cond_pri = self.downproject_pri(h_cond)
-        mean = self.hidden2mean(h_enc)
-        logv = self.hidden2mean(h_enc)
+        # [Posterior]
+        z_sent_rel = self.proj_down(h_sent_rel)
+        mean = self.hidden2mean(z_sent_rel)
+        logv = self.hidden2mean(z_sent_rel)
         std = torch.exp(0.5*logv)
-        r = torch.rand(mean.shape, device=mean.device) 
-        if steps is None:
-            r = 0
+        r = torch.rand(mean.shape, device=mean.device) if steps else 0
         z = mean + r * std
+        z = self.proj_up(z)
+        h_sent_rel = self.latent2hidden(z)
 
-        # vae (decoder)
-        ## label encoding 
-        z = torch.cat((z, h_cond), -1)
-
-        if self.upproject is not None:
-            z = self.upproject(z)
-        h_label = self.latent2hidden(z)
-
-        # Compute the prior
-        logv_pri = self.hidden2logv_pri(h_cond_pri)
-        mean_pri = self.hidden2mean_pri(h_cond_pri)
-
-        # compuate loss
-        loss = kl_loss(
-                logv.view(-1, self.latent_size),
-                mean.view(-1, self.latent_size),
-                logv_pri.view(-1, self.latent_size),
-                mean_pri.view(-1, self.latent_size)
-        ) 
+        # [Prior]
+        if hidden_state is not None:
+            h_sent = hidden_state
+            z_sent = self.proj_down_pri(h_sent)
+            mean_pri = self.hidden2mean_pri(z_sent)
+            logv_pri = self.hidden2logv_pri(z_sent)
+            loss = kl_loss(logv.view(-1, self.latent_size),
+                           mean.view(-1, self.latent_size),
+                           logv_pri.view(-1, self.latent_size),
+                           mean_pri.view(-1, self.latent_size))
+        else:
+            loss = kl_loss(logv.view(-1, self.latent_size),
+                           mean.view(-1, self.latent_size))
         weight = kl_weight(**self.kld_kwargs, steps=steps)
 
-        return h_label, loss*weight
+        return h_sent_rel, loss*weight
 
 class EncDecVAE(nn.Module):
     def __init__(

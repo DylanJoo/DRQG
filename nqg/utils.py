@@ -9,7 +9,7 @@ from torch.nn import CosineEmbeddingLoss, CrossEntropyLoss
 def interpolate(A, B, n):
     return [torch.lerp(A, B, i) for i in np.linspace(0, 1, n)]
 
-def kl_weight(annealing_fn, steps, k=None, x0=None, n_total=None, n_cycle=None):
+def kl_weight(annealing_fn, steps, k=None, x0=None, n_total_iter=None, n_cycle=None):
     if steps is None:
         return 1
     if annealing_fn == 'logistic':
@@ -17,27 +17,13 @@ def kl_weight(annealing_fn, steps, k=None, x0=None, n_total=None, n_cycle=None):
     elif annealing_fn == 'linear':
         return min(1, steps/x0)
     elif annealing_fn == 'cyclic':
-        return frange_cycle_linear(n_total, steps, n_cycle=n_cycle)
+        return frange_cycle_linear(n_total_iter, steps, n_cycle)
 
 def frange_cycle_linear(n_total, curr, start=0.0, stop=1.0, n_cycle=4, ratio=1.0):
     L = np.ones(n_total) * stop
     period = n_total/n_cycle
     step = (stop-start)/(period*ratio) # linear schedule
     return min(stop, start + step * (curr % period))
-
-def old_frange_cycle_linear(n_epoch, start, stop, n_cycle=4, ratio=0.5):
-    L = np.ones(n_epoch)
-    period = n_epoch/n_cycle
-    step = (stop-start)/(period*ratio) # linear schedule
-
-    for c in range(n_cycle):
-
-        v , i = start , 0
-        while v <= stop and (int(i+c*period) < n_epoch):
-            L[int(i+c*period)] = v
-            v += step
-            i += 1
-    return L    
 
 def sim_loss(a, b, metric='cosine'):
     loss_fct = CosineEmbeddingLoss()
@@ -47,20 +33,22 @@ def sim_loss(a, b, metric='cosine'):
                     torch.tensor(labels).to(a.device))
     return loss
 
-def kl_loss(logv1, mean1, logv2=None, mean2=None): # [batch_size(64), hidden_size(768)]
+def kl_loss(logv1, mean1, logv2=None, mean2=None, reduction='sum'): # [batch_size(64), hidden_size(768)]
     if logv2 is None and mean2 is None:
         return -0.5 * torch.sum(1 + logv1 - mean1.pow(2) - logv1.exp())
 
     exponential = 1 + (logv1-logv2) - (mean1-mean2).pow(2)/logv2.exp() - (logv1-logv2).exp()
     kl_loss_embeds = -0.5 * torch.sum(exponential, tuple(range(1, len(exponential.shape))))
-    return kl_loss_embeds.mean()
+    if reduction == 'sum':
+        return kl_loss_embeds.sum()
+    else:
+        return kl_loss_embeds.mean()
 
 def PairwiseCELoss(scores):
     CELoss = CrossEntropyLoss()
     logits = scores.view(2, -1).permute(1, 0) # (B*2 1) -> (B 2)
     labels = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
     return CELoss(logits, labels)
-
 
 def random_masking(tokens_lists, masked_token):
 

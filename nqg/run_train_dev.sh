@@ -1,16 +1,13 @@
-export CUDA_VISIBLE_DEVICES=0
-BASE=bartvqg-test
-MODEL=redragon-cold-adamean-B_444
+export CUDA_VISIBLE_DEVICES=2
+BASE=bartvqg
+MODEL=nils
 
 rm -rvf $BASE/$MODEL
-# PRT_MODEL=facebook/bart-base
 PRT_MODEL=bartqg-d2q/relevant/checkpoint-8000
 PRT_CONFIG=facebook/bart-base
 
-TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
-# TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
-# TRAIN_FILE=/home/jhju/datasets/msmarco.triples_train_small/triples.train.small.vL.jsonl  
-python3 train_vqg_dev.py \
+TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
+python3 train_vqg.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
@@ -20,24 +17,27 @@ python3 train_vqg_dev.py \
   --per_device_train_batch_size 4 \
   --m_negative_per_example 4 \
   --m_positive_per_example 4 \
-  --n_side 10 \
-  --evaluation_strategy steps \
   --learning_rate 1e-3 \
-  --train_file $TRAIN_FILE \
+  --evaluation_strategy steps \
   --max_steps 10000 \
   --save_steps 2000 \
   --eval_steps 500 \
-  --pooling none \
-  --add_classification_head true \
-  --adaptive_pooling mean \
-  --n_soft_prompts 10 \
+  --train_file $TRAIN_FILE \
   --latent_size 128 \
   --has_compressed_layer true \
-  --initialize_from_vocab true \
-  --used_prompt 'generate positive or negative question for this passage' \
-  --k 0.5 \
-  --x0 1000 \
+  --add_classification_head true \
+  --annealing_fn cyclic \
+  --n_cycle 10 \
+  --pos_anchors 'what where when who how why which' \
+  --neg_anchors 'what where when who how why which' \
+  --pooling mean \
+  --activation tanh \
   --warmup_ratio 0.1 \
-  --annealing logistic \
   --do_train \
   --do_eval 
+
+# [NOTE] 
+# larger leanring rate 
+# longer and diversified anchors  
+# n cycle  
+# larger negative samples  

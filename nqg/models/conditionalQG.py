@@ -57,25 +57,6 @@ class DocRelBartQG(BartQG):
                 lbl_init_idx=cvqg_config.label_prompts_idx,
         )
 
-        # [condition]
-        # kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
-        # if kld_kwargs['annealing_fn'] != 'cyclic':
-        #     kld_kwargs.update({
-        #         'k': cvqg_config.k, 'x0': cvqg_config.x0
-        #     })
-        # else:
-        #     kld_kwargs.update({
-        #         'total_iter': cvqg_config.total_iter, 
-        #         'n_cycle': cvqg_config.n_cycle
-        #     }) 
-        # self.encdec_cvae = EncDecCVAE(
-        #         wte=self.model.shared,
-        #         hidden_size=config.d_model,
-        #         latent_size=cvqg_config.latent_size,
-        #         prefix_length=len(cvqg_config.used_label_idx),
-        #         has_compressed_layer=cvqg_config.has_compressed_layer,
-        # )
-
     def forward(
         self,
         input_ids: torch.LongTensor = None,
@@ -119,8 +100,8 @@ class DocRelBartQG(BartQG):
 
         # [Bart encoding]
         if encoder_outputs is None:
-            # ## [Encoder prompt wrapper]
-            # inputs_embeds = self.prompts(clf_scores, input_ids)
+            # ## [Encoder prompt] -- FAILED
+            # inputs_embeds = self.prompts(clf_scores, input_ids, None)
             # attention_mask = self.prompts.expand_mask(attention_mask)
 
             ## [Bart encoder]
@@ -142,10 +123,9 @@ class DocRelBartQG(BartQG):
                 attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
             )
 
-        ## [Encoder prompt wrapper]
-        encoder_hidden_states = self.prompts(
-                clf_scores, None, encoder_outputs[0]
-        )
+        ## [EncoderDecoder prompt wrapper]
+        # encoder_hidden_states = encoder_outputs[0]
+        encoder_hidden_states = self.prompts(clf_scores, encoder_outputs[0], None)
         attention_mask = self.prompts.expand_mask(attention_mask)
 
         # standard enc-dec pipeline
@@ -178,12 +158,12 @@ class DocRelBartQG(BartQG):
 
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state
-                decoder_input_ids = shift_tokens_right_modified(
+                decoder_input_ids_ = shift_tokens_right_modified(
                         labels, 
                         self.config.pad_token_id, 
                         self.config.eos_token_id
                 )
-                eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
+                eos_mask = decoder_input_ids_.eq(self.config.eos_token_id).to(hidden_states.device)
                 sentence_representation = hidden_states[eos_mask, :]
                 clf_logits = self.classification_head(sentence_representation) # B 2
 
@@ -270,6 +250,7 @@ class DocRelBartQG(BartQG):
             "cross_attn_head_mask": cross_attn_head_mask,
             "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
         }
+
 def shift_tokens_right_modified(
     input_ids: torch.Tensor, 
     pad_token_id: int, 

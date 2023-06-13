@@ -1,5 +1,5 @@
 export CUDA_VISIBLE_DEVICES=2
-BASE=bart
+BASE=bartvqg
 MODEL=nils
 
 rm -rvf $BASE/$MODEL
@@ -18,7 +18,7 @@ python3 train_vqg.py \
   --m_negative_per_example 4 \
   --m_positive_per_example 4 \
   --learning_rate 1e-3 \
-  --lr_scheduler_type constant \
+  --lr_scheduler_type linear \
   --evaluation_strategy steps \
   --max_steps 10000 \
   --save_steps 2000 \

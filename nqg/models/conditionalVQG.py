@@ -15,12 +15,11 @@ from transformers.modeling_outputs import BaseModelOutput
 
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
-from .modules import InstanceWisePrompt, EncDecCVAE, RelPrompt
+from .modules import VAE, RelAdapter
 
-from utils import kl_weight, kl_loss
 import copy
 
-class DocRelBartVQG(BartQG):
+class RelBartVQG(BartQG):
     base_model_prefix = "model"
     _keys_to_ignore_on_load_missing = [
         r"final_logits_bias",
@@ -30,7 +29,6 @@ class DocRelBartVQG(BartQG):
     ]
     def __init__(self, config: BartConfig, cvqg_config=None):
         super().__init__(config)
-        # self.n_soft_prompts = vqg_config.n_soft_prompts
 
         self.model = BartModel(config)
 
@@ -50,30 +48,30 @@ class DocRelBartVQG(BartQG):
         self.post_init()
 
         # [prompt] 
-        self.prompts = RelPrompt(
+        self.adapter = RelAdapter(
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
-                head_size=64,
-                pos_init_idx=cvqg_config.prompts_idx,
-                neg_init_idx=cvqg_config.prompts_idx
+                head_size=cvqg_config.head_size,
+                pos_init_idx=cvqg_config.pos_anchors_idx,
+                neg_init_idx=cvqg_config.neg_anchors_idx,
+                pooling=cvqg_config.pooling,
+                activation=cvqg_config.activation
         )
-        self.prompts.set_embeddings()
 
         # [condition]
-        # kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
-        # if kld_kwargs['annealing_fn'] == 'cyclic':
-        #     kld_kwargs.update({'total_iter': cvqg_config.total_iter, 
-        #                        'n_cycle': cvqg_config.n_cycle}) 
-        # else:
-        #     kld_kwargs.update({'k': cvqg_config.k, 'x0': cvqg_config.x0})
+        kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
+        if kld_kwargs['annealing_fn'] == 'cyclic':
+            kld_kwargs.update({'n_total_iter': cvqg_config.n_total_iter, 
+                               'n_cycle': cvqg_config.n_cycle}) 
+        else:
+            kld_kwargs.update({'k': cvqg_config.k, 'x0': cvqg_config.x0})
 
-        # self.encdec_cvae = EncDecCVAE(
-        #         wte=self.model.shared,
-        #         hidden_size=config.d_model,
-        #         latent_size=cvqg_config.latent_size,
-        #         prefix_length=len(cvqg_config.used_label_idx),
-        #         has_compressed_layer=cvqg_config.has_compressed_layer,
-        # )
+        self.vae = VAE(
+                hidden_size=config.d_model,
+                latent_size=cvqg_config.latent_size,
+                learnable_prior=True,
+                kld_kwargs=kld_kwargs
+        )
 
     def forward(
         self,
@@ -139,10 +137,31 @@ class DocRelBartVQG(BartQG):
             )
 
         # [Enc-dec VAE]
-        encoder_hidden_states = self.prompts(
-                clf_scores, None, encoder_outputs[0]
-        )
+        # setting 0
         # encoder_hidden_states = encoder_outputs[0]
+
+        # setting 1
+        reparam_loss = 0
+        encoder_hidden_states = self.adapter(
+                clf_scores, encoder_outputs[0], 
+                mask=attention_mask
+        )
+
+        # setting 2: adapter with sentence embeddings
+        # setting 2.1 prior is from gaussian
+        # sentences = torch.mean(encoder_outputs[0], dim=1).unsqueeze(1)
+        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=sentences)
+        #
+        # rel_sentences = torch.mean(encoder_hidden_states, dim=1).unsqueeze(1)
+        # rel_sentences_prime, reparam_loss = self.vae(rel_sentences)
+        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=rel_sentences_prime)
+
+        # setting 2.2 learnable prior from orginal sentence embeddings
+        # sentences = torch.mean(encoder_outputs[0], dim=1).unsqueeze(1)
+        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=sentences)
+        # rel_sentences = torch.mean(encoder_hidden_states, dim=1).unsqueeze(1)
+        # rel_sentences_prime, reparam_loss = self.vae(rel_sentences, sentences)
+        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=rel_sentences_prime)
 
         # [Bart decoding]
         decoder_outputs = self.model.decoder(
@@ -162,7 +181,7 @@ class DocRelBartVQG(BartQG):
         lm_logits = self.lm_head(decoder_outputs[0])
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-        masked_lm_loss, reparam_loss = 0, 0
+        masked_lm_loss = 0
         clf_logits = None
         if labels is not None:
             labels = labels.to(lm_logits.device)
@@ -174,12 +193,12 @@ class DocRelBartVQG(BartQG):
 
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state
-                decoder_input_ids = shift_tokens_right_modified(
+                decoder_input_ids_ = shift_tokens_right_modified(
                         labels, 
                         self.config.pad_token_id, 
                         self.config.eos_token_id
                 )
-                eos_mask = decoder_input_ids.eq(self.config.eos_token_id).to(hidden_states.device)
+                eos_mask = decoder_input_ids_.eq(self.config.eos_token_id).to(hidden_states.device)
                 sentence_representation = hidden_states[eos_mask, :]
                 clf_logits = self.classification_head(sentence_representation) # B 2
 
