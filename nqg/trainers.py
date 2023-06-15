@@ -59,23 +59,28 @@ class TrainerForQG(TrainerBase):
         clf_logits = outputs.get("clf_logits")
 
         ## (1) CE Loss (same as built-in but separate positive/negative)
+        w = clf_scores.exp().view(-1, 1).expand(labels.shape)
         loss_gen_pos, loss_gen_neg = 0, 0
         loss_fct = CrossEntropyLoss(reduction='none')
-
         selected = (clf_labels<1)
         loss_gen_neg = loss_fct(
                 lm_logits[selected].view(-1, model.config.vocab_size), 
                 labels[selected].view(-1)
-        ).mean()
+        )
+        loss_gen_neg = loss_gen_neg.mean()
+
+        loss_fct = CrossEntropyLoss(reduction='none')
         selected = (clf_labels==1)
         loss_gen_pos = loss_fct(
                 lm_logits[selected].view(-1, model.config.vocab_size), 
                 labels[selected].view(-1)
-        ).mean()
+        )
+        loss_gen_pos = loss_gen_pos.mean()
+
         loss_gen = (loss_gen_pos+loss_gen_neg) / 2
 
         ## (2) KL loss (relevance)
-        loss_clf = 0
+        loss_rel = 0
         loss_fct = KLDivLoss(reduction='sum')
         logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
         target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
@@ -85,7 +90,7 @@ class TrainerForQG(TrainerBase):
         ## (4) KL loss (reparam)
         loss_reparam = outputs.get('reparam_loss')
 
-        loss = loss_gen + loss_reparam + loss_rel
+        loss = loss_gen+loss_reparam+loss_rel
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

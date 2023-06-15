@@ -102,8 +102,8 @@ class RelAdapter(nn.Module):
         self.orig_embeds = wte
         self.pos_init_idx = pos_init_idx
         self.neg_init_idx = neg_init_idx
-        self.pooling = kwargs.pop('pooling', 'mean')
-        self.activation = kwargs.pop('activation', 'sigmoid')
+        self.batch_size = kwargs.pop('batch_size', None)
+        self.hidden_size = hidden_size
 
         self.pos_prompts = nn.Parameter(torch.randn(
             (len(pos_init_idx), hidden_size), device=wte.weight.device
@@ -116,9 +116,11 @@ class RelAdapter(nn.Module):
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size,
-                pooling=self.pooling,
-                activation=self.activation
+                pooling=kwargs.pop('pooling', 'mean'),
+                activation=kwargs.get('activation', 'sigmoid'),
         )
+
+        # self.norm = nn.LayerNorm(self.hidden_size)
 
     def set_embeddings(self):
         self.pos_prompts = nn.Parameter(
@@ -138,12 +140,24 @@ class RelAdapter(nn.Module):
         neg_prompts = self.neg_prompts.unsqueeze(0).repeat(batch_size, 1, 1)
         rel_prompts = (relevance.view(-1, 1, 1) * pos_prompts + \
                        (1-relevance).view(-1, 1, 1) * neg_prompts) / 2
+        self.rel_prompts = rel_prompts
 
         residual = 0 if residual is None else residual
         rel_hidden_states = self.adapter(
                 rel_prompts+residual, hidden_states_src, 
                 mask=mask
         )
+
+        # [document-wise layer norm]
+        # [document-wise layer norm]
+        if self.batch_size is not None:
+            length_size = rel_hidden_states.size(1)
+            rel_hidden_states = self.norm(rel_hidden_states.view(
+                self.batch_size, -1, length_size, self.hidden_size
+            ))
+            rel_hidden_states = rel_hidden_states.view(-1, length_size, self.hidden_size)
+        else:
+            rel_hidden_states = self.norm(rel_hidden_states)
 
         return rel_hidden_states
 
@@ -175,7 +189,12 @@ class InstanceWisePrompt(nn.Module):
         self.q_proj = nn.Linear(hidden_size, head_size, bias=True)
         self.k_proj = nn.Linear(hidden_size, head_size, bias=True)
         self.pooling = pooling
-        self.activation = activation
+        if activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
+        elif activation == 'tanh':
+            self.activation = nn.Tanh()
+        elif activation == 'softmax':
+            self.activation = nn.Softmax(dim=-1)
 
         if init_idx is not None:
             self.init_idx = (init_idx*length)[:length]
@@ -206,23 +225,25 @@ class InstanceWisePrompt(nn.Module):
         K = torch.transpose(K, 1, 2)
         scores = torch.matmul(Q, K)   
 
+        if mask is not None: # mask: [B Lx]
+            expanded_mask = mask[:, :, None].expand(scores.shape)
+            inverted_mask = 1.0 - expanded_mask
+            inverted_mask.masked_fill(
+                    inverted_mask.bool(), torch.finfo(scores.dtype).min
+            )
+            scores = scores + inverted_mask
+
         # scores: B N L or B L N --> B N or B L
         if self.pooling == 'max':
             scores = torch.max(scores / math.sqrt(self.head_size), dim=-1).values
         elif self.pooling == 'mean':
             scores = torch.mean(scores / math.sqrt(self.head_size), dim=-1)
 
-        if mask is not None:
-            scores.masked_fill_(~mask, 1e-5)
-
         # converage mechanism
-        if self.activation == 'tanh':
-            probs = torch.tanh(scores)
-        elif self.activation == 'sigmoid':
-            probs = torch.sigmoid(scores)
+        scores = self.activation(scores)
 
         # B N H * B N or B L H * B L
-        return torch.mul(V, probs.unsqueeze(-1))
+        return torch.mul(V, scores.unsqueeze(-1))
 
     def expand_mask(self, mask):
         additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
@@ -239,7 +260,7 @@ class VAE(nn.Module):
             **kwargs
         ):
         super(VAE, self).__init__()
-        cond_size = 0
+        cond_size = kwargs.pop('cond_size', 0)
         self.proj_down = nn.Linear(cond_size+hidden_size, latent_size*2, bias=False)
         self.hidden2mean = nn.Linear(latent_size*2, latent_size, bias=False)
         self.hidden2logv = nn.Linear(latent_size*2, latent_size, bias=False)
@@ -257,18 +278,23 @@ class VAE(nn.Module):
         self.prefix_length = prefix_length
         self.kld_kwargs = kwargs.pop('kld_kwargs')
 
-    def forward(self, rel_hidden_state, hidden_state=None, steps=None):
-        # h_sent_prefix = rel_hidden_state[:, :self.prefix_length]
-        # h_sent_rel = rel_hidden_state[:, self.prefix_length:]
-        h_sent_rel = rel_hidden_state
+    def forward(self, rel_hidden_state, hidden_state=None, steps=None, conditions=None):
+        def _concat_condition(x, c=None):
+            if c is not None:
+                return torch.cat([c, x], -1)
+            else:
+                return x
+        h_sent_rel = _concat_condition(rel_hidden_state, conditions)
 
         # [Posterior]
         z_sent_rel = self.proj_down(h_sent_rel)
         mean = self.hidden2mean(z_sent_rel)
         logv = self.hidden2mean(z_sent_rel)
         std = torch.exp(0.5*logv)
-        r = torch.rand(mean.shape, device=mean.device) if steps else 0
+        r = torch.rand(mean.shape, device=mean.device) if steps is not None else 0
         z = mean + r * std
+
+        z = _concat_condition(z, conditions)
         z = self.proj_up(z)
         h_sent_rel = self.latent2hidden(z)
 

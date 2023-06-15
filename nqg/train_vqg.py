@@ -133,7 +133,8 @@ def main():
     model = MODELS[model_key].from_pretrained(
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
-            cvqg_config=model_args
+            cvqg_config=model_args,
+            batch_size=training_args.per_device_train_batch_size
     )
     model.set_tokenizer(tokenizer)
     model.adapter.set_embeddings()

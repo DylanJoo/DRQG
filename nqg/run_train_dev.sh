@@ -3,7 +3,7 @@ BASE=bartvqg
 MODEL=nils
 
 rm -rvf $BASE/$MODEL
-PRT_MODEL=bartqg-d2q/relevant/checkpoint-8000
+PRT_MODEL=bartqg-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 
 TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
@@ -18,6 +18,7 @@ python3 train_vqg.py \
   --m_negative_per_example 4 \
   --m_positive_per_example 4 \
   --learning_rate 1e-3 \
+  --lr_scheduler_type linear \
   --evaluation_strategy steps \
   --max_steps 10000 \
   --save_steps 2000 \
@@ -27,12 +28,12 @@ python3 train_vqg.py \
   --has_compressed_layer true \
   --add_classification_head true \
   --annealing_fn cyclic \
-  --n_cycle 10 \
+  --n_cycle 4 \
   --pos_anchors 'what where when who how why which' \
   --neg_anchors 'what where when who how why which' \
   --pooling mean \
   --activation tanh \
-  --warmup_ratio 0.1 \
+  --warmup_ratio 0.5 \
   --do_train \
   --do_eval 
 

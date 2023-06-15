@@ -132,22 +132,37 @@ class DataCollatorForVQG(DataCollatorBase):
         texts_q = []
         clf_labels = []
         clf_scores = []
+        batch_id = []
 
         for i, batch in enumerate(features):
 
-            for i, batch_pos in enumerate(batch['positive'][:self.m_positives]):
-                texts_p += [batch['passage']]
-                texts_q += [batch_pos]
-                clf_labels += [1]
-                if self.use_clf_score:
-                    clf_scores += [batch['positive_score'][i]]
+            p = batch['passage']
+            batch_pos = batch['positive']
+            batch_pos_scores = batch['positive_score']
+            batch_neg = batch['negative']
+            batch_neg_scores = batch['negative_score']
 
-            for i, batch_neg in enumerate(batch['negative'][::-1][:self.m_negatives]):
-                texts_p += [batch['passage']]
-                texts_q += [batch_neg]
+            for j in range(self.m_positives):
+                texts_p += [p]
+                clf_labels += [1]
+                try:
+                    texts_q += [batch_pos[j]]
+                    clf_scores += [batch_pos_scores[j]]
+                except:
+                    offset = int(j % len(batch_pos))
+                    texts_q += [batch_pos[offset]]
+                    clf_scores += [batch_pos_scores[offset]]
+
+            for j in range(self.m_negatives):
+                texts_p += [p]
                 clf_labels += [0]
-                if self.use_clf_score:
-                    clf_scores += [batch['negative_score'][::-1][i]]
+                try:
+                    texts_q += [batch_neg[j]]
+                    clf_scores += [batch_neg_scores[j]]
+                except:
+                    offset = int(j % len(batch_neg)) 
+                    texts_q += [batch_neg[offset]]
+                    clf_scores += [batch_neg_scores[offset]]
 
         if self.is_train:
             inputs = self.tokenizer(
@@ -174,6 +189,7 @@ class DataCollatorForVQG(DataCollatorBase):
             inputs['decoder_attention_mask'] = target_mask
             inputs['clf_labels'] = torch.Tensor(clf_labels)
             inputs['clf_scores'] = torch.Tensor(clf_scores)
+            inputs['batch_id'] = torch.Tensor(batch_id)
 
         else:
             inputs = self.tokenizer(

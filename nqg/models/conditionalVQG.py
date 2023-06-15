@@ -27,7 +27,7 @@ class RelBartVQG(BartQG):
         "encoder.embed_tokens.weight",
         "decoder.embed_tokens.weight",
     ]
-    def __init__(self, config: BartConfig, cvqg_config=None):
+    def __init__(self, config: BartConfig, cvqg_config=None, **kwargs):
         super().__init__(config)
 
         self.model = BartModel(config)
@@ -55,7 +55,9 @@ class RelBartVQG(BartQG):
                 pos_init_idx=cvqg_config.pos_anchors_idx,
                 neg_init_idx=cvqg_config.neg_anchors_idx,
                 pooling=cvqg_config.pooling,
-                activation=cvqg_config.activation
+                activation=cvqg_config.activation,
+                layer_norm=True,
+                batch_size=kwargs.pop('batch_size', None)
         )
 
         # [condition]
@@ -70,8 +72,14 @@ class RelBartVQG(BartQG):
                 hidden_size=config.d_model,
                 latent_size=cvqg_config.latent_size,
                 learnable_prior=True,
-                kld_kwargs=kld_kwargs
+                kld_kwargs=kld_kwargs,
+                cond_size=2
         )
+        self.linear = nn.Linear(
+                config.d_model, config.d_model*config.decoder_layers, 
+                bias=False
+        )
+
 
     def forward(
         self,
@@ -144,17 +152,22 @@ class RelBartVQG(BartQG):
         reparam_loss = 0
         encoder_hidden_states = self.adapter(
                 clf_scores, encoder_outputs[0], 
-                mask=attention_mask
+                mask=None
         )
+        # setting 1a
+        # change the InfoNCE loss to reparm
 
         # setting 2: adapter with sentence embeddings
         # setting 2.1 prior is from gaussian
         # sentences = torch.mean(encoder_outputs[0], dim=1).unsqueeze(1)
-        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=sentences)
-        #
+        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0])
         # rel_sentences = torch.mean(encoder_hidden_states, dim=1).unsqueeze(1)
-        # rel_sentences_prime, reparam_loss = self.vae(rel_sentences)
-        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=rel_sentences_prime)
+        # conditions = torch.cat([1-clf_scores.view(-1,1,1), clf_scores.view(-1,1,1)], -1)
+        # conditions = conditions.to(self.device)
+        # rel_sentences_prime, reparam_loss = self.vae(
+        #         rel_sentences, sentences, 
+        #         steps=steps, conditions=conditions
+        # )
 
         # setting 2.2 learnable prior from orginal sentence embeddings
         # sentences = torch.mean(encoder_outputs[0], dim=1).unsqueeze(1)
@@ -162,6 +175,21 @@ class RelBartVQG(BartQG):
         # rel_sentences = torch.mean(encoder_hidden_states, dim=1).unsqueeze(1)
         # rel_sentences_prime, reparam_loss = self.vae(rel_sentences, sentences)
         # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=rel_sentences_prime)
+
+        # setting II: InfoNCE
+        # rel_logits = torch.bmm(e_sents_rel, e_sents_orig.transpose(1, 2))
+
+        # [VAE with key value injection]
+        # if past_key_values is None:
+        #     past_key_values = self.memory_mechanism(rel_sentences_prime)
+        #
+        #     if decoder_attention_mask is not None:
+        #         additional_mask = torch.ones(
+        #                 (attention_mask.size(0), 1), device=self.device
+        #         )
+        #         decoder_attention_mask = torch.cat(
+        #                 [additional_mask, decoder_attention_mask], 1
+        #         )
 
         # [Bart decoding]
         decoder_outputs = self.model.decoder(
@@ -182,6 +210,7 @@ class RelBartVQG(BartQG):
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
         masked_lm_loss = 0
+        rel_ctr_loss = 0
         clf_logits = None
         if labels is not None:
             labels = labels.to(lm_logits.device)
@@ -215,6 +244,18 @@ class RelBartVQG(BartQG):
                 encoder_hidden_states=encoder_outputs.hidden_states, 
                 encoder_attentions=encoder_outputs.attentions,
         )
+
+    def memory_mechanism(self, hidden_state):
+        projection = self.linear(hidden_state)
+        cross_attn = projection.reshape(
+            self.config.decoder_layers,
+            projection.shape[0],
+            self.config.decoder_attention_heads,
+            1,
+            int(self.config.d_model / self.config.decoder_attention_heads)
+        )
+        past_key_values = tuple((ca, ca) for ca in cross_attn)
+        return past_key_values
 
     # tune for encoder-decoder when generation
     def _prepare_encoder_decoder_kwargs_for_generation(
