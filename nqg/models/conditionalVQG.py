@@ -154,6 +154,7 @@ class RelBartVQG(BartQG):
                 clf_scores, encoder_outputs[0], 
                 mask=None
         )
+
         # setting 1a
         # change the InfoNCE loss to reparm
 
@@ -219,6 +220,14 @@ class RelBartVQG(BartQG):
                     lm_logits.view(-1, self.config.vocab_size), 
                     labels.view(-1)
             )
+
+            # document divergence loss
+            loss_fct = CrossEntropyLoss()
+            doc_scores = self.adapter.doc_scores
+            bs, ns = doc_scores.size(0), doc_scores.size(1)
+            doc_labels = torch.arange(0, ns, device=self.device)
+
+            reparam_loss = loss_fct(doc_scores.view(-1, ns), doc_labels.repeat(bs))
 
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state

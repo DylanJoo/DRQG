@@ -143,21 +143,26 @@ class RelAdapter(nn.Module):
         self.rel_prompts = rel_prompts
 
         residual = 0 if residual is None else residual
+        # multi-view hidden states
         rel_hidden_states = self.adapter(
-                rel_prompts+residual, hidden_states_src, 
-                mask=mask
+                rel_prompts + residual, hidden_states_src, 
+                mask=None
         )
+        # norm in hidden_state dimension
+        # BN L H --> BN L H 
 
-        # [document-wise layer norm]
-        # [document-wise layer norm]
         if self.batch_size is not None:
-            length_size = rel_hidden_states.size(1)
-            rel_hidden_states = self.norm(rel_hidden_states.view(
-                self.batch_size, -1, length_size, self.hidden_size
-            ))
-            rel_hidden_states = rel_hidden_states.view(-1, length_size, self.hidden_size)
-        else:
-            rel_hidden_states = self.norm(rel_hidden_states)
+            # BN L H --> BN H  --> B N H
+            sent_hidden_states = torch.mean(rel_hidden_states, dim=1)
+            sent_hidden_states = F.normalize(sent_hidden_states, p=2, dim=-1)
+            doc_sent_hidden_states = sent_hidden_states.view(
+                self.batch_size, -1, self.hidden_size
+            )
+            # B N N 
+            self.doc_scores = torch.bmm(
+                    doc_sent_hidden_states, 
+                    doc_sent_hidden_states.transpose(-1, -2)
+            )
 
         return rel_hidden_states
 
