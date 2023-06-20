@@ -18,13 +18,14 @@ python3 train_vqg.py \
   --m_negative_per_example 4 \
   --m_positive_per_example 4 \
   --learning_rate 1e-3 \
-  --lr_scheduler_type linear \
+  --lr_scheduler_type constant \
   --evaluation_strategy steps \
   --max_steps 10000 \
   --save_steps 2000 \
   --eval_steps 500 \
   --train_file $TRAIN_FILE \
   --latent_size 128 \
+  --freeze_LM true \
   --has_compressed_layer true \
   --add_classification_head true \
   --annealing_fn cyclic \
@@ -33,7 +34,7 @@ python3 train_vqg.py \
   --neg_anchors 'what where when who how why which' \
   --pooling mean \
   --activation tanh \
-  --warmup_ratio 0.5 \
+  --warmup_ratio 0.1 \
   --do_train \
   --do_eval 
 
@@ -42,3 +43,5 @@ python3 train_vqg.py \
 # longer and diversified anchors  
 # n cycle  
 # larger negative samples  
+  # --pos_anchors 'true true true true true true true true true true' \
+  # --neg_anchors 'false false false false false false false false false false' \

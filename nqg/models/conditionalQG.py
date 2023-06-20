@@ -15,9 +15,8 @@ from transformers.modeling_outputs import BaseModelOutput
 
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
-from .modules import InstanceWisePrompt, EncDecCVAE, DocRelPrompt
+from .modules import DocRelPrompt
 
-from utils import kl_weight, kl_loss
 import copy
 
 class DocRelBartQG(BartQG):
@@ -50,7 +49,7 @@ class DocRelBartQG(BartQG):
         self.post_init()
 
         # [prompt] 
-        self.prompts = DocRelPrompt(
+        self.reformulator = DocRelPrompt(
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 init_idx=cvqg_config.prompts_idx,
@@ -101,8 +100,8 @@ class DocRelBartQG(BartQG):
         # [Bart encoding]
         if encoder_outputs is None:
             # ## [Encoder prompt] -- FAILED
-            # inputs_embeds = self.prompts(clf_scores, input_ids, None)
-            # attention_mask = self.prompts.expand_mask(attention_mask)
+            inputs_embeds = self.reformulator(clf_scores, input_ids, None)
+            attention_mask = self.reformulator.expand_mask(attention_mask)
 
             ## [Bart encoder]
             encoder_outputs = self.model.encoder(
@@ -125,8 +124,8 @@ class DocRelBartQG(BartQG):
 
         ## [EncoderDecoder prompt wrapper]
         # encoder_hidden_states = encoder_outputs[0]
-        encoder_hidden_states = self.prompts(clf_scores, encoder_outputs[0], None)
-        attention_mask = self.prompts.expand_mask(attention_mask)
+        # encoder_hidden_states = self.prompts(clf_scores, encoder_outputs[0], None)
+        # attention_mask = self.prompts.expand_mask(attention_mask)
 
         # standard enc-dec pipeline
         decoder_outputs = self.model.decoder(

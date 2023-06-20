@@ -56,11 +56,10 @@ class RelBartVQG(BartQG):
                 neg_init_idx=cvqg_config.neg_anchors_idx,
                 pooling=cvqg_config.pooling,
                 activation=cvqg_config.activation,
-                layer_norm=True,
                 batch_size=kwargs.pop('batch_size', None)
         )
 
-        # [condition]
+        # [decoder injection]
         kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
         if kld_kwargs['annealing_fn'] == 'cyclic':
             kld_kwargs.update({'n_total_iter': cvqg_config.n_total_iter, 
@@ -68,18 +67,19 @@ class RelBartVQG(BartQG):
         else:
             kld_kwargs.update({'k': cvqg_config.k, 'x0': cvqg_config.x0})
 
-        self.vae = VAE(
-                hidden_size=config.d_model,
-                latent_size=cvqg_config.latent_size,
-                learnable_prior=True,
-                kld_kwargs=kld_kwargs,
-                cond_size=2
-        )
-        self.linear = nn.Linear(
-                config.d_model, config.d_model*config.decoder_layers, 
-                bias=False
-        )
-
+        # [setiting 1: VAE]
+        # self.vae = VAE(
+        #         hidden_size=config.d_model,
+        #         latent_size=cvqg_config.latent_size,
+        #         learnable_prior=True,
+        #         kld_kwargs=kld_kwargs,
+        #         cond_size=2
+        # )
+        ## [setiting 1a: VAE]
+        # self.adapter_memory = nn.Linear(
+        #         config.d_model, config.d_model*config.decoder_layers, 
+        #         bias=False
+        # )
 
     def forward(
         self,
@@ -151,9 +151,9 @@ class RelBartVQG(BartQG):
         # setting 1
         reparam_loss = 0
         encoder_hidden_states = self.adapter(
-                clf_scores, encoder_outputs[0], 
-                mask=None
+                clf_scores, encoder_outputs[0], mask=None
         )
+        # encoder_outputs[0][:, :1, :]
 
         # setting 1a
         # change the InfoNCE loss to reparm
@@ -177,10 +177,6 @@ class RelBartVQG(BartQG):
         # rel_sentences_prime, reparam_loss = self.vae(rel_sentences, sentences)
         # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], residual=rel_sentences_prime)
 
-        # setting II: InfoNCE
-        # rel_logits = torch.bmm(e_sents_rel, e_sents_orig.transpose(1, 2))
-
-        # [VAE with key value injection]
         # if past_key_values is None:
         #     past_key_values = self.memory_mechanism(rel_sentences_prime)
         #
@@ -210,8 +206,7 @@ class RelBartVQG(BartQG):
         lm_logits = self.lm_head(decoder_outputs[0])
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-        masked_lm_loss = 0
-        rel_ctr_loss = 0
+        masked_lm_loss, rel_ctr_loss = 0, 0
         clf_logits = None
         if labels is not None:
             labels = labels.to(lm_logits.device)
@@ -224,8 +219,13 @@ class RelBartVQG(BartQG):
             # document divergence loss
             loss_fct = CrossEntropyLoss()
             doc_scores = self.adapter.doc_scores
+            # print(nn.functional.softmax(doc_scores[0], dim=-1))
             bs, ns = doc_scores.size(0), doc_scores.size(1)
             doc_labels = torch.arange(0, ns, device=self.device)
+
+            if steps is None:
+                print(doc_labels.shape)
+                print(nn.functional.softmax(doc_scores[0], dim=-1))
 
             reparam_loss = loss_fct(doc_scores.view(-1, ns), doc_labels.repeat(bs))
 
@@ -255,7 +255,7 @@ class RelBartVQG(BartQG):
         )
 
     def memory_mechanism(self, hidden_state):
-        projection = self.linear(hidden_state)
+        projection = self.adapter_memory(hidden_state)
         cross_attn = projection.reshape(
             self.config.decoder_layers,
             projection.shape[0],

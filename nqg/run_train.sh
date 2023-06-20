@@ -1,5 +1,5 @@
 export CUDA_VISIBLE_DEVICES=2
-BASE=bartvqg
+BASE=bartqg
 MODEL=nils
 
 rm -rvf $BASE/$MODEL

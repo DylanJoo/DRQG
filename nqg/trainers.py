@@ -7,32 +7,57 @@ from torch.nn import functional as F
 
 class TrainerBase(Trainer):
 
+    def compute_loss(self, model, inputs, return_outputs=False):
+        training_steps = copy.deepcopy(self.state.global_step)
+        outputs = super().compute_loss(model, inputs, return_outputs)
+
+        if training_steps % 50 == 0:
+            print(f"\nNLL: {outputs}")
+            inputs_for_eval = {
+                    "input_ids": inputs['input_ids'],
+                    "attention_mask": inputs['attention_mask'],
+                    "labels": inputs['labels'],
+                    "m": 1
+            }
+            self._verbose_prediction(model, **inputs_for_eval)
+
+        return outputs
+
     def _verbose_prediction(
         self, 
         model, 
         input_ids, 
         attention_mask, 
         labels,
+        m
     ):
         with torch.no_grad():
             # generate the normal one
             model.eval()
             n = input_ids.size()[0]
-            m = 11
 
-            input_ids = input_ids.repeat_interleave(m, 0)
-            attention_mask = attention_mask.repeat_interleave(m, 0)
-            clf_scores = torch.arange(0, m, 1)/(m-1)
-            clf_scores = clf_scores.repeat(n)
-            out = model.generate(
-                    input_ids, 
-                    attention_mask=attention_mask, 
-                    clf_scores=clf_scores,
-                    clf_labels=clf_scores,
-                    return_dict_in_generate=True,
-                    output_scores=True,
-                    num_beams=1
-            )
+            if m>1:
+                input_ids = input_ids.repeat_interleave(m, 0)
+                attention_mask = attention_mask.repeat_interleave(m, 0)
+                clf_scores = torch.arange(0, m, 1)/(m-1)
+                clf_scores = clf_scores.repeat(n)
+                out = model.generate(
+                        input_ids, 
+                        attention_mask=attention_mask, 
+                        clf_scores=clf_scores,
+                        clf_labels=clf_scores,
+                        return_dict_in_generate=True,
+                        output_scores=True,
+                        num_beams=1
+                )
+            else:
+                out = model.generate(
+                        input_ids, 
+                        attention_mask=attention_mask, 
+                        return_dict_in_generate=True,
+                        output_scores=True,
+                        num_beams=1
+                )
             temp = out.sequences
             labels_reformulate = [l for l in labels[0] if l != -100]
             print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
@@ -59,6 +84,12 @@ class TrainerForQG(TrainerBase):
         clf_logits = outputs.get("clf_logits")
 
         ## (1) CE Loss (same as built-in but separate positive/negative)
+        ### masked labels
+        rand = torch.rand(labels.shape, device=labels.device) 
+        masked = (rand > 0.7).to(labels.device)
+        masked = masked & (clf_labels==0).view(-1, 1).repeat(1, labels.size(1))
+        labels = labels.masked_fill(masked, -100)
+
         w = clf_scores.exp().view(-1, 1).expand(labels.shape)
         loss_gen_pos, loss_gen_neg = 0, 0
         loss_fct = CrossEntropyLoss(reduction='none')
@@ -91,6 +122,7 @@ class TrainerForQG(TrainerBase):
         loss_reparam = outputs.get('reparam_loss')
 
         loss = loss_gen+loss_reparam+loss_rel
+        # loss = loss_reparam+loss_rel
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
@@ -100,7 +132,8 @@ class TrainerForQG(TrainerBase):
             inputs_for_eval = {
                     "input_ids": inputs['input_ids'][selected],
                     "attention_mask": inputs['attention_mask'][selected],
-                    "labels": inputs['labels'][selected]
+                    "labels": inputs['labels'][selected],
+                    "m": 11
             }
             self._verbose_prediction(model, **inputs_for_eval)
 

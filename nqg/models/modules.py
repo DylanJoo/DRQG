@@ -102,7 +102,7 @@ class RelAdapter(nn.Module):
         self.orig_embeds = wte
         self.pos_init_idx = pos_init_idx
         self.neg_init_idx = neg_init_idx
-        self.batch_size = kwargs.pop('batch_size', None)
+        self.batch_size = kwargs.pop('batch_size')
         self.hidden_size = hidden_size
 
         self.pos_prompts = nn.Parameter(torch.randn(
@@ -119,8 +119,9 @@ class RelAdapter(nn.Module):
                 pooling=kwargs.pop('pooling', 'mean'),
                 activation=kwargs.get('activation', 'sigmoid'),
         )
-
-        # self.norm = nn.LayerNorm(self.hidden_size)
+        self.adapter_cond = nn.Linear(
+                hidden_size*2, hidden_size, bias=False
+        )
 
     def set_embeddings(self):
         self.pos_prompts = nn.Parameter(
@@ -133,28 +134,33 @@ class RelAdapter(nn.Module):
                 self.pos_init_idx, self.neg_init_idx)
 
     def forward(self, relevance, hidden_states_src=None, residual=False, mask=None):
-        batch_size = hidden_states_src.size(0)
+        batch_doc_size = hidden_states_src.size(0)
         # [relevance conditioned]
         relevance = relevance.to(self.pos_prompts.device)
-        pos_prompts = self.pos_prompts.unsqueeze(0).repeat(batch_size, 1, 1)
-        neg_prompts = self.neg_prompts.unsqueeze(0).repeat(batch_size, 1, 1)
+        pos_prompts = self.pos_prompts.unsqueeze(0).repeat(batch_doc_size, 1, 1)
+        neg_prompts = self.neg_prompts.unsqueeze(0).repeat(batch_doc_size, 1, 1)
         rel_prompts = (relevance.view(-1, 1, 1) * pos_prompts + \
                        (1-relevance).view(-1, 1, 1) * neg_prompts) / 2
-        self.rel_prompts = rel_prompts
 
-        residual = 0 if residual is None else residual
-        # multi-view hidden states
+        # [condition settings]
+        ## residual
+        rel_prompts += residual if residual is not None else 0
+
+        ## conditions
+        doc_rel_prompts = torch.cat([
+            hidden_states_src.mean(1)[:, None, :].expand(rel_prompts.shape),
+            rel_prompts
+        ], -1)
+        rel_prompts = self.adapter_cond(doc_rel_prompts)
         rel_hidden_states = self.adapter(
-                rel_prompts + residual, hidden_states_src, 
+                rel_prompts, hidden_states_src, 
                 mask=None
         )
-        # norm in hidden_state dimension
-        # BN L H --> BN L H 
 
         if self.batch_size is not None:
             # BN L H --> BN H  --> B N H
             sent_hidden_states = torch.mean(rel_hidden_states, dim=1)
-            sent_hidden_states = F.normalize(sent_hidden_states, p=2, dim=-1)
+            # sent_hidden_states = F.normalize(sent_hidden_states, p=2, dim=-1)
             doc_sent_hidden_states = sent_hidden_states.view(
                 self.batch_size, -1, self.hidden_size
             )
@@ -213,21 +219,31 @@ class InstanceWisePrompt(nn.Module):
         )
         print("Set embeddings to", self.init_idx)
 
-    def forward(self, hidden_states=None, base=None, input_ids=None, mask=None):
-        if hidden_states is None:
-            hidden_states = self.orig_embeds(input_ids)
-        base = self.prompt_embeds if base is None else base
+    def forward(self, anchor=None, base=None, input_ids=None, mask=None):
+        """
+        # reformulatr
+        anchor: encoder output token embeddings --> B L H
+        base: None --> promt embeddings N H --> B N H
 
-        if base.size(0) == hidden_states.size(0):
-            # Reformulator (prompt as base, hidden as anchor)
+        # adapter
+        anchor: relevance embeddings B N H 
+        base: encoder output tokens embeddings B L H
+        """
+        if (anchor is None) and (input_ids is not None):
+            anchor = self.orig_embeds(input_ids)
+
+        # Reformulator (prompt as base, hidden as anchor)
+        if base is None:
+            base = self.prompt_embeds
+            V = base.repeat(anchor.size(0), 1, 1)
+        else:
             V = base
-        else: 
-            # Adapter (hidden as base, prompt as anchor)
-            V = base.unsqueeze(0).repeat(hidden_states.size(0), 1, 1)
 
-        Q = self.q_proj(V) # N H' or B L H'
-        K = self.k_proj(hidden_states) # B L H' or B N H'
+        Q = self.q_proj(V) 
+        K = self.k_proj(anchor) 
         K = torch.transpose(K, 1, 2)
+
+        # B N/L N
         scores = torch.matmul(Q, K)   
 
         if mask is not None: # mask: [B Lx]

@@ -32,9 +32,9 @@ class DataCollatorBase:
                     for q1, q0 in zip(texts_q1, texts_q0)]
         else:
             if self.irrelevant_included:
-                texts_q = texts_q1
-            if self.relevant_included:
                 texts_q = texts_q0
+            if self.relevant_included:
+                texts_q = texts_q1
 
         inputs = self.tokenizer(
                 [f"{self.prefix}{p}" for p in texts_p],
@@ -58,63 +58,6 @@ class DataCollatorBase:
             inputs['negative'] = texts_q0
 
         return inputs
-
-
-@dataclass
-class DataCollatorForPQG(DataCollatorBase):
-    is_train: Union[bool, str] = False
-    is_eval: Union[bool, str] = False
-    prefix: str = "positive question generation: passage: "
-    negative_prefix: str = "negative question generation: passage: "
-
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
-
-        # text and id info 
-        texts_p = [batch['passage'] for batch in features]
-
-        if self.is_train:
-            texts_pq = [batch['positive'] for batch in features]
-            texts_nq = [batch['negative'] for batch in features]
-            inputs = self.tokenizer(
-                    [f"{self.prefix}{p}" for p in texts_p] + \
-                    [f"{self.negative_prefix} {p}" for p in texts_p],
-                    max_length=self.max_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
-            targets = self.tokenizer(
-                    texts_pq+texts_nq,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            ).input_ids
-            targets[targets == self.tokenizer.pad_token_id] = -100
-            inputs['labels'] = targets
-            return inputs
-
-        else:
-            inputs1 = self.tokenizer(
-                    [f"{self.prefix}{p}" \
-                            for p in texts_p],
-                    max_length=self.max_p_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
-            inputs0 = self.tokenizer(
-                    [f"{self.negative_prefix}{p}" \
-                            for p in texts_p],
-                    max_length=self.max_p_length,
-                    truncation=True,
-                    padding=True,
-                    return_tensors=self.return_tensors
-            )
-            inputs = {'passage': texts_p}
-
-            if self.is_eval:
-                inputs['positive'] = [batch['positive'] for batch in features]
-                inputs['negative'] = [batch['negative'] for batch in features]
-            return inputs, inputs1, inputs0
 
 
 @dataclass

@@ -81,8 +81,13 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model: backbone and pretrained 
-    from models import BartQG, MemBartQG
-    model = MemBartQG.from_pretrained(
+    from models import T5QG, BartQG
+    MODELS = {"t5": T5QG, "bart": BartQG}
+    for key in MODELS:
+        if key in training_args.output_dir.lower():
+            model_key = key
+
+    model = MODELS[key].from_pretrained(
             hfmodel_args.model_name_or_path, config=config, 
     )
     model.set_tokenizer(tokenizer)
@@ -106,8 +111,13 @@ def main():
             relevant_included=data_args.relevant_included
     )
     # Data: dataset
-    from data import msmarco
-    dataset = msmarco.passage_centric_dataset(data_args.train_file)
+    from data import msmarco, dragon
+    DATASETS = {"msmarco": msmarco, "dragon": dragon}
+    for key in DATASETS:
+        if key in data_args.train_file.lower():
+            dataset_key = key
+
+    dataset = DATASETS[dataset_key].passage_centric_dataset(data_args.train_file)
 
     from trainers import TrainerBase
     trainer = TrainerBase(

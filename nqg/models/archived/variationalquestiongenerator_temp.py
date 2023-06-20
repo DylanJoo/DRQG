@@ -3,7 +3,7 @@ import inspect
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import BartForConditionalGeneration, BartConfig
-from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead, BartEncoder, BartDecoder, BartModel
+from transformers.models.bart.modeling_bart import shift_tokens_right, BartClassificationHead, BartModel
 from transformers.modeling_outputs import BaseModelOutput
 
 from torch import nn
@@ -111,6 +111,7 @@ class BartCVQG(BartQG):
                 has_compressed_layer=vqg_config.has_compressed_layer,
                 pooling=vqg_config.pooling,
                 init_idx=vqg_config.used_label_idx,
+                learnable_prior=vqg_config.learnable_prior,
                 kld_kwargs=kld_kwargs, 
         )
 
