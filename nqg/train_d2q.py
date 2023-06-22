@@ -13,7 +13,7 @@ from transformers import (
 )
 
 import os
-os.environ["WANDB_DISABLED"] = "false"
+os.environ["WANDB_DISABLED"] = "true"
 
 @dataclass
 class OurHFModelArguments:
@@ -24,6 +24,10 @@ class OurHFModelArguments:
     cache_dir: Optional[str] = field(default=None)
     use_fast_tokenizer: bool = field(default=True)
     use_auth_token: bool = field(default=False)
+
+@dataclass
+class OurModelArguments:
+    pooling: str = field(default='cls')
 
 @dataclass
 class OurDataArguments:
@@ -68,31 +72,30 @@ def main():
 
     # Parseing argument for huggingface packages
     parser = HfArgumentParser(
-            (OurHFModelArguments, OurDataArguments, OurTrainingArguments)
+            (OurHFModelArguments, OurModelArguments, 
+                OurDataArguments, OurTrainingArguments)
     )
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        hfmodel_args, data_args, training_args = \
+        hfmodel_args, model_args, data_args, training_args = \
                 parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
-        hfmodel_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        hfmodel_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Config and Tokenizer 
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model: backbone and pretrained 
-    from models import BartQG, MemBartQG
+    from models import MemBartQG
     model = MemBartQG.from_pretrained(
-            hfmodel_args.model_name_or_path, config=config, 
+            hfmodel_args.model_name_or_path, 
+            config=config, 
+            pooling=model_args.pooling
     )
     model.set_tokenizer(tokenizer)
     
     # Model: generation config
-    try:
-        generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
-    except:
-        if 'bart' in hfmodel_args.config_name:
-            generation_config = GenerationConfig.from_model_config(model.config)
+    generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
     # Data: collator/preprocessor
@@ -114,7 +117,7 @@ def main():
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
-            data_collator=data_collator
+            data_collator=data_collator,
     )
     
     # ***** strat training *****

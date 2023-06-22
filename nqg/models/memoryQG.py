@@ -27,7 +27,7 @@ class MemBartQG(BartQG):
         "encoder.embed_tokens.weight",
         "decoder.embed_tokens.weight",
     ]
-    def __init__(self, config: BartConfig, cvqg_config=None, **kwargs):
+    def __init__(self, config: BartConfig, **kwargs):
         super().__init__(config)
 
         self.model = BartModel(config)
@@ -36,6 +36,7 @@ class MemBartQG(BartQG):
         self.register_buffer("final_logits_bias", torch.zeros((1, self.model.shared.num_embeddings)))
         self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)   
 
+        self.pooling = kwargs.pop('pooling', 'cls')
         self.post_init()
 
     def forward(
@@ -99,7 +100,10 @@ class MemBartQG(BartQG):
             )
 
         # latent embeddings
-        encoder_hidden_state = encoder_outputs[0][:, :1, :]
+        if self.pooling == 'cls':
+            encoder_hidden_state = encoder_outputs[0][:, :1, :]
+        elif self.pooling == 'mean':
+            encoder_hidden_state = encoder_outputs[0].mean(1)[:, None, :]
 
         # [Bart decoding]
         decoder_outputs = self.model.decoder(

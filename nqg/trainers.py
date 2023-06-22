@@ -85,12 +85,12 @@ class TrainerForQG(TrainerBase):
 
         ## (1) CE Loss (same as built-in but separate positive/negative)
         ### masked labels
-        rand = torch.rand(labels.shape, device=labels.device) 
-        masked = (rand > 0.7).to(labels.device)
-        masked = masked & (clf_labels==0).view(-1, 1).repeat(1, labels.size(1))
-        labels = labels.masked_fill(masked, -100)
-
-        w = clf_scores.exp().view(-1, 1).expand(labels.shape)
+        # rand = torch.rand(labels.shape, device=labels.device) 
+        # masked = (rand > 0.7).to(labels.device)
+        # masked = masked & (clf_labels==0).view(-1, 1).repeat(1, labels.size(1))
+        # labels = labels.masked_fill(masked, -100)
+        #
+        # w = clf_scores.exp().view(-1, 1).expand(labels.shape)
         loss_gen_pos, loss_gen_neg = 0, 0
         loss_fct = CrossEntropyLoss(reduction='none')
         selected = (clf_labels<1)

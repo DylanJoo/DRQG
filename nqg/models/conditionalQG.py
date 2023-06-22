@@ -15,7 +15,7 @@ from transformers.modeling_outputs import BaseModelOutput
 
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
-from .modules import DocRelPrompt
+from .controller import DocRelPrompt
 
 import copy
 
@@ -27,7 +27,7 @@ class DocRelBartQG(BartQG):
         "encoder.embed_tokens.weight",
         "decoder.embed_tokens.weight",
     ]
-    def __init__(self, config: BartConfig, cvqg_config=None):
+    def __init__(self, config: BartConfig, cvqg_config=None, **kwargs):
         super().__init__(config)
         # self.n_soft_prompts = vqg_config.n_soft_prompts
 
@@ -49,12 +49,14 @@ class DocRelBartQG(BartQG):
         self.post_init()
 
         # [prompt] 
-        self.reformulator = DocRelPrompt(
+        self.controller = DocRelPrompt(
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 init_idx=cvqg_config.prompts_idx,
                 lbl_init_idx=cvqg_config.label_prompts_idx,
         )
+        self.hidden_size = config.d_model
+        self.batch_size = kwargs.pop('batch_size', None)
 
     def forward(
         self,
@@ -99,9 +101,9 @@ class DocRelBartQG(BartQG):
 
         # [Bart encoding]
         if encoder_outputs is None:
-            # ## [Encoder prompt] -- FAILED
-            inputs_embeds = self.reformulator(clf_scores, input_ids, None)
-            attention_mask = self.reformulator.expand_mask(attention_mask)
+            ## [Encoder prompt] 
+            inputs_embeds = self.controller(clf_scores, input_ids=input_ids)
+            attention_mask = self.controller.expand_mask(attention_mask)
 
             ## [Bart encoder]
             encoder_outputs = self.model.encoder(
@@ -123,15 +125,28 @@ class DocRelBartQG(BartQG):
             )
 
         ## [EncoderDecoder prompt wrapper]
-        # encoder_hidden_states = encoder_outputs[0]
-        # encoder_hidden_states = self.prompts(clf_scores, encoder_outputs[0], None)
-        # attention_mask = self.prompts.expand_mask(attention_mask)
+        encoder_hidden_states = encoder_outputs[0]
+
+        ## setting 0 # very failed
+        encoder_hidden_state = encoder_hidden_states
+
+        ## setting 1 & 2: 
+        ### remove prompts or not 
+        # encoder_hidden_states = encoder_hidden_states[:, self.controller.length:, :]
+
+        # mean pooling
+        encoder_hidden_state = encoder_hidden_states.mean(1)[:, None, :]
+        attention_mask=None
+
+        # cls pooling
+        # encoder_hidden_states = encoder_hidden_states[:, self.controller.length:, :]
+        # encoder_hidden_state = encoder_hidden_states[:, :1, :]
 
         # standard enc-dec pipeline
         decoder_outputs = self.model.decoder(
                 input_ids=decoder_input_ids,
                 attention_mask=decoder_attention_mask,
-                encoder_hidden_states=encoder_hidden_states,
+                encoder_hidden_states=encoder_hidden_state,
                 encoder_attention_mask=attention_mask,
                 head_mask=decoder_head_mask,
                 cross_attn_head_mask=cross_attn_head_mask,
@@ -145,9 +160,11 @@ class DocRelBartQG(BartQG):
         lm_logits = self.lm_head(decoder_outputs[0])
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-        masked_lm_loss, reparam_loss = 0, 0
+        masked_lm_loss = 0
+        docibn_loss = 0
         clf_logits = None
         if labels is not None:
+            # query generation 
             labels = labels.to(lm_logits.device)
             loss_fct = CrossEntropyLoss()
             masked_lm_loss = loss_fct(
@@ -155,6 +172,12 @@ class DocRelBartQG(BartQG):
                     labels.view(-1)
             )
 
+            # doc ibn
+            docibn_loss = self.controller.calculate_src_ibn_loss(
+                    encoder_hidden_state, self.batch_size
+            )
+
+            # [discriminator]
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state
                 decoder_input_ids_ = shift_tokens_right_modified(
@@ -168,16 +191,13 @@ class DocRelBartQG(BartQG):
 
         return Seq2SeqCVQGOutput(
                 loss=masked_lm_loss, 
-                reparam_loss=reparam_loss,
+                reparam_loss=docibn_loss,
                 logits=lm_logits, 
                 clf_logits=clf_logits,
                 past_key_values=decoder_outputs.past_key_values, 
                 decoder_hidden_states=decoder_outputs.hidden_states, 
                 decoder_attentions=decoder_outputs.attentions, 
                 cross_attentions=decoder_outputs.cross_attentions, 
-                encoder_last_hidden_state=encoder_outputs.last_hidden_state,
-                encoder_hidden_states=encoder_outputs.hidden_states, 
-                encoder_attentions=encoder_outputs.attentions,
         )
 
     # tune for encoder-decoder when generation
@@ -212,9 +232,15 @@ class DocRelBartQG(BartQG):
         encoder_kwargs[model_input_name] = inputs_tensor
 
         # 3+. retrieva labels and scores
-        model_kwargs['clf_labels'] = encoder_kwargs.pop('clf_labels', None)
-        model_kwargs['clf_scores'] = encoder_kwargs.pop('clf_scores', None)
+        clf_labels = encoder_kwargs.pop('clf_labels', None)
+        clf_scores = encoder_kwargs.pop('clf_scores', None)
+
+        ## add the additional layer
+        encoder_kwargs['inputs_embeds'] = self.controller(clf_scores, input_ids=encoder_kwargs['input_ids'])
+        encoder_kwargs['input_ids'] = None
+        encoder_kwargs['attention_mask'] = self.controller.expand_mask(encoder_kwargs['attention_mask'])
         model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)
+        model_kwargs["attention_mask"] = encoder_kwargs['attention_mask']
 
         return model_kwargs
 

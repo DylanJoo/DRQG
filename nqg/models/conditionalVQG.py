@@ -75,6 +75,7 @@ class RelBartVQG(BartQG):
         #         kld_kwargs=kld_kwargs,
         #         cond_size=2
         # )
+
         ## [setiting 1a: VAE]
         # self.adapter_memory = nn.Linear(
         #         config.d_model, config.d_model*config.decoder_layers, 
@@ -150,10 +151,9 @@ class RelBartVQG(BartQG):
 
         # setting 1
         reparam_loss = 0
-        encoder_hidden_states = self.adapter(
-                clf_scores, encoder_outputs[0], mask=None
-        )
-        # encoder_outputs[0][:, :1, :]
+        # encoder_hidden_state = encoder_outputs[0][:, :1, :]
+        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], mask=None)
+        encoder_hidden_states = torch.mean(encoder_hidden_states, dim=1)
 
         # setting 1a
         # change the InfoNCE loss to reparm
@@ -163,6 +163,7 @@ class RelBartVQG(BartQG):
         # sentences = torch.mean(encoder_outputs[0], dim=1).unsqueeze(1)
         # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0])
         # rel_sentences = torch.mean(encoder_hidden_states, dim=1).unsqueeze(1)
+
         # conditions = torch.cat([1-clf_scores.view(-1,1,1), clf_scores.view(-1,1,1)], -1)
         # conditions = conditions.to(self.device)
         # rel_sentences_prime, reparam_loss = self.vae(
@@ -179,7 +180,6 @@ class RelBartVQG(BartQG):
 
         # if past_key_values is None:
         #     past_key_values = self.memory_mechanism(rel_sentences_prime)
-        #
         #     if decoder_attention_mask is not None:
         #         additional_mask = torch.ones(
         #                 (attention_mask.size(0), 1), device=self.device

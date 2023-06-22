@@ -124,8 +124,8 @@ def main():
         print('Used pos/neg anchors index:', \
                 model_args.pos_anchors_idx, model_args.neg_anchors_idx)
 
-    from models import T5VQG, DocRelBartQG, RelBartVQG
-    MODELS = {"t5": T5VQG, 'bartqg': DocRelBartQG, 'bartvqg': RelBartVQG}
+    from models import DocRelBartQG, RelBartVQG
+    MODELS = {'bartqg': DocRelBartQG, 'bartvqg': RelBartVQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key
@@ -137,24 +137,14 @@ def main():
             batch_size=training_args.per_device_train_batch_size
     )
     model.set_tokenizer(tokenizer)
-    model.adapter.set_embeddings()
+    model.controller.set_embeddings()
     
     # [generation config]
-    try:
-        generation_config = GenerationConfig.from_pretrained(
-                hfmodel_args.config_name,
-                _from_model_config=False,
-                num_beams=1,
-                max_length=data_args.max_q_length
-        )
-    except:
-        if 'bart' in hfmodel_args.config_name:
-            generation_config = GenerationConfig.from_model_config(model.config)
-
+    generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['reformulator', 'adapter', 'vae']
+    optimized_prefix = ['controller', 'reformulator', 'adapter', 'vae']
     freezed_prefix = []
 
     if model_args.freeze_LM:
