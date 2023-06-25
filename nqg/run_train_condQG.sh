@@ -1,12 +1,12 @@
-BASE=bartqg
+BASE=bart-condqg
 MODEL=$BASE/mean/
 
 export CUDA_VISIBLE_DEVICES=0
-PRT_MODEL=bartqg-d2q/mean/checkpoint-16000
+PRT_MODEL=bart-d2q/mean/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
 
-python3 train_vqg.py \
+python3 train_qg.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \

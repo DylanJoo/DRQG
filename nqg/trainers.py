@@ -109,6 +109,7 @@ class TrainerForQG(TrainerBase):
         loss_gen_pos = loss_gen_pos.mean()
 
         loss_gen = (loss_gen_pos+loss_gen_neg) / 2
+        loss_cond = outputs.get("docibn_loss", 0)
 
         ## (2) KL loss (relevance)
         loss_rel = 0
@@ -119,15 +120,16 @@ class TrainerForQG(TrainerBase):
         loss_rel = loss_rel / labels.size(0)
 
         ## (4) KL loss (reparam)
-        loss_reparam = outputs.get('reparam_loss')
+        loss_reparam = outputs.get('reparam_loss', 0)
 
-        loss = loss_gen+loss_reparam+loss_rel
+        loss = loss_gen+loss_reparam+loss_rel+loss_cond
         # loss = loss_reparam+loss_rel
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
             print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
-                    \nKL: (reparam) {loss_reparam} (rel) {loss_rel}")
+                    \nKL: (reparam) {loss_reparam} (rel) {loss_rel} \
+                    \nCE: (condition) {loss_cond}")
 
             inputs_for_eval = {
                     "input_ids": inputs['input_ids'][selected],

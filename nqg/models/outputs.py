@@ -14,6 +14,8 @@ class Seq2SeqCVQGOutput(ModelOutput):
     encoder_last_hidden_state: Optional[torch.FloatTensor] = None
     encoder_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     encoder_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    # controller 
+    docibn_loss: Optional[torch.FloatTensor] = None
     # reparameterized loss
     reparam_loss: Optional[torch.FloatTensor] = None
     # classification logit placeholder

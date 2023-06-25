@@ -7,5 +7,5 @@ from .questiongenerator import T5QG, BartQG
 from .config import VQG_CONFIG, VQG_OLD_CONFIG
 
 from .conditionalQG import DocRelBartQG
-from .conditionalVQG import RelBartVQG
+from .relevanceQG import RelBartQG
 from .memoryQG import MemBartQG

@@ -28,25 +28,29 @@ class OurHFModelArguments:
 @dataclass
 class OurModelArguments:
     # disable_dropout: bool = field(default=False)
-    latent_size: int = field(default=128)
-    has_compressed_layer: bool = field(default=False)
     freeze_LM: bool = field(default=True)
-    prompts: Optional[str] = field(default=None)
-    # reformulator
-    head_size: int = field(default=64)
-    label_prompts: Optional[str] = field(default=None)
     add_classification_head: bool = field(default=False)
+
+    ## Controller
+    head_size: int = field(default=64)
     pooling: Optional[str] = field(default='mean')
     activation: Optional[str] = field(default='sigmoid')
-    ## adapter
-    pos_anchors : Optional[str] = field(default=None)
-    neg_anchors : Optional[str] = field(default=None)
-    # placeholder
+
+    # conditional QG
+    prompts: Optional[str] = field(default=None)
+    label_prompts: Optional[str] = field(default=None)
     prompts_idx = None
     label_prompts_idx = None
+
+    # relevance QG
+    pos_anchors : Optional[str] = field(default=None)
+    neg_anchors : Optional[str] = field(default=None)
     pos_anchors_idx = None
     neg_anchors_idx = None
+
     # variational
+    latent_size: int = field(default=128)
+    has_compressed_layer: bool = field(default=False)
     annealing_fn: str = field(default='cyclic')
     n_total_iter: Optional[int] = field(default=10000)
     n_cycle: Optional[int] = field(default=10)
@@ -124,8 +128,8 @@ def main():
         print('Used pos/neg anchors index:', \
                 model_args.pos_anchors_idx, model_args.neg_anchors_idx)
 
-    from models import DocRelBartQG, RelBartVQG
-    MODELS = {'bartqg': DocRelBartQG, 'bartvqg': RelBartVQG}
+    from models import DocRelBartQG, RelBartQG
+    MODELS = {'bart-condqg': DocRelBartQG, 'bart-relqg': RelBartQG}
     for key in MODELS:
         if key in training_args.output_dir.lower():
             model_key = key

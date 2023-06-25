@@ -29,8 +29,6 @@ class DocRelBartQG(BartQG):
     ]
     def __init__(self, config: BartConfig, cvqg_config=None, **kwargs):
         super().__init__(config)
-        # self.n_soft_prompts = vqg_config.n_soft_prompts
-
         self.model = BartModel(config)
 
         # [generation] 
@@ -55,7 +53,6 @@ class DocRelBartQG(BartQG):
                 init_idx=cvqg_config.prompts_idx,
                 lbl_init_idx=cvqg_config.label_prompts_idx,
         )
-        self.hidden_size = config.d_model
         self.batch_size = kwargs.pop('batch_size', None)
 
     def forward(
@@ -162,9 +159,9 @@ class DocRelBartQG(BartQG):
 
         masked_lm_loss = 0
         docibn_loss = 0
+        reparam_loss = 0
         clf_logits = None
         if labels is not None:
-            # query generation 
             labels = labels.to(lm_logits.device)
             loss_fct = CrossEntropyLoss()
             masked_lm_loss = loss_fct(
@@ -174,7 +171,7 @@ class DocRelBartQG(BartQG):
 
             # doc ibn
             docibn_loss = self.controller.calculate_src_ibn_loss(
-                    encoder_hidden_state, self.batch_size
+                    encoder_hidden_state, self.batch_size, norm=True
             )
 
             # [discriminator]
@@ -191,7 +188,8 @@ class DocRelBartQG(BartQG):
 
         return Seq2SeqCVQGOutput(
                 loss=masked_lm_loss, 
-                reparam_loss=docibn_loss,
+                reparam_loss=reparam_loss,
+                docibn_loss=docibn_loss,
                 logits=lm_logits, 
                 clf_logits=clf_logits,
                 past_key_values=decoder_outputs.past_key_values, 

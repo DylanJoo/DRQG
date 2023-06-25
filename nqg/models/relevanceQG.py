@@ -15,11 +15,9 @@ from transformers.modeling_outputs import BaseModelOutput
 
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
-from .modules import VAE, RelAdapter
+from .controller import RelAdapter
 
-import copy
-
-class RelBartVQG(BartQG):
+class RelBartQG(BartQG):
     base_model_prefix = "model"
     _keys_to_ignore_on_load_missing = [
         r"final_logits_bias",
@@ -29,7 +27,6 @@ class RelBartVQG(BartQG):
     ]
     def __init__(self, config: BartConfig, cvqg_config=None, **kwargs):
         super().__init__(config)
-
         self.model = BartModel(config)
 
         # [generation] 
@@ -48,7 +45,7 @@ class RelBartVQG(BartQG):
         self.post_init()
 
         # [prompt] 
-        self.adapter = RelAdapter(
+        self.controller = RelAdapter(
                 wte=self.model.shared, 
                 hidden_size=config.d_model,
                 head_size=cvqg_config.head_size,
@@ -56,8 +53,8 @@ class RelBartVQG(BartQG):
                 neg_init_idx=cvqg_config.neg_anchors_idx,
                 pooling=cvqg_config.pooling,
                 activation=cvqg_config.activation,
-                batch_size=kwargs.pop('batch_size', None)
         )
+        self.batch_size = kwargs.pop('batch_size', None)
 
         # [decoder injection]
         kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
@@ -151,9 +148,9 @@ class RelBartVQG(BartQG):
 
         # setting 1
         reparam_loss = 0
-        # encoder_hidden_state = encoder_outputs[0][:, :1, :]
-        # encoder_hidden_states = self.adapter(clf_scores, encoder_outputs[0], mask=None)
-        encoder_hidden_states = torch.mean(encoder_hidden_states, dim=1)
+        encoder_hidden_states = self.controller(clf_scores, encoder_outputs[0])
+        # encoder_hidden_states = encoder_hidden_states.mean(1)[:, None, :]
+        # attention_mask = None
 
         # setting 1a
         # change the InfoNCE loss to reparm
@@ -206,7 +203,9 @@ class RelBartVQG(BartQG):
         lm_logits = self.lm_head(decoder_outputs[0])
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
-        masked_lm_loss, rel_ctr_loss = 0, 0
+        masked_lm_loss = 0
+        docibn_loss = 0
+        reparam_loss = 0
         clf_logits = None
         if labels is not None:
             labels = labels.to(lm_logits.device)
@@ -216,18 +215,13 @@ class RelBartVQG(BartQG):
                     labels.view(-1)
             )
 
-            # document divergence loss
-            loss_fct = CrossEntropyLoss()
-            doc_scores = self.adapter.doc_scores
-            # print(nn.functional.softmax(doc_scores[0], dim=-1))
-            bs, ns = doc_scores.size(0), doc_scores.size(1)
-            doc_labels = torch.arange(0, ns, device=self.device)
-
-            if steps is None:
-                print(doc_labels.shape)
-                print(nn.functional.softmax(doc_scores[0], dim=-1))
-
-            reparam_loss = loss_fct(doc_scores.view(-1, ns), doc_labels.repeat(bs))
+            # doc ibn
+            docibn_loss = self.controller.calculate_src_ibn_loss(
+                    encoder_hidden_states, self.batch_size, True
+            )
+            # docibn_loss = self.controller.calculate_src_ibn_loss(
+            #         encoder_hidden_states, self.batch_size
+            # )
 
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state
@@ -243,6 +237,7 @@ class RelBartVQG(BartQG):
         return Seq2SeqCVQGOutput(
                 loss=masked_lm_loss, 
                 reparam_loss=reparam_loss,
+                docibn_loss=docibn_loss,
                 logits=lm_logits, 
                 clf_logits=clf_logits,
                 past_key_values=decoder_outputs.past_key_values, 
