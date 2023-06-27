@@ -206,7 +206,7 @@ class RelBartQG(BartQG):
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
         masked_lm_loss = 0
-        docibn_loss = 0
+        cont_loss = 0
         reparam_loss = 0
         clf_logits = None
         if labels is not None:
@@ -222,11 +222,11 @@ class RelBartQG(BartQG):
                 query_repr = decoder_outputs[0] * decoder_attention_mask.unsqueeze(-1)
 
             # in-document contrastive loss
-            # docibn_loss = indoc_cont_loss(
-            #         query_repr, self.batch_size, norm=True
-            # )
+            cont_loss = indoc_cont_loss(
+                    query_repr, self.batch_size, norm=True
+            )
 
-            docibn_loss = pairwise_cont_loss(
+            cont_loss = pairwise_cont_loss(
                     query_repr, doc_repr,
                     self.batch_size, norm=True
             )
@@ -245,7 +245,7 @@ class RelBartQG(BartQG):
         return Seq2SeqCVQGOutput(
                 loss=masked_lm_loss, 
                 reparam_loss=reparam_loss,
-                docibn_loss=docibn_loss,
+                cont_loss=cont_loss,
                 logits=lm_logits, 
                 clf_logits=clf_logits,
                 past_key_values=decoder_outputs.past_key_values, 

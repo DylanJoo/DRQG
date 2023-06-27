@@ -3,11 +3,15 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import copy
+from torch.nn import CrossEntropyLoss, KLDivLoss
 
 def indoc_cont_loss(hidden_states, bs, norm=False):
-    from torch.nn import CrossEntropyLoss
     device = hidden_states.device
-    hidden_state = hidden_states.mean(1)[:, None, :]
+    if (hidden_states.size(1) != 1) or (len(hidden_state.shape)>2):
+        hidden_state = hidden_states.mean(1)[:, None, :]
+    else:
+        hidden_state = hidden_states
+
     hs = hidden_state.size(-1)
     if norm:
         hidden_state = torch.nn.functional.normalize(hidden_state, p=2, dim=-1)
@@ -18,13 +22,12 @@ def indoc_cont_loss(hidden_states, bs, norm=False):
     loss_fct = CrossEntropyLoss()
     n_size = ib_scores.size(1)
     ib_labels = torch.arange(0, n_size, device=device)
-    ib_loss = loss_fct(
+    loss = loss_fct(
             ib_scores.view(-1, n_size), ib_labels.repeat(bs)
     )
-    return ib_loss
+    return loss
 
 def pairwise_cont_loss(hidden_states, hidden_states_src=None, bs=1, norm=False):
-    from torch.nn import CrossEntropyLoss
     device = hidden_states.device
     hs = hidden_states.size(-1)
     ls = hidden_states.size(-2)
@@ -61,8 +64,34 @@ def pairwise_cont_loss(hidden_states, hidden_states_src=None, bs=1, norm=False):
     doc_scores = torch.cat([doc_scores_pos, doc_scores_neg], -1) 
 
     loss_fct = CrossEntropyLoss()
-    docibn_loss = loss_fct(
+    loss = loss_fct(
             doc_scores, 
             torch.zeros(doc_scores.size(0), dtype=torch.long, device=device)
     )
-    return docibn_loss
+    return loss
+
+def gen_mle_loss(lm_logits, seq_labels, vocab_size):
+    """ 
+    [TODO] mask, reweight, contrastive framework
+    """
+    loss_gen_pos, loss_gen_neg = 0, 0
+    loss_fct = CrossEntropyLoss(reduction='none')
+
+    loss_gen_neg = loss_fct(
+            lm_logits[seq_labels<1].view(-1, vocab_size), 
+            labels[seq_labels<1].view(-1)
+    ).mean()
+
+    loss_gen_pos = loss_fct(
+            lm_logits[seq_labels==1].view(-1, vocab_size), 
+            labels[seq_labels==1].view(-1)
+    ).mean()
+
+    return {"pos": loss_gen_pos, "neg": loss_gen_neg}
+
+def ql_kl_loss(clf_logits, clf_scores):
+    loss_fct = KLDivLoss(reduction='sum')
+    logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
+    target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
+    loss = loss_fct(logp, target)
+    return loss / labels.size(0)
