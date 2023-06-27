@@ -52,8 +52,10 @@ class DocRelBartQG(BartQG):
                 hidden_size=config.d_model,
                 init_idx=cvqg_config.prompts_idx,
                 lbl_init_idx=cvqg_config.label_prompts_idx,
+                activation=cvqg_config.activation
         )
         self.batch_size = kwargs.pop('batch_size', None)
+        self.aggregate = kwargs.pop('aggregate', False)
 
     def forward(
         self,
@@ -122,22 +124,17 @@ class DocRelBartQG(BartQG):
             )
 
         ## [EncoderDecoder prompt wrapper]
-        encoder_hidden_states = encoder_outputs[0]
-
-        ## setting 0 # very failed
-        encoder_hidden_state = encoder_hidden_states
 
         ## setting 1 & 2: 
-        ### remove prompts or not 
-        # encoder_hidden_states = encoder_hidden_states[:, self.controller.length:, :]
 
         # mean pooling
-        encoder_hidden_state = encoder_hidden_states.mean(1)[:, None, :]
-        attention_mask=None
-
-        # cls pooling
-        # encoder_hidden_states = encoder_hidden_states[:, self.controller.length:, :]
-        # encoder_hidden_state = encoder_hidden_states[:, :1, :]
+        encoder_hidden_states = encoder_outputs[0][:, self.controller.length:, :]
+        attention_mask = attention_mask[:, self.controller.length:]
+        if self.aggregate:
+            encoder_hidden_state = encoder_hidden_states.mean(1)[:, None, :]
+            attention_mask=None
+        else:
+            encoder_hidden_state = encoder_hidden_states
 
         # standard enc-dec pipeline
         decoder_outputs = self.model.decoder(
@@ -171,7 +168,7 @@ class DocRelBartQG(BartQG):
 
             # doc ibn
             docibn_loss = self.controller.calculate_src_ibn_loss(
-                    encoder_hidden_state, self.batch_size, norm=True
+                    encoder_hidden_state, self.batch_size, norm=False
             )
 
             # [discriminator]

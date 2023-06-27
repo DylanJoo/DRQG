@@ -16,6 +16,7 @@ from transformers.modeling_outputs import BaseModelOutput
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
 from .controller import RelAdapter
+from .loss import indoc_cont_loss, pairwise_cont_loss
 
 class RelBartQG(BartQG):
     base_model_prefix = "model"
@@ -55,6 +56,7 @@ class RelBartQG(BartQG):
                 activation=cvqg_config.activation,
         )
         self.batch_size = kwargs.pop('batch_size', None)
+        self.aggregate = kwargs.pop('aggregate', False)
 
         # [decoder injection]
         kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
@@ -148,12 +150,12 @@ class RelBartQG(BartQG):
 
         # setting 1
         reparam_loss = 0
-        encoder_hidden_states = self.controller(clf_scores, encoder_outputs[0])
-        # encoder_hidden_states = encoder_hidden_states.mean(1)[:, None, :]
-        # attention_mask = None
-
-        # setting 1a
-        # change the InfoNCE loss to reparm
+        encoder_hidden_state = self.controller(
+                clf_scores, encoder_outputs[0], use_residual=False
+        )
+        if self.aggregate:
+            encoder_hidden_state = encoder_hidden_state.mean(1)[:, None, :]
+            attention_mask = None
 
         # setting 2: adapter with sentence embeddings
         # setting 2.1 prior is from gaussian
@@ -189,7 +191,7 @@ class RelBartQG(BartQG):
         decoder_outputs = self.model.decoder(
                 input_ids=decoder_input_ids,
                 attention_mask=decoder_attention_mask,
-                encoder_hidden_states=encoder_hidden_states,
+                encoder_hidden_states=encoder_hidden_state,
                 encoder_attention_mask=attention_mask,
                 head_mask=decoder_head_mask,
                 cross_attn_head_mask=cross_attn_head_mask,
@@ -215,13 +217,19 @@ class RelBartQG(BartQG):
                     labels.view(-1)
             )
 
-            # doc ibn
-            docibn_loss = self.controller.calculate_src_ibn_loss(
-                    encoder_hidden_states, self.batch_size, True
-            )
-            # docibn_loss = self.controller.calculate_src_ibn_loss(
-            #         encoder_hidden_states, self.batch_size
+            if attention_mask is not None:
+                doc_repr = encoder_outputs[0] * attention_mask.unsqueeze(-1)
+                query_repr = decoder_outputs[0] * decoder_attention_mask.unsqueeze(-1)
+
+            # in-document contrastive loss
+            # docibn_loss = indoc_cont_loss(
+            #         query_repr, self.batch_size, norm=True
             # )
+
+            docibn_loss = pairwise_cont_loss(
+                    query_repr, doc_repr,
+                    self.batch_size, norm=True
+            )
 
             if self.classification_head is not None:
                 hidden_states = decoder_outputs.last_hidden_state

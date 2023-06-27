@@ -24,6 +24,7 @@ class DocRelPrompt(nn.Module):
             head_size: int = 64,
             lbl_init_idx: Optional[List] = None,
             init_idx: Optional[List] = None,
+            activation: Optional[str] = 'sigmoid',
         ):
         super(DocRelPrompt, self).__init__()
         self.orig_embeds = wte
@@ -40,13 +41,13 @@ class DocRelPrompt(nn.Module):
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size,
-                activation='tanh'
+                activation=activation
         )
         self.label_reformulator = InstanceWisePrompt(
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size,
-                activation='tanh'
+                activation=activation
         )
 
     def forward(self, relevance, hidden_states_src=None, input_ids=None, steps=None):
@@ -71,28 +72,6 @@ class DocRelPrompt(nn.Module):
         # [TODO] Maybe try reformulate the prompts
         self.length = 2*len(self.init_idx) # output should fit the mask
         return torch.cat([doc_prompts, rel_prompts, hidden_states_src], 1)
-
-    def calculate_src_ibn_loss(self, hidden_state, bs, norm=False):
-        device = hidden_state.device
-        if hidden_state.size(1) != 1:
-            hidden_state = hidden_state.mean(1)[:, None, :]
-        hs = hidden_state.size(-1)
-        doc_hidden_state = hidden_state.view(bs, -1, hs)
-
-        if norm:
-            doc_hidden_state = torch.nn.functional.normalize(doc_hidden_state, p=2, dim=-1)
-
-        doc_scores = torch.bmm(
-                doc_hidden_state, 
-                doc_hidden_state.transpose(-1, -2)
-        )
-        loss_fct = CrossEntropyLoss()
-        n_size = doc_scores.size(1)
-        doc_labels = torch.arange(0, n_size, device=device)
-        docibn_loss = loss_fct(
-                doc_scores.view(-1, n_size), doc_labels.repeat(bs)
-        )
-        return docibn_loss
 
     def expand_mask(self, mask):
         mask = mask.repeat(self.n_samples, 1)
@@ -152,62 +131,22 @@ class RelAdapter(nn.Module):
                 activation=activation
         )
 
-    def forward(self, relevance, hidden_states_src=None, mask=None):
+    def forward(self, relevance, hidden_states_src=None, use_residual=False):
         batch_doc_size = hidden_states_src.size(0)
         # [relevance conditioned]
         relevance = relevance.to(hidden_states_src.device)
         pos_prompts = self.pos_prompts.unsqueeze(0).repeat(batch_doc_size, 1, 1)
         neg_prompts = self.neg_prompts.unsqueeze(0).repeat(batch_doc_size, 1, 1)
         rel_prompts = (relevance.view(-1, 1, 1) * pos_prompts + \
-                       (1-relevance).view(-1, 1, 1) * neg_prompts) / 2
+                       (1-relevance).view(-1, 1, 1) * neg_prompts) 
 
         # [condition settings]
-        hidden_states = self.adapter(
-                anchor=rel_prompts, base=hidden_states_src, 
-        )
-        return hidden_states
-
-    def calculate_src_maxsim_ibn_loss(self, hidden_state, bs):
-        device = hidden_state.device
-        bsns, ls, hs = hidden_state.size()
-        ns = bsns // bs
-        doc_hidden_state = torch.nn.functional.normalize(
-                hidden_state, p=2, dim=-1
-        ).view(bs, -1, hs)
-
-        doc_scores = torch.bmm(
-                doc_hidden_state, 
-                doc_hidden_state.transpose(-1, -2)
-        )
-        loss_fct = CrossEntropyLoss()
-        doc_labels = torch.arange(0, ns, device=device)
-        docibn_loss = loss_fct(
-                doc_scores.view(-1, ns), doc_labels.repeat(bs)
-        )
-        return docibn_loss
-
-    def calculate_src_ibn_loss(self, hidden_state, bs, norm=False):
-        device = hidden_state.device
-        if hidden_state.size(1) != 1:
-            hidden_state = hidden_state.mean(1)[:, None, :]
-        hs = hidden_state.size(-1)
-        doc_hidden_state = hidden_state.view(bs, -1, hs)
-
-        if norm:
-            doc_hidden_state = torch.nn.functional.normalize(doc_hidden_state, p=2, dim=-1)
-
-        doc_scores = torch.bmm(
-                doc_hidden_state, 
-                doc_hidden_state.transpose(-1, -2)
-        )
-        loss_fct = CrossEntropyLoss()
-        n_size = doc_scores.size(1)
-        doc_labels = torch.arange(0, n_size, device=device)
-        docibn_loss = loss_fct(
-                doc_scores.view(-1, n_size), doc_labels.repeat(bs)
-        )
-        return docibn_loss
-
+        residual = self.adapter(anchor=rel_prompts, base=hidden_states_src)
+        # B L 
+        if use_residual:
+            return residual + hidden_states_src
+        else:
+            return residual
 
     def set_embeddings(self):
         self.pos_prompts = nn.Parameter(

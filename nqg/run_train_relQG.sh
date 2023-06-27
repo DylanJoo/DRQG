@@ -1,10 +1,11 @@
 BASE=bart-relqg
 MODEL=$BASE/test
 
-export CUDA_VISIBLE_DEVICES=2
-PRT_MODEL=bart-d2q/mean/checkpoint-16000
+export CUDA_VISIBLE_DEVICES=1
+PRT_MODEL=bart-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
+# TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
 
 python3 train_qg.py \
   --model_name_or_path $PRT_MODEL \
@@ -25,13 +26,14 @@ python3 train_qg.py \
   --train_file $TRAIN_FILE \
   --latent_size 128 \
   --add_classification_head true \
-  --pos_anchors 'what where when who how why which' \
-  --neg_anchors 'what where when who how why which' \
+  --pos_anchors 'positive positive positive positive positive' \
+  --neg_anchors 'negative negative negative negative negative' \
   --pooling mean \
   --activation tanh \
   --warmup_ratio 0.1 \
   --do_train \
-  --do_eval 
+  --do_eval \
+  --set_embeddings false
 
   # --annealing_fn cyclic \
   # --n_cycle 4 \

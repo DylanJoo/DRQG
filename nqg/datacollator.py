@@ -149,3 +149,70 @@ class DataCollatorForVQG(DataCollatorBase):
 
         return inputs
 
+@dataclass
+class DataCollatorForMaskQG(DataCollatorBase):
+    is_train: Union[bool, str] = False
+    is_eval: Union[bool, str] = False
+    m_negatives: int = 2
+    m_positives: int = 2
+    use_clf_score: bool = True
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        # text and id info 
+        src_text = []
+        tgt_text = []
+
+        for i, batch in enumerate(features):
+
+            p = batch['passage']
+            q_texts = (batch['positive']*self.m_positives)[:self.m_positives]
+            r_scores = (batch['positive_score']*self.m_positives)[:self.m_positives]
+
+            for (r, q) in zip(r_scores, q_texts): 
+                r = '%.3f'%r
+                if random.uniform(0, 1) > 1: # 10 % generate relevance
+                    src_text += [f"Passage: {p} Relevance: <mask> Query: {q}"]
+                    tgt_text += [r]
+                else:
+                    src_text += [f"Passage: {p} Relevance: {r} Query: <mask>"]
+                    tgt_text += [q]
+
+            q_texts = (batch['negative']*self.m_negatives)[:self.m_negatives]
+            r_scores = (batch['negative_score']*self.m_negatives)[:self.m_negatives]
+
+            for (r, q) in zip(r_scores, q_texts): 
+                r = '%.3f'%r
+                if random.uniform(0, 1) > 1: # 10 % generate relevance
+                    src_text += [f"Passage: {p} Relevance: <mask> Query: {q}"]
+                    tgt_text += [r]
+                else:
+                    src_text += [f"Passage: {p} Relevance: {r} Query: <mask>"]
+                    tgt_text += [q]
+
+        if self.is_train:
+            inputs = self.tokenizer(
+                    src_text,
+                    max_length=self.max_p_length,
+                    truncation=True,
+                    padding='max_length',
+                    return_tensors=self.return_tensors
+            )
+
+            targets = self.tokenizer(
+                    tgt_text,
+                    padding='max_length',
+                    truncation=True,
+                    return_tensors=self.return_tensors,
+                    max_length=self.max_q_length
+            )
+
+            target_ids = targets['input_ids']
+            target_mask = targets['attention_mask'].bool()
+            target_ids = target_ids.masked_fill(~target_mask, -100)
+
+            inputs['labels'] = target_ids
+            inputs['decoder_attention_mask'] = target_mask
+
+        return inputs
+

@@ -34,8 +34,8 @@ class InstanceWisePrompt(nn.Module):
             self.activation = nn.Sigmoid()
         elif activation == 'tanh':
             self.activation = nn.Tanh()
-        elif activation == 'softmax':
-            self.activation = nn.Softmax(dim=-1)
+        elif activation == 'relu':
+            self.activation = nn.ReLU()
 
         if init_idx is not None:
             self.init_idx = (init_idx*length)[:length]
@@ -74,23 +74,20 @@ class InstanceWisePrompt(nn.Module):
         K = torch.transpose(K, 1, 2)
 
         # B N/L N
-        scores = torch.matmul(Q, K)   
+        logits = torch.matmul(Q, K)   
 
-        if mask is not None: # mask: [B Lx]
-            expanded_mask = mask[:, :, None].expand(scores.shape)
-            inverted_mask = 1.0 - expanded_mask
-            inverted_mask.masked_fill(
-                    inverted_mask.bool(), torch.finfo(scores.dtype).min
-            )
-            scores = scores + inverted_mask
+        # if mask is not None: # mask: [B Lx]
+        #     expanded_mask = mask[:, :, None].expand(logits.shape)
+        #     logits = logits * expanded_mask
 
-        # scores: B N L or B L N --> B N or B L
+        # logits: B N L or B L N --> B N or B L
         if self.pooling == 'max':
-            scores = torch.max(scores / math.sqrt(self.head_size), dim=-1).values
+            scores = torch.max(logits / math.sqrt(self.head_size), dim=-1).values
         elif self.pooling == 'mean':
-            scores = torch.mean(scores / math.sqrt(self.head_size), dim=-1)
+            scores = torch.mean(logits / math.sqrt(self.head_size), dim=-1)
 
         # converage mechanism
+        self.scores = scores
         scores = self.activation(scores)
 
         # B N H * B N or B L H * B L

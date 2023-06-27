@@ -61,6 +61,7 @@ class TrainerBase(Trainer):
             temp = out.sequences
             labels_reformulate = [l for l in labels[0] if l != -100]
             print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+            m = len(temp) if m == 1 else m
             for i in range(m):
                 print(f"D2Q ({i:<3}):", 
                         model.tokenizer.decode(temp[i], skip_special_tokens=True)
@@ -99,6 +100,7 @@ class TrainerForQG(TrainerBase):
                 labels[selected].view(-1)
         )
         loss_gen_neg = loss_gen_neg.mean()
+        # loss_gen_neg = loss_gen_neg * clf_scores[selected]
 
         loss_fct = CrossEntropyLoss(reduction='none')
         selected = (clf_labels==1)
@@ -107,6 +109,7 @@ class TrainerForQG(TrainerBase):
                 labels[selected].view(-1)
         )
         loss_gen_pos = loss_gen_pos.mean()
+        # loss_gen_pos = loss_gen_pos * clf_scores[selected]
 
         loss_gen = (loss_gen_pos+loss_gen_neg) / 2
         loss_cond = outputs.get("docibn_loss", 0)
@@ -122,8 +125,9 @@ class TrainerForQG(TrainerBase):
         ## (4) KL loss (reparam)
         loss_reparam = outputs.get('reparam_loss', 0)
 
-        loss = loss_gen+loss_reparam+loss_rel+loss_cond
-        # loss = loss_reparam+loss_rel
+        # loss = loss_gen+loss_reparam+loss_rel+loss_cond
+        # loss = loss_gen+loss_cond+loss_rel
+        loss = loss_gen+loss_cond
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

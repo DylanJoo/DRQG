@@ -88,6 +88,7 @@ class OurTrainingArguments(TrainingArguments):
     warmup_ratio: Union[float] = field(default=0.0)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
+    set_embeddings: bool = field(default=True)
 
 def main():
 
@@ -138,10 +139,12 @@ def main():
             pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
             config=config, 
             cvqg_config=model_args,
-            batch_size=training_args.per_device_train_batch_size
+            batch_size=training_args.per_device_train_batch_size,
+            aggregate=('mean' in hfmodel_args.model_name_or_path)
     )
     model.set_tokenizer(tokenizer)
-    model.controller.set_embeddings()
+    if training_args.set_embeddings:
+        model.controller.set_embeddings()
     
     # [generation config]
     generation_config = GenerationConfig.from_model_config(model.config)
@@ -163,16 +166,9 @@ def main():
                 print('param {} wont be optimized.'.format(name))
                 param.requires_grad = False
 
-
     # Data: collator
     from datacollator import DataCollatorForVQG
-    DATACOLLATORS = {"vl": DataCollatorForVQG }
-
-    for key in DATACOLLATORS:
-        if key in data_args.train_file.lower():
-            datacollator_key = key
-
-    data_collator = DATACOLLATORS[datacollator_key](
+    data_collator = DataCollatorForVQG(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',

@@ -43,6 +43,9 @@ class OurDataArguments:
     max_q_length: int = field(default=16)
     relevant_included: bool = field(default=True)
     irrelevant_included: bool = field(default=False)
+    # for maskQG (similiar to conditionalQG)
+    m_negative_per_example: int = field(default=1)
+    m_positive_per_example: int = field(default=1)
 
 @dataclass
 class OurTrainingArguments(Seq2SeqTrainingArguments):
@@ -86,12 +89,18 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model: backbone and pretrained 
-    from models import MemBartQG
-    model = MemBartQG.from_pretrained(
-            hfmodel_args.model_name_or_path, 
-            config=config, 
-            pooling=model_args.pooling
-    )
+    from models import MemBartQG, BartQG
+    if 'mean' in training_args.output_dir:
+        model = MemBartQG.from_pretrained(
+                hfmodel_args.model_name_or_path, 
+                config=config, 
+                pooling=model_args.pooling
+        )
+    else:
+        model = BartQG.from_pretrained(
+                hfmodel_args.model_name_or_path, 
+                config=config, 
+        )
     model.set_tokenizer(tokenizer)
     
     # Model: generation config
@@ -99,15 +108,27 @@ def main():
     model.generation_config = generation_config
 
     # Data: collator/preprocessor
-    from datacollator import DataCollatorBase
-    data_collator = DataCollatorBase(
-            tokenizer=tokenizer,
-            max_p_length=data_args.max_p_length,
-            max_q_length=data_args.max_q_length,
-            is_eval=False,
-            irrelevant_included=data_args.irrelevant_included,
-            relevant_included=data_args.relevant_included
-    )
+    from datacollator import DataCollatorBase, DataCollatorForMaskQG
+    if 'bartqg' in training_args.output_dir:
+        data_collator = DataCollatorBase(
+                tokenizer=tokenizer,
+                max_p_length=data_args.max_p_length,
+                max_q_length=data_args.max_q_length,
+                is_eval=False,
+                irrelevant_included=data_args.irrelevant_included,
+                relevant_included=data_args.relevant_included
+        )
+    if 'maskqg' in training_args.output_dir:
+        data_collator = DataCollatorForMaskQG(
+                tokenizer=tokenizer, 
+                padding=True,
+                return_tensors='pt',
+                is_train=True,
+                max_p_length=data_args.max_p_length,
+                m_negatives=data_args.m_negative_per_example,
+                m_positives=data_args.m_positive_per_example
+        )
+
     # Data: dataset
     from data import msmarco
     dataset = msmarco.passage_centric_dataset(data_args.train_file)
