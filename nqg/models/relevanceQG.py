@@ -151,7 +151,7 @@ class RelBartQG(BartQG):
         # setting 1
         reparam_loss = 0
         encoder_hidden_state = self.controller(
-                clf_scores, encoder_outputs[0], use_residual=False
+                clf_scores, encoder_outputs[0], use_residual=True,
         )
         if self.aggregate:
             encoder_hidden_state = encoder_hidden_state.mean(1)[:, None, :]
@@ -209,6 +209,8 @@ class RelBartQG(BartQG):
         cont_loss = 0
         reparam_loss = 0
         clf_logits = None
+        # test = lm_logits.view(self.batch_size, -1, lm_logits.size(-2), lm_logits.size(-1))
+        # print(torch.sum(test, (2, 1)).softmax(-1)[0].sort(-1, descending=True))
         if labels is not None:
             labels = labels.to(lm_logits.device)
             loss_fct = CrossEntropyLoss()
@@ -219,15 +221,18 @@ class RelBartQG(BartQG):
 
             if attention_mask is not None:
                 doc_repr = encoder_outputs[0] * attention_mask.unsqueeze(-1)
-                query_repr = decoder_outputs[0] * decoder_attention_mask.unsqueeze(-1)
+                query_repr_ctrl = decoder_outputs[0] * decoder_attention_mask.unsqueeze(-1)
+                doc_repr_ctrl = encoder_hidden_state * attention_mask.unsqueeze(-1)
 
             # in-document contrastive loss
-            cont_loss = indoc_cont_loss(
-                    query_repr, self.batch_size, norm=True
-            )
+            # cont_loss = indoc_cont_loss(
+            #         doc_repr_ctrl, 
+            #         bs=self.batch_size, norm=True
+            # )
 
             cont_loss = pairwise_cont_loss(
-                    query_repr, doc_repr,
+                    hidden_states=query_repr_ctrl, 
+                    hidden_base=doc_repr, 
                     self.batch_size, norm=True
             )
 

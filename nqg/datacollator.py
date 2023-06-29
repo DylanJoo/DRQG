@@ -82,8 +82,8 @@ class DataCollatorForVQG(DataCollatorBase):
             p = batch['passage']
             batch_pos = batch['positive']
             batch_pos_scores = batch['positive_score']
-            batch_neg = batch['negative']
-            batch_neg_scores = batch['negative_score']
+            batch_neg = batch['negative'][::-1]
+            batch_neg_scores = batch['negative_score'][::-1]
 
             for j in range(self.m_positives):
                 texts_p += [p]
@@ -118,10 +118,10 @@ class DataCollatorForVQG(DataCollatorBase):
 
             targets = self.tokenizer(
                     texts_q,
-                    padding='max_length',
+                    max_length=self.max_q_length,
                     truncation=True,
-                    return_tensors=self.return_tensors,
-                    max_length=self.max_q_length
+                    padding='max_length',
+                    return_tensors=self.return_tensors
             )
 
             target_ids = targets['input_ids']

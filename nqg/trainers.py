@@ -6,7 +6,8 @@ from torch.nn import CrossEntropyLoss, NLLLoss, MSELoss, KLDivLoss
 from torch.nn import functional as F
 from models.loss import (
         gen_mle_loss,
-        ql_kl_loss
+        ql_kl_loss,
+        gen_mle_gumbel_loss
 )
 
 class TrainerBase(Trainer):
@@ -35,9 +36,9 @@ class TrainerBase(Trainer):
         labels,
         m
     ):
+        model.eval()
         with torch.no_grad():
             # generate the normal one
-            model.eval()
             n = input_ids.size()[0]
 
             if m>1:
@@ -70,7 +71,8 @@ class TrainerBase(Trainer):
                 print(f"D2Q ({i:<3}):", 
                         model.tokenizer.decode(temp[i], skip_special_tokens=True)
                 )
-            model.train()
+
+        model.train()
 
 class TrainerForQG(TrainerBase):
 
@@ -89,11 +91,22 @@ class TrainerForQG(TrainerBase):
         clf_logits = outputs.get("clf_logits")
 
         ## (1) text generation loss
-        loss_gen = gen_mle_loss(lm_logits, clf_labels, model.config.vocab_size)
+        loss_gen = gen_mle_loss(
+                lm_logits, labels, clf_labels, 
+                model.config.vocab_size
+        )
         loss_gen_pos = loss_gen.get('pos', 0)
         loss_gen_neg = loss_gen.get('neg', 0)
+
+        ### (1.a) text generation loss with gumbel softmax
+        # loss_gen_gumbel = gen_mle_gumbel_loss(
+        #         lm_logits, labels, clf_labels, 
+        #         model.config.vocab_size, training_steps
+        # )
+        # loss_gen_pos = loss_gen_gumbel.get('pos', 0)
+        # loss_gen_neg = loss_gen_gumbel.get('neg', 0)
+
         loss_gen = (loss_gen_pos+loss_gen_neg) / 2
-        # selected = (clf_labels==1)
 
         ## (2) query logits contrastive loss
         loss_cont = outputs.get("cont_loss", 0)
@@ -106,11 +119,12 @@ class TrainerForQG(TrainerBase):
         loss_reparam = outputs.get('reparam_loss', 0)
 
         # loss = loss_gen+loss_reparam+loss_rel+loss_cont
-        # loss = loss_gen+loss_cont+loss_rel
         loss = loss_gen+loss_cont
+        # loss = loss_gen
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
+            selected = (clf_labels==1)
             print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
                     \nKL: (reparam) {loss_reparam} (rel) {loss_rel} \
                     \nCE: (condition) {loss_cont}")

@@ -16,6 +16,7 @@ from transformers.modeling_outputs import BaseModelOutput
 from .outputs import Seq2SeqCVQGOutput
 from .questiongenerator import BartQG
 from .controller import DocRelPrompt
+from .loss import indoc_cont_loss, pairwise_cont_loss
 
 import copy
 
@@ -155,7 +156,7 @@ class DocRelBartQG(BartQG):
         lm_logits = lm_logits + self.final_logits_bias.to(lm_logits.device)
 
         masked_lm_loss = 0
-        docibn_loss = 0
+        cont_loss = 0
         reparam_loss = 0
         clf_logits = None
         if labels is not None:
@@ -166,9 +167,19 @@ class DocRelBartQG(BartQG):
                     labels.view(-1)
             )
 
-            # doc ibn
-            docibn_loss = self.controller.calculate_src_ibn_loss(
-                    encoder_hidden_state, self.batch_size, norm=False
+            if attention_mask is not None:
+                query_repr = decoder_outputs[0] * decoder_attention_mask.unsqueeze(-1)
+                doc_repr_ctrl = encoder_hidden_state * attention_mask.unsqueeze(-1)
+
+            # in-document contrastive loss
+            # cont_loss = indoc_cont_loss(
+            #         doc_repr_ctrl,
+            #         bs=self.batch_size, norm=True
+            # )
+
+            cont_loss = pairwise_cont_loss(
+                    doc_repr_ctrl, None,
+                    bs=self.batch_size, norm=True
             )
 
             # [discriminator]
@@ -186,13 +197,16 @@ class DocRelBartQG(BartQG):
         return Seq2SeqCVQGOutput(
                 loss=masked_lm_loss, 
                 reparam_loss=reparam_loss,
-                docibn_loss=docibn_loss,
+                cont_loss=cont_loss,
                 logits=lm_logits, 
                 clf_logits=clf_logits,
                 past_key_values=decoder_outputs.past_key_values, 
                 decoder_hidden_states=decoder_outputs.hidden_states, 
                 decoder_attentions=decoder_outputs.attentions, 
                 cross_attentions=decoder_outputs.cross_attentions, 
+                encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+                encoder_hidden_states=encoder_outputs.hidden_states, 
+                encoder_attentions=encoder_outputs.attentions,
         )
 
     # tune for encoder-decoder when generation

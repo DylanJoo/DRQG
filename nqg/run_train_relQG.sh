@@ -1,5 +1,6 @@
 BASE=bart-relqg
 MODEL=$BASE/test
+rm -rvf $MODEL/*
 
 export CUDA_VISIBLE_DEVICES=1
 PRT_MODEL=bart-d2q/relevant/checkpoint-16000
@@ -26,14 +27,13 @@ python3 train_qg.py \
   --train_file $TRAIN_FILE \
   --latent_size 128 \
   --add_classification_head true \
-  --pos_anchors 'positive positive positive positive positive' \
-  --neg_anchors 'negative negative negative negative negative' \
+  --pos_anchors 'true true true true true' \
+  --neg_anchors 'false false false false false' \
   --pooling mean \
   --activation tanh \
   --warmup_ratio 0.1 \
   --do_train \
-  --do_eval \
-  --set_embeddings false
+  --do_eval
 
   # --annealing_fn cyclic \
   # --n_cycle 4 \

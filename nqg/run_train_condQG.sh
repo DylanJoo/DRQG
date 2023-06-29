@@ -5,7 +5,7 @@ export CUDA_VISIBLE_DEVICES=0
 PRT_MODEL=bart-d2q/relevant/checkpoint-16000
 PRT_CONFIG=facebook/bart-base
 TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
-TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
+# TRAIN_FILE=/home/jhju/datasets/redragon.pseudo_datasets/colbertv2.pcentric.train.vL.jsonl
 
 python3 train_qg.py \
   --model_name_or_path $PRT_MODEL \

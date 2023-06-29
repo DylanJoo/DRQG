@@ -5,8 +5,9 @@ from torch import nn
 from torch.nn import functional as F
 from utils import kl_weight, kl_loss
 import copy
-from .modules import InstanceWisePrompt
+from .modules import InstanceWisePrompt, AttentivePrompt
 from torch.nn import CrossEntropyLoss
+from transformers.models.bart.modeling_bart import BartAttention
 
 """ 
 DocRelPrompt
@@ -123,7 +124,14 @@ class RelAdapter(nn.Module):
             (len(neg_init_idx), hidden_size), device=self.device
         ))
 
-        self.adapter = InstanceWisePrompt(
+        # self.adapter = InstanceWisePrompt(
+        #         wte=None,
+        #         hidden_size=hidden_size,
+        #         head_size=head_size,
+        #         pooling=pooling,
+        #         activation=activation
+        # )
+        self.adapter = AttentivePrompt(
                 wte=None,
                 hidden_size=hidden_size,
                 head_size=head_size,
@@ -131,7 +139,7 @@ class RelAdapter(nn.Module):
                 activation=activation
         )
 
-    def forward(self, relevance, hidden_states_src=None, use_residual=False):
+    def forward(self, relevance, hidden_states_src=None, use_residual=False, cross_attn=False):
         batch_doc_size = hidden_states_src.size(0)
         # [relevance conditioned]
         relevance = relevance.to(hidden_states_src.device)
@@ -141,7 +149,10 @@ class RelAdapter(nn.Module):
                        (1-relevance).view(-1, 1, 1) * neg_prompts) 
 
         # [condition settings]
-        residual = self.adapter(anchor=rel_prompts, base=hidden_states_src)
+        residual = self.adapter(hidden_states_src, rel_prompts)
+                # anchor=rel_prompts, 
+                # base=hidden_states_src
+
         # B L 
         if use_residual:
             return residual + hidden_states_src

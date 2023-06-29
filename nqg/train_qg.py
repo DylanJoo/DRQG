@@ -151,7 +151,8 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = ['controller', 'reformulator', 'adapter', 'vae']
+    optimized_prefix = \
+            ['controller', 'reformulator', 'adapter', 'vae']
     freezed_prefix = []
 
     if model_args.freeze_LM:
