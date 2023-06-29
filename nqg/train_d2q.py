@@ -28,6 +28,8 @@ class OurHFModelArguments:
 @dataclass
 class OurModelArguments:
     pooling: str = field(default='cls')
+    freeze_encoder: bool = field(default=False)
+    freeze_decoder: bool = field(default=False)
 
 @dataclass
 class OurDataArguments:
@@ -107,6 +109,20 @@ def main():
     generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
+    # Model: freezing LM
+    if model_args.freeze_decoder:
+        for name, param in model.named_parameters():
+            if any([p in name for p in ["model.decoder"]]):
+                print(name, 'off')
+                param.requires_grad = False
+
+    if model_args.freeze_encoder:
+        for name, param in model.named_parameters():
+            if any([p in name for p in ["model.encoder"]]):
+                print(name, 'off')
+                param.requires_grad = False
+
+
     # Data: collator/preprocessor
     from datacollator import DataCollatorBase, DataCollatorForMaskQG
     if 'bartqg' in training_args.output_dir:
@@ -117,16 +133,6 @@ def main():
                 is_eval=False,
                 irrelevant_included=data_args.irrelevant_included,
                 relevant_included=data_args.relevant_included
-        )
-    if 'maskqg' in training_args.output_dir:
-        data_collator = DataCollatorForMaskQG(
-                tokenizer=tokenizer, 
-                padding=True,
-                return_tensors='pt',
-                is_train=True,
-                max_p_length=data_args.max_p_length,
-                m_negatives=data_args.m_negative_per_example,
-                m_positives=data_args.m_positive_per_example
         )
 
     # Data: dataset

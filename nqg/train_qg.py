@@ -6,7 +6,7 @@ from typing import Optional, Union, List
 from transformers import (
     AutoConfig,
     AutoTokenizer,
-    TrainingArguments,
+    Seq2SeqTrainingArguments,
     Trainer,
     HfArgumentParser,
     GenerationConfig
@@ -68,7 +68,7 @@ class OurDataArguments:
     m_positive_per_example: int = field(default=1)
 
 @dataclass
-class OurTrainingArguments(TrainingArguments):
+class OurTrainingArguments(Seq2SeqTrainingArguments):
     output_dir: str = field(default='./temp')
     seed: int = field(default=42)
     data_seed: int = field(default=None)
@@ -89,6 +89,8 @@ class OurTrainingArguments(TrainingArguments):
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
     set_embeddings: bool = field(default=True)
+    freeze_encoder: bool = field(default=False)
+    freeze_decoder: bool = field(default=False)
 
 def main():
 

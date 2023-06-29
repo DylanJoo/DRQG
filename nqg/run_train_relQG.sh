@@ -1,6 +1,6 @@
 BASE=bart-relqg
 MODEL=$BASE/test
-rm -rvf $MODEL/*
+rm -rvf $MODEL/
 
 export CUDA_VISIBLE_DEVICES=1
 PRT_MODEL=bart-d2q/relevant/checkpoint-16000
@@ -12,7 +12,7 @@ python3 train_qg.py \
   --model_name_or_path $PRT_MODEL \
   --tokenizer_name $PRT_CONFIG \
   --config_name $PRT_CONFIG \
-  --output_dir $BASE/$MODEL \
+  --output_dir $MODEL \
   --max_p_length 200 \
   --max_q_length 16 \
   --per_device_train_batch_size 4 \

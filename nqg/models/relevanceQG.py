@@ -233,7 +233,7 @@ class RelBartQG(BartQG):
             cont_loss = pairwise_cont_loss(
                     hidden_states=query_repr_ctrl, 
                     hidden_base=doc_repr, 
-                    self.batch_size, norm=True
+                    bs=self.batch_size, norm=True
             )
 
             if self.classification_head is not None:

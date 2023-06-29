@@ -10,7 +10,7 @@ from models.loss import (
         gen_mle_gumbel_loss
 )
 
-class TrainerBase(Trainer):
+class TrainerBase(Seq2SeqTrainer):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         training_steps = copy.deepcopy(self.state.global_step)
@@ -119,8 +119,10 @@ class TrainerForQG(TrainerBase):
         loss_reparam = outputs.get('reparam_loss', 0)
 
         # loss = loss_gen+loss_reparam+loss_rel+loss_cont
-        loss = loss_gen+loss_cont
-        # loss = loss_gen
+        if training_steps is None:
+            loss = loss_gen
+        else:
+            loss = loss_gen+loss_cont
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
