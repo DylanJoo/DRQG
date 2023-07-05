@@ -1,5 +1,5 @@
-BASE=bartqg-d2q
-MODEL=$BASE/freeze_encoder/
+BASE=bart-d2q
+MODEL=$BASE/relQG/
 
 export CUDA_VISIBLE_DEVICES=2
 PRT_MODEL=facebook/bart-base
@@ -12,7 +12,7 @@ python3 train_d2q.py \
   --config_name $PRT_CONFIG \
   --output_dir $MODEL \
   --max_p_length 256 \
-  --max_q_length 32 \
+  --max_q_length 16 \
   --learning_rate 1e-4 \
   --warmup_steps 4000 \
   --per_device_train_batch_size 64 \
@@ -22,7 +22,8 @@ python3 train_d2q.py \
   --irrelevant_included false \
   --relevant_included true \
   --do_train \
-  --freeze_encoder true
+  --pos_anchors 'true true true true true true true true true true true true true true true true true true true true' \
+  --neg_anchors 'false false false false false false false false false false false false false false false false false false false false'
 
 # BASE=bartqg-d2q
 # MODEL=$BASE/mean/

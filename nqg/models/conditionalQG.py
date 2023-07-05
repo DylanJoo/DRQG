@@ -127,7 +127,6 @@ class DocRelBartQG(BartQG):
         ## [EncoderDecoder prompt wrapper]
 
         ## setting 1 & 2: 
-
         # mean pooling
         encoder_hidden_states = encoder_outputs[0][:, self.controller.length:, :]
         attention_mask = attention_mask[:, self.controller.length:]

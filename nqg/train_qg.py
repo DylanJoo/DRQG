@@ -28,10 +28,9 @@ class OurHFModelArguments:
 @dataclass
 class OurModelArguments:
     # disable_dropout: bool = field(default=False)
-    freeze_LM: bool = field(default=True)
     add_classification_head: bool = field(default=False)
 
-    ## Controller
+    # Controller
     head_size: int = field(default=64)
     pooling: Optional[str] = field(default='mean')
     activation: Optional[str] = field(default='sigmoid')
@@ -54,6 +53,11 @@ class OurModelArguments:
     annealing_fn: str = field(default='cyclic')
     n_total_iter: Optional[int] = field(default=10000)
     n_cycle: Optional[int] = field(default=10)
+
+    # freeze layers
+    freeze_encoder: Optional[bool] = field(default=True)
+    freeze_decoder: Optional[bool] = field(default=True)
+    freeze_embeddings: Optional[bool] = field(default=True)
 
 @dataclass
 class OurDataArguments:
@@ -89,8 +93,6 @@ class OurTrainingArguments(Seq2SeqTrainingArguments):
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
     set_embeddings: bool = field(default=True)
-    freeze_encoder: bool = field(default=False)
-    freeze_decoder: bool = field(default=False)
 
 def main():
 
@@ -153,21 +155,27 @@ def main():
     model.generation_config = generation_config
 
     # Model: freezing LM
-    optimized_prefix = \
-            ['controller', 'reformulator', 'adapter', 'vae']
+    optimized_prefix = ['controller', 'reformulator', 'adapter', 'vae', 'classification']
     freezed_prefix = []
 
-    if model_args.freeze_LM:
-        for name, param in model.named_parameters():
-            if any([p in name for p in optimized_prefix]):
-                print('param {} will be optimized.'.format(name))
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
+    if model_args.freeze_embeddings:
+        freezed_prefix += ['shared.weight']
+    if model_args.freeze_encoder:
+        freezed_prefix += ['model.encoder']
+    if model_args.freeze_decoder:
+        freezed_prefix += ['model.decoder']
 
-            if any([p in name for p in freezed_prefix]):
-                print('param {} wont be optimized.'.format(name))
-                param.requires_grad = False
+    for name, param in model.named_parameters():
+        if any([p in name for p in optimized_prefix]):
+            # print('param {} will be optimized.'.format(name))
+            param.requires_grad = True
+        elif any([p in name for p in freezed_prefix]):
+            # print('param {} wont be optimized.'.format(name))
+            param.requires_grad = False
+        else:
+            print('param {} will be optimized.'.format(name))
+            param.requires_grad = True
+
 
     # Data: collator
     from datacollator import DataCollatorForVQG

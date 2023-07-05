@@ -58,14 +58,6 @@ class RelBartQG(BartQG):
         self.batch_size = kwargs.pop('batch_size', None)
         self.aggregate = kwargs.pop('aggregate', False)
 
-        # [decoder injection]
-        kld_kwargs = {'annealing_fn': cvqg_config.annealing_fn}
-        if kld_kwargs['annealing_fn'] == 'cyclic':
-            kld_kwargs.update({'n_total_iter': cvqg_config.n_total_iter, 
-                               'n_cycle': cvqg_config.n_cycle}) 
-        else:
-            kld_kwargs.update({'k': cvqg_config.k, 'x0': cvqg_config.x0})
-
         # [setiting 1: VAE]
         # self.vae = VAE(
         #         hidden_size=config.d_model,
@@ -151,11 +143,13 @@ class RelBartQG(BartQG):
         # setting 1
         reparam_loss = 0
         encoder_hidden_state = self.controller(
-                clf_scores, encoder_outputs[0], use_residual=True,
+                clf_scores, encoder_outputs[0], 
+                mask=attention_mask, use_residual=False,
         )
-        if self.aggregate:
-            encoder_hidden_state = encoder_hidden_state.mean(1)[:, None, :]
-            attention_mask = None
+        doc_repr = encoder_outputs[0] * attention_mask.unsqueeze(-1)
+        attention_mask = self.controller.adapter.expand_mask(attention_mask)
+        # print(encoder_hidden_state.shape)
+        # print(attention_mask.shape)
 
         # setting 2: adapter with sentence embeddings
         # setting 2.1 prior is from gaussian
@@ -220,18 +214,17 @@ class RelBartQG(BartQG):
             )
 
             if attention_mask is not None:
-                doc_repr = encoder_outputs[0] * attention_mask.unsqueeze(-1)
                 query_repr_ctrl = decoder_outputs[0] * decoder_attention_mask.unsqueeze(-1)
                 doc_repr_ctrl = encoder_hidden_state * attention_mask.unsqueeze(-1)
 
             # in-document contrastive loss
-            # cont_loss = indoc_cont_loss(
+            # cont_loss += indoc_cont_loss(
             #         doc_repr_ctrl, 
             #         bs=self.batch_size, norm=True
             # )
 
-            cont_loss = pairwise_cont_loss(
-                    hidden_states=query_repr_ctrl, 
+            cont_loss += pairwise_cont_loss(
+                    hidden_states=doc_repr_ctrl, 
                     hidden_base=doc_repr, 
                     bs=self.batch_size, norm=True
             )
@@ -343,6 +336,7 @@ class RelBartQG(BartQG):
             "cross_attn_head_mask": cross_attn_head_mask,
             "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
         }
+
 def shift_tokens_right_modified(
     input_ids: torch.Tensor, 
     pad_token_id: int, 

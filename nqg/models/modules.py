@@ -23,7 +23,6 @@ class AttentivePrompt(nn.Module):
             activation: str = 'sigmoid',
         ):
         super(AttentivePrompt, self).__init__()
-        self.orig_embeds = wte
         self.hidden_size = hidden_size
         self.head_size = head_size
         self.num_heads = hidden_size // head_size
@@ -44,38 +43,36 @@ class AttentivePrompt(nn.Module):
         else:
             self.activation = nn.Softmax(dim=-1)
 
-        if init_idx is not None:
-            self.init_idx = (init_idx*length)[:length]
-            self.prompt_embeds = nn.Parameter(
-                    torch.randn((length, hidden_size), device=wte.weight.device)
-            )
-
-    def set_embeddings(self):
-        self.prompt_embeds = nn.Parameter(
-                self.orig_embeds.weight[self.init_idx].clone().detach()
-        )
-        print("Set embeddings to", self.init_idx)
-
     def _reshape(self, tensor, seq_len, bsz):
         return tensor.view(bsz, seq_len, self.num_heads, self.head_size).transpose(1, 2).contiguous()
 
-    def forward(self, hidden_states, anchor_states=None):
+    def forward(self, query_states, anchor_states, option=1, mask=None):
         """
         [Opt1]
-        hidden_states: encoder_outputs as query_states
-        anchor_states: relevance prompts and hidden_states as key_value_states
+        query_states: encoder_outputs 
+        anchor_states: relevance prompts and encoder_outputs
+        [Opt2]
+        query_states: relevance prompts (then add encoder_outputs)
+        anchor_states: encoder_outputs 
+        [Opt3]
+        query_states: relevance prompts
+        anchor_states: encoder_outputs 
         """
-        bsz = hidden_states.size(0)
-        if anchor_states is None: # B N H
-            anchor_states = self.prompt_embeds
-            anchor_states = anchor_states.repeat(bsz, 1, 1)
+        bsz = query_states.size(0)
+        if option==1:
+            self.length = 0
+            mask = self.expand_mask(mask, anchor_states.size(1)) # L H
+            anchor_states = torch.cat([anchor_states, query_states], 1)
+        elif option==2:
+            self.length = query_states.size(1)
+            query_states = torch.cat([query_states, anchor_states], 1)
+        elif option==3:
+            self.length = -query_states.size(1)
 
-        base = torch.cat([anchor_states, hidden_states], 1)
         # base = anchor_states
-
-        Q = self._reshape(self.q_proj(hidden_states), -1, bsz)
-        K = self._reshape(self.k_proj(base), -1, bsz)
-        V = self._reshape(self.v_proj(base), -1, bsz)
+        Q = self._reshape(self.q_proj(query_states), -1, bsz)
+        K = self._reshape(self.k_proj(anchor_states), -1, bsz)
+        V = self._reshape(self.v_proj(anchor_states), -1, bsz)
 
         # aggregate heads
         proj_shape = (bsz * self.num_heads, -1, self.head_size)
@@ -83,11 +80,23 @@ class AttentivePrompt(nn.Module):
         K = K.reshape(*proj_shape)
         V = V.reshape(*proj_shape)
 
-        # In [Opt1] the attention matrix is (bsz*n_heads L (L+N))
-        # In [Opt2] the attention matrix is (bsz*n_heads (L+N) L)
+        # In [opt1] the attention matrix is (bsz*n_heads L (L+N))
+        # In [opt2] the attention matrix is (bsz*n_heads (L+N) L)
         attn_logits = torch.bmm(Q, K.transpose(1, 2))   
+
+        # scaling
+        scale = math.sqrt(self.head_size)  
+        scale = 1
+        attn_logits = attn_logits/scale
+
+        # masking
+        if mask is not None:
+            tgt_len, src_len = attn_logits.size(-2), attn_logits.size(-1)
+            attn_logits = attn_logits.view(bsz, self.num_heads, tgt_len, src_len) + mask[:, None, None, :]
+            attn_logits = attn_logits.view(bsz*self.num_heads, tgt_len, src_len)
+
+        # probs
         attn_probs = F.softmax(attn_logits, dim=-1)
-        # print(attn_probs[0, :5, :10])
         attn_output = torch.bmm(attn_probs, V)
 
         # reshape and revert hidden size
@@ -97,9 +106,13 @@ class AttentivePrompt(nn.Module):
 
         return attn_output
 
-    def expand_mask(self, mask):
-        additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
-        mask = torch.cat([additional_mask, mask], 1)
+    def expand_mask(self, mask, length=None):
+        length = self.length if length is None else length
+        if length > 0:
+            additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
+            mask = torch.cat([additional_mask, mask], 1)
+        elif length < 0:
+            mask = torch.ones((mask.size(0), -self.length), device=mask.device)
         return mask
 
 """
@@ -179,7 +192,7 @@ class InstanceWisePrompt(nn.Module):
 
         # logits: B N L or B L N --> B N or B L
         # print(logits)
-        scale = 1 #math.sqrt(self.head_size)
+        scale = 1 
         if self.pooling == 'max':
             scores = torch.max(logits / scale, dim=-1).values
         elif self.pooling == 'mean':
@@ -195,8 +208,11 @@ class InstanceWisePrompt(nn.Module):
         return torch.mul(V, scores.unsqueeze(-1))
 
     def expand_mask(self, mask):
-        additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
-        mask = torch.cat([additional_mask, mask], 1)
+        if self.length > 0:
+            additional_mask = torch.ones((mask.size(0), self.length), device=mask.device)
+            mask = torch.cat([additional_mask, mask], 1)
+        else:
+            mask = torch.ones((mask.size(0), -self.length), device=mask.device)
         return mask
 
 

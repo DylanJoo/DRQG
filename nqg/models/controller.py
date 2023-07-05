@@ -58,17 +58,13 @@ class DocRelPrompt(nn.Module):
         self.n_samples = len(relevance) // hidden_states_src.size(0)
 
         # Document-wise prompt
-        doc_prompts = self.reformulator(
-                anchor=hidden_states_src, base=self.prompts
-        )
+        doc_prompts = self.reformulator(anchor=hidden_states_src, base=self.prompts)
 
         # Relevance wise prompt
         relevance = torch.cat([(1-relevance).view(-1, 1), relevance.view(-1, 1)], 1)
         relevance = relevance.to(device)
         hidden_states_rel = torch.matmul(relevance, self.label_prompts).unsqueeze(1) 
-        rel_prompts = self.reformulator(
-                anchor=hidden_states_rel, base=self.prompts
-        )
+        rel_prompts = self.reformulator(anchor=hidden_states_rel, base=self.prompts)
 
         # [TODO] Maybe try reformulate the prompts
         self.length = 2*len(self.init_idx) # output should fit the mask
@@ -117,20 +113,10 @@ class RelAdapter(nn.Module):
         self.hidden_size = hidden_size
         self.device = wte.weight.device
 
-        self.pos_prompts = nn.Parameter(torch.randn(
-            (len(pos_init_idx), hidden_size), device=self.device
-        ))
-        self.neg_prompts = nn.Parameter(torch.randn(
-            (len(neg_init_idx), hidden_size), device=self.device
-        ))
+        # [TODO] Revise other prompt settings
+        self.pos_prompts = nn.Embedding(len(pos_init_idx), hidden_size)
+        self.neg_prompts = nn.Embedding(len(neg_init_idx), hidden_size)
 
-        # self.adapter = InstanceWisePrompt(
-        #         wte=None,
-        #         hidden_size=hidden_size,
-        #         head_size=head_size,
-        #         pooling=pooling,
-        #         activation=activation
-        # )
         self.adapter = AttentivePrompt(
                 wte=None,
                 hidden_size=hidden_size,
@@ -139,19 +125,22 @@ class RelAdapter(nn.Module):
                 activation=activation
         )
 
-    def forward(self, relevance, hidden_states_src=None, use_residual=False, cross_attn=False):
+    def forward(self, relevance, hidden_states_src=None, mask=None, use_residual=False):
+        device = hidden_states_src.device
+        if relevance is None:
+            relevance = torch.ones(hidden_states_src.size(0), device=device)
+
         batch_doc_size = hidden_states_src.size(0)
         # [relevance conditioned]
-        relevance = relevance.to(hidden_states_src.device)
-        pos_prompts = self.pos_prompts.unsqueeze(0).repeat(batch_doc_size, 1, 1)
-        neg_prompts = self.neg_prompts.unsqueeze(0).repeat(batch_doc_size, 1, 1)
+        relevance = relevance.to(device)
+        pos_prompts = self.pos_prompts.weight.unsqueeze(0).repeat(batch_doc_size, 1, 1)
+        neg_prompts = self.neg_prompts.weight.unsqueeze(0).repeat(batch_doc_size, 1, 1)
         rel_prompts = (relevance.view(-1, 1, 1) * pos_prompts + \
                        (1-relevance).view(-1, 1, 1) * neg_prompts) 
 
         # [condition settings]
-        residual = self.adapter(hidden_states_src, rel_prompts)
-                # anchor=rel_prompts, 
-                # base=hidden_states_src
+        # residual = self.adapter(hidden_states_src, rel_prompts)
+        residual = self.adapter(rel_prompts, hidden_states_src, option=3, mask=mask)
 
         # B L 
         if use_residual:
@@ -160,10 +149,10 @@ class RelAdapter(nn.Module):
             return residual
 
     def set_embeddings(self):
-        self.pos_prompts = nn.Parameter(
+        self.pos_prompts = self.pos_prompts.from_pretrained(
                 self.orig_embeds.weight[self.pos_init_idx].clone().detach()
         )
-        self.neg_prompts = nn.Parameter(
+        self.neg_prompts = self.neg_prompts.from_pretrained(
                 self.orig_embeds.weight[self.neg_init_idx].clone().detach()
         )
         print(f"{self.__class__.__name__} embeddings set: ", \

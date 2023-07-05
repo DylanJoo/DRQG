@@ -64,9 +64,14 @@ class TrainerBase(Seq2SeqTrainer):
                         num_beams=1
                 )
             temp = out.sequences
-            labels_reformulate = [l for l in labels[0] if l != -100]
-            print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
             m = len(temp) if m == 1 else m
+
+            print('===')
+            for i in range(4):
+                labels_reformulate = [l for l in labels[i] if l != -100]
+                print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+
+            print('===')
             for i in range(m):
                 print(f"D2Q ({i:<3}):", 
                         model.tokenizer.decode(temp[i], skip_special_tokens=True)
@@ -118,11 +123,9 @@ class TrainerForQG(TrainerBase):
         ## (4) KL loss (reparam)
         loss_reparam = outputs.get('reparam_loss', 0)
 
-        # loss = loss_gen+loss_reparam+loss_rel+loss_cont
-        if training_steps is None:
-            loss = loss_gen
-        else:
-            loss = loss_gen+loss_cont
+        loss = loss_gen
+        if training_steps is not None:
+            loss += loss_cont
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:

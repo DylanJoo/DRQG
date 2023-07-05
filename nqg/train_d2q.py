@@ -7,13 +7,12 @@ from transformers import (
     AutoConfig,
     AutoTokenizer,
     Seq2SeqTrainingArguments,
-    Trainer,
     HfArgumentParser,
     GenerationConfig
 )
 
 import os
-os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "false"
 
 @dataclass
 class OurHFModelArguments:
@@ -27,9 +26,31 @@ class OurHFModelArguments:
 
 @dataclass
 class OurModelArguments:
+    # disable_dropout: bool = field(default=False)
+    add_classification_head: bool = field(default=False)
+
+    # Controller
+    head_size: int = field(default=64)
+    pooling: Optional[str] = field(default='mean')
+    activation: Optional[str] = field(default='sigmoid')
+
+    # conditional QG
+    prompts: Optional[str] = field(default=None)
+    label_prompts: Optional[str] = field(default=None)
+    prompts_idx = None
+    label_prompts_idx = None
     pooling: str = field(default='cls')
+
+    # Relevance QG
+    pos_anchors : Optional[str] = field(default=None)
+    neg_anchors : Optional[str] = field(default=None)
+    pos_anchors_idx = None
+    neg_anchors_idx = None
+
+    # freeze
     freeze_encoder: bool = field(default=False)
     freeze_decoder: bool = field(default=False)
+
 
 @dataclass
 class OurDataArguments:
@@ -98,6 +119,12 @@ def main():
                 config=config, 
                 pooling=model_args.pooling
         )
+    elif 'relQG' in training_args.output_dir:
+        model = BartQG.from_pretrained(
+                pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
+                config=config, 
+                cvqg_config=model_args,
+        )
     else:
         model = BartQG.from_pretrained(
                 hfmodel_args.model_name_or_path, 
@@ -124,16 +151,15 @@ def main():
 
 
     # Data: collator/preprocessor
-    from datacollator import DataCollatorBase, DataCollatorForMaskQG
-    if 'bartqg' in training_args.output_dir:
-        data_collator = DataCollatorBase(
-                tokenizer=tokenizer,
-                max_p_length=data_args.max_p_length,
-                max_q_length=data_args.max_q_length,
-                is_eval=False,
-                irrelevant_included=data_args.irrelevant_included,
-                relevant_included=data_args.relevant_included
-        )
+    from datacollator import DataCollatorBase
+    data_collator = DataCollatorBase(
+            tokenizer=tokenizer,
+            max_p_length=data_args.max_p_length,
+            max_q_length=data_args.max_q_length,
+            is_eval=False,
+            irrelevant_included=data_args.irrelevant_included,
+            relevant_included=data_args.relevant_included
+    )
 
     # Data: dataset
     from data import msmarco
