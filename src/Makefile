@@ -16,7 +16,7 @@ train_flan_baseline:
 	  --max_steps 10000 \
 	  --save_steps 2000 \
 	  --eval_steps 500 \
-	  --train_file $TRAIN_FILE \
+	  --train_file ${TRAIN_FILE} \
 	  --latent_size 128 \
 	  --do_train \
 	  --do_eval 
