@@ -3,13 +3,17 @@ import copy
 import torch
 import argparse
 import collections
-import numpy as np
 from tqdm import tqdm
 from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
 from transformers import T5ForConditionalGeneration
+from datacollator import DataCollatorForT5VQG
 from utils import interpolate
+
+from models import *
+# T5VQGV0, T5VQGV1, T5PQG, T5VQGSPT, T5VQGDEV
+from models import VAE_CONFIG
 
 class QuestionGenerator:
 
@@ -25,11 +29,16 @@ class QuestionGenerator:
         self.generation_type = generation_type
         self.flags = generation_config.pop('flags', [])
         self.generation_config = generation_config
+
         self.total_n_samples = model.n_samples if model.n_samples else 5
+        #`num_beams`, `do_sample`, `top_k`
 
     def __call__(self, **batch):
         batch_size = batch['input_ids'].size(0)
 
+        ## TODO sepeare each type of generation: 
+        ### (1) latent z reconstriction
+        ### (2) soft prompting
         if isinstance(self.model, T5VQGV1):
             enc_output = self.model.encoder(**batch)
             hidden_states = enc_output[0]
@@ -45,26 +54,70 @@ class QuestionGenerator:
                     encoder_outputs=enc_output,
                     **self.generation_config
             )
-        else:
+        elif isinstance(self.model, T5VQGSPT):
             outputs = self.model.generate(
                     batch['input_ids'],
                     attention_mask=batch['attention_mask'],
-                    return_dict_in_generate=True,
-                    output_scores=True,
+                    **self.generation_config
+            )
+        elif isinstance(self.model, T5VQGSPT):
+            outputs = self.model.generate(
+                    batch['input_ids'],
+                    attention_mask=batch['attention_mask'],
                     **self.generation_config
             )
 
         ## Convert token to texts
-        texts = []
-        for output in outputs.sequences:
-            text=self.tokenizer.decode(output, skip_special_tokens=True)
-            texts.append(text)
+        texts = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+        print("\n".join(texts))
 
+        ## Collect outputs
         output_dict = collections.defaultdict(list)
         for i in range(len(texts)):
             output_dict[i % batch_size].append(texts[i])
 
         return output_dict
+
+    def _gaussian_encoding(self, embeds, hidden_states):
+        """ In the following three condition, 
+        the first two are for VQG_v0; the last is for VQG_v1
+        In VQG_v0 and v1, n_sample is the amounts of left or right.
+        """
+        n_side = (self.total_n_samples - 1) // 2
+        std_list = list(range(-(self.n_side), self.n_side+1, 1))
+        self.total_n_samples = len(self.flags) * len(std_list)
+
+        zs = []
+        ## generate the latent z
+        for flag in self.flags:
+            if flag == 'positive':
+                mean = self.model.hidden2pmean(embeds)
+                std = self.model.hidden2plogv(embeds)
+                zs += [mean+(std*n) for n in std_list]
+            elif flag == 'negative':
+                mean = self.model.hidden2nmean(embeds)
+                std = self.model.hidden2nlogv(embeds)
+                zs += [mean+(std*n) for n in std_list]
+            elif flag == 'polarity':
+                mean = self.model.hidden2mean(embeds)
+                std = self.model.hidden2logv(embeds)
+                zs += [mean+(std*n) for n in std_list]
+            else:
+                raise ValueError(f"The value flag, {flag} is invalid.")
+
+        ## transform into hidden
+        resid_z = self.model.latent2hidden(torch.cat(zs, 0))
+
+        ## residual adding
+        zeros = torch.zeros(resid_z.size(0), 
+                            resid_z.size(1)-1, 
+                            resid_z.size(2)).to(embeds.device)
+        resid = torch.cat((resid_z, zeros), 1)
+        h_prime = hidden_states.repeat((self.total_n_samples, 1, 1)) + resid
+        return h_prime
+
+    def _interploate_encoding(self):
+        pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -80,80 +133,62 @@ if __name__ == "__main__":
     # variational inference (only latent_size is required)
     parser.add_argument("--latent_size", default=128, type=int)
 
-    ## the VAE parameters (useless)
+    ## the unused parameters
     parser.add_argument("--k", default=0.0025, type=float) 
     parser.add_argument("--x0", default=2500, type=int)
     parser.add_argument("--annealing_fn", default='logistic')
 
-    ## the model hyper paramters
-    parser.add_argument("--n_soft_prompts", default=1, type=int)
-    parser.add_argument("--n_side_tail", default=0, type=int)
-    parser.add_argument("--pooling", default='static', type=str)
-    parser.add_argument("--adaptive_pooling", default='mean', type=str)
-    parser.add_argument("--add_attentive_pooler", default=False, type=bool)
-    parser.add_argument("--has_compressed_layer", default=False, type=bool)
+    # generation type
+    parser.add_argument("--generation_type", default='gaussian', type=str)
 
     # generation config
-    parser.add_argument("--generation_type", default='gaussian', type=str)
+    parser.add_argument("--n_soft_prompts", default=20, type=int)
+    parser.add_argument("--n_samples", default=0, type=int)
     parser.add_argument("--num_beams", default=1, type=int)
-    parser.add_argument("--max_q_length", default=100, type=int)
+    parser.add_argument("--max_q_length", default=20, type=int)
     parser.add_argument("--max_p_length", default=256, type=int)
     parser.add_argument("--do_sample", default=False, action='store_true')
     parser.add_argument("--top_k", default=10, type=int)
 
     args = parser.parse_args()
+    print(args)
 
-    # Config and tokenizer
+    vae_config = VAE_CONFIG(
+            latent_size=args.latent_size, 
+            n_soft_prompts=args.n_soft_prompts
+    )
     config = AutoConfig.from_pretrained(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
-    # Model
-    from models import BartQG, T5QG, BartVQG, VQG_CONFIG, T5VQGV0, T5VQGV1
-    MODELS = {'bartqg': BartQG, 't5qg': T5QG, 'bartvqg': BartVQG}
-    vqg_config = VQG_CONFIG(
-            latent_size=args.latent_size, 
-            n_soft_prompts=args.n_soft_prompts,
-            n_side=args.n_side_tail,
-            pooling=args.pooling,
-            adaptive_pooling=args.adaptive_pooling,
-            add_attentive_pooler=args.add_attentive_pooler,
-            has_compressed_layer=args.has_compressed_layer
-    )
+    MODELS = {
+            'vqgv0': T5VQGV0, 
+            'vqgv1': T5VQGV1, 
+            'pqg': T5PQG, 
+            'vqgspt': T5VQGSPT,
+            'vqgdev': T5VQGDEV
+    }
 
     for key in MODELS:
         if key in args.model_path.lower():
-            model_key = key
+            model = MODELS[key].from_pretrained(
+                    pretrained_model_name_or_path=args.model_path,
+                    config=config,
+                    vae_config=vae_config,
+                    tokenizer=tokenizer, 
+            ).to(args.device).eval()
 
-    model = MODELS[model_key].from_pretrained(
-            pretrained_model_name_or_path=args.model_path,
-            config=config,
-            vqg_config=vqg_config
-    ).to(args.device).eval()
-    model.set_tokenizer(tokenizer)
-
-    ## setting the gaussian sampling
-    # std_list = np.arange(-0.9, 1, 0.2)
-    # model.set_n_eval_samples(n=len(std_list))
-    # model.enc_prompts.std_list = model.name_samples
-    # model.name_samples = std_list
-    # model.enc_prompts.set_gaussian_range(std_list)
-
-    # Data: dataset
+    # load dataset
     dataset = load_dataset("json", data_files=args.input_jsonl)['train']
 
-    # Data: datacollator
-    from datacollator import DataCollatorForVQG
-    data_collator = DataCollatorForVQG(
+    from datacollator import DataCollatorForT5Dev
+    data_collator = DataCollatorForT5Dev(
             tokenizer=tokenizer, 
             padding=True,
             return_tensors='pt',
-            max_p_length=args.max_p_length,
-            max_q_length=args.max_q_length,
-            use_clf_score=False,
+            max_length=args.max_p_length,
+            is_train=False,
             is_eval=True # to check the ground truth
     )
-
-    # Data: dataloader
     from torch.utils.data import DataLoader
     dataloader = DataLoader(
             dataset,
@@ -163,10 +198,11 @@ if __name__ == "__main__":
             collate_fn=data_collator
     )
 
-    # Generation: writer
+    # new a writer
     f = open(args.output_jsonl, 'w')
 
-    # Generation: config
+    # new a generator 
+    ## generation config
     generator_config = {
             'num_beams': args.num_beams,
             'max_length': args.max_q_length,
@@ -175,7 +211,6 @@ if __name__ == "__main__":
     }
     generator_config['flags'] = args.flags
 
-    # Generation: generator
     generator = QuestionGenerator(
             model=model, 
             tokenizer=tokenizer, 
@@ -183,18 +218,21 @@ if __name__ == "__main__":
             generation_config=generator_config
     )
 
+    # prediction
     for batch in tqdm(dataloader):
-        output_dict = {i: {
-            "passage": p, "positive_truth": pq, "negative_truth": nq
-            } for i, (p, pq, nq) in enumerate(
-                zip(batch.pop('passage'), 
-                    batch.pop('positive'), 
-                    batch.pop('negative'))
-        )}
+        output_dict = {i: 
+                {"passage": p, 
+                 "positive_truth": pq, 
+                 "negative_truth": nq} \
+                for i, (p, pq, nq) in enumerate(
+                    zip(batch.pop('passage'), batch.pop('positive'), batch.pop('negative'))
+                )
+        }
 
         for k in batch:
             batch[k] = batch[k].to(args.device)
 
+        # forward and generate
         with torch.no_grad():
             predictions = generator(**batch)
             N = generator.total_n_samples
@@ -211,6 +249,6 @@ if __name__ == "__main__":
     # transform to good read version
     from utils import transform_pred_to_good_read
     transform_pred_to_good_read(
-            args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt'),
+            args.output_jsonl, args.output_jsonl.replace('jsonl', 'txt')
     )
 

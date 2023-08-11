@@ -11,13 +11,15 @@ from transformers import (
     HfArgumentParser,
     GenerationConfig
 )
-from models import T5VAEForConditionalGeneration
-from trainers import VAETrainer
-from datacollator import DataCollatorForT5VAE
+from trainers import TrainerForT5
+from datacollator import DataCollatorForT5VQG
 import msmarco 
 
 import os
-os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "false"
+
+from models import T5VQGV0, T5VQGV1, T5PQG
+MODELS = {'vqgv0': T5VQGV0, 'vqgv1': T5VQGV1, 'pqg': T5PQG}
 
 @dataclass
 class OurHFModelArguments:
@@ -46,14 +48,12 @@ class OurDataArguments:
     preprocessing_num_workers: Optional[int] = field(default=None)
     # Customized arguments
     train_file: Optional[str] = field(default=None)
-    max_length: int = field(default=256)
-    triplet: Optional[str] = field(default=None)
+    eval_file: Optional[str] = field(default=None)
+    max_length: int = field(default=5)
     collection: Optional[str] = field(default=None)
     queries: Optional[str] = field(default=None)
     qrels: Optional[str] = field(default=None)
-    triplet: Optional[str] = field(default=None)
-    joinbynegative: bool = field(default=False)
-    p_aligned_triplet: Optional[str] = field(default='triples.train.small.v1.jsonl')
+    p_centric_triplet: Optional[str] = field(default='triples.train.small.v0.sample.jsonl')
 
 @dataclass
 class OurTrainingArguments(TrainingArguments):
@@ -67,12 +67,13 @@ class OurTrainingArguments(TrainingArguments):
     save_steps: int = field(default=5000)
     eval_steps: int = field(default=2500)
     evaluation_strategy: Optional[str] = field(default='no')
-    per_device_train_batch_size: int = field(default=8)
-    per_device_eval_batch_size: int = field(default=8)
+    per_device_train_batch_size: int = field(default=2)
+    per_device_eval_batch_size: int = field(default=2)
     logging_dir: Optional[str] = field(default='./logs')
     resume_from_checkpoint: Optional[str] = field(default=None)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
+    debug_mode: int = field(default=None)
 
 def main():
 
@@ -89,37 +90,49 @@ def main():
     # additional config for models
     config = AutoConfig.from_pretrained(hfmodel_args.config_name)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
-    model = T5VAEForConditionalGeneration.from_pretrained(
-            pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
-            config=config, 
-            vae_config=model_args,
-            tokenizer=tokenizer
-    )
+    for key in MODELS:
+        if key in training_args.output_dir:
+            model = MODELS[key].from_pretrained(
+                    pretrained_model_name_or_path=hfmodel_args.model_name_or_path,
+                    config=config, 
+                    vae_config=model_args,
+                    tokenizer=tokenizer,
+                    debug=training_args.debug_mode
+            )
     
     ## add generation config
     generation_config = GenerationConfig.from_pretrained(hfmodel_args.config_name)
     generation_config.update(
         _from_model_config=False,
         num_beams=5,
-        max_length=32
+        max_length=16
     )
     model.generation_config = generation_config
 
     ## data collator
-    data_collator = DataCollatorForT5VAE(
+    data_collator = DataCollatorForT5VQG(
             tokenizer=tokenizer, 
             padding=True,
-            return_tensors='pt'
+            max_length=data_args.max_length,
+            return_tensors='pt',
+            is_train=True
     )
 
     # Trainer
-    dataset = msmarco.passage_aligned_triplet_dataset(data_args)
+    dataset = msmarco.passage_centric_triplet_dataset(data_args)
+    N = len(dataset['train'])
+    if training_args.do_eval and data_args.eval_file is None:
+        # split 0.1% for evaluation
+        dataset = dataset['train'].train_test_split(test_size=0.001)
+    else:
+        dataset['test'] = load_dataset('json', data_files=data_args.eval_file)['train']
 
-    trainer = VAETrainer(
+
+    trainer = TrainerForT5(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
-            eval_dataset=None,
+            eval_dataset=dataset['test'],
             data_collator=data_collator
     )
     
