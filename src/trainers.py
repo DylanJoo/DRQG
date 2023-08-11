@@ -19,9 +19,9 @@ class TrainerBase(Seq2SeqTrainer):
         if training_steps % 50 == 0:
             print(f"\nNLL: {outputs}")
             inputs_for_eval = {
-                    "input_ids": inputs['input_ids'],
-                    "attention_mask": inputs['attention_mask'],
-                    "labels": inputs['labels'],
+                    "input_ids": inputs['input_ids'][0],
+                    "attention_mask": inputs['attention_mask'][0],
+                    "labels": inputs['labels'][0],
                     "m": 1
             }
             self._verbose_prediction(model, **inputs_for_eval)
@@ -99,13 +99,12 @@ class TrainerForQG(TrainerBase):
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
-            selected = (clf_labels==1)
             print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg}")
 
             inputs_for_eval = {
-                    "input_ids": inputs['input_ids'][selected],
-                    "attention_mask": inputs['attention_mask'][selected],
-                    "labels": inputs['labels'][selected],
+                    "input_ids": inputs['input_ids'][0],
+                    "attention_mask": inputs['attention_mask'][0],
+                    "labels": inputs['labels'][0],
                     "m": 11
             }
             self._verbose_prediction(model, **inputs_for_eval)

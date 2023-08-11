@@ -61,7 +61,8 @@ def main():
             max_p_length=data_args.max_p_length,
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
-            m_positives=data_args.m_positive_per_example
+            m_positives=data_args.m_positive_per_example,
+            prefix="Generate a question with relevance score {0} for the passage: {1}"
     )
 
     # Data
