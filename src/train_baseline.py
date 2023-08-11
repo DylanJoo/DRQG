@@ -13,14 +13,13 @@ from arguments_new import *
 import os
 os.environ["WANDB_DISABLED"] = "false"
 
-def prepare_prompt_idx(opt, tokenizer)
-    get_tokenized_idx = lambda x: tokenizer.encode(x, add_special_tokens=False)
+def prepare_prompt_idx(opt, tokenizer):
+    get_tokenized_idx = (lambda x: tokenizer.encode(x, add_special_tokens=False))
 
-    # [EarlyCtrlQG]
-    if opt.instruct_prompt is not None:
+    if opt.instruct_prompt:
         opt.instruct_prompt_idx = get_tokenized_idx(opt.instruct_prompt)
         print('Used instruction prompt:', opt.instruct_prompt_idx)
-    if opt.relevance_prompt is not None:
+    if opt.relevance_prompt:
         opt.relevance_prompt_idx = get_tokenized_idx(opt.relevance_prompt)
         print('Used relevance prompt:', opt.relevance_prompt_idx)
 
@@ -49,7 +48,7 @@ def main():
     generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
-    # Data:
+    # Data
     # Datacollator
     from data import DataCollatorForCtrlQG
     data_collator = DataCollatorForCtrlQG(
@@ -68,7 +67,7 @@ def main():
     # Dataset
     from data import nils
     dataset = nils.passage_centric_dataset(data_args.train_file)
-    n_examples = len(dataset['train']
+    n_examples = len(dataset['train'])
 
     if training_args.do_eval:
         if data_args.eval_file is None:

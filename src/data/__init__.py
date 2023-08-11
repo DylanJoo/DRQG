@@ -1,1 +1,1 @@
-from datacollator import DataCollatorForCtrlQG
+from .datacollator import DataCollatorForCtrlQG

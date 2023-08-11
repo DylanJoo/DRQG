@@ -76,7 +76,6 @@ class DataCollatorForCtrlQG(DataCollatorBase):
         scores = []
         batch_id = []
 
-        print(features)
         for i, batch in enumerate(features):
             p = batch['passage']
 
@@ -84,6 +83,7 @@ class DataCollatorForCtrlQG(DataCollatorBase):
             q1_batch = batch['positive']
             score1_batch = batch['positive_score']
             for j in range(self.m_positives):
+                labels += [1]
                 try:
                     texts_q += [q1_batch[j]]
                     scores += [score1_batch[j]]
@@ -129,9 +129,12 @@ class DataCollatorForCtrlQG(DataCollatorBase):
         target_mask = targets['attention_mask'].bool()
         target_ids = target_ids.masked_fill(~target_mask, -100)
 
+        # tensor inputs
         inputs['labels'] = target_ids
         inputs['decoder_attention_mask'] = target_mask
         inputs['rel_labels'] = torch.Tensor(labels)
         inputs['rel_scores'] = torch.Tensor(scores)
+        inputs['passage'] = p
+
         return inputs
 
