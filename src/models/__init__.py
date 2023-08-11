@@ -9,3 +9,5 @@ from .config import VQG_CONFIG, VQG_OLD_CONFIG
 from .conditionalQG import DocRelBartQG
 from .relevanceQG import RelBartQG
 from .memoryQG import MemBartQG
+
+from ._base import FlanT5

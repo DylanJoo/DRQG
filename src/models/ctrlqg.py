@@ -1,53 +1,35 @@
+from typing import List, Optional, Tuple, Union, Dict, Any
+
 import torch
-from typing import Optional, Tuple, Union
-from transformers import T5ForConditionalGeneration, T5Config
-from transformers.models.t5.modeling_t5 import T5Stack
-from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
+import inspect
 from torch import nn
-from torch.nn import CrossEntropyLoss, CosineEmbeddingLoss
-from utils import kl_weight, kl_loss
+from torch.nn import CrossEntropyLoss
+
+from transformers import AutoModelForSeq2SeqLM
+from transformers.modeling_outputs import Seq2SeqLMOutput
+from controller import D
+from _base import FlanT5
+
 import copy
 
-class T5ForNTR(T5ForConditionalGeneration):
-    _keys_to_ignore_on_load_missing = [
-        r"encoder.embed_tokens.weight",
-        r"decoder.embed_tokens.weight",
-        r"lm_head.weight",
-    ]
-    _keys_to_ignore_on_load_unexpected = [
-        r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
-    ]
+class EarlyCtrlQG(FlanT5):
+    def __init__(self, config):
+        super().__init_(config)
 
-    def __init__(self, config: T5Config, tokenizer=None):
-        super().__init__(config)
-        self.model_dim = config.d_model
-        ##
-        self.tokenizer = tokenizer
-        ###
+        # [Pre-prompt] 
+        # [TODO] write static functions for them?
+        self.controller = AdaPrompt(
+                wte=self.shared, 
+                hidden_size=self.config.d_model,
+                init_idx=cvqg_config.prompts_idx,
+                lbl_init_idx=cvqg_config.label_prompts_idx,
+                activation=cvqg_config.activation
+        )
+        self.batch_size = kwargs.pop('batch_size', None)
+        self.aggregate = kwargs.pop('aggregate', False)
 
-        self.shared = nn.Embedding(config.vocab_size, config.d_model)
-
-        encoder_config = copy.deepcopy(config)
-        encoder_config.is_decoder = False
-        encoder_config.use_cache = False
-        encoder_config.is_encoder_decoder = False
-        self.encoder = T5Stack(encoder_config, self.shared)
-
-        decoder_config = copy.deepcopy(config)
-        decoder_config.is_decoder = True
-        decoder_config.is_encoder_decoder = False
-        decoder_config.num_layers = config.num_decoder_layers
-        self.decoder = T5Stack(decoder_config, self.shared)
-
-        self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
-
-        # Initialize weights and apply final processing
-        self.post_init()
-
-        # Model parallel
-        self.model_parallel = False
-        self.device_map = None
-
+    @add_start_docstrings_to_model_forward(T5_INPUTS_DOCSTRING)
+    @replace_return_docstrings(output_type=Seq2SeqLMOutput, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -66,12 +48,11 @@ class T5ForNTR(T5ForConditionalGeneration):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        steps: int = None, 
+        steps: Optional[int] = None,
+        rel_labels: Optional[torch.LongTensor] = None,
+        rel_scores: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
-        """
-        Add SVAE module at the end (before LM head)
-        To make the output ditribution wiht variety.
-        """
+
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -83,9 +64,12 @@ class T5ForNTR(T5ForConditionalGeneration):
 
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
+            # [pre-prompt]
+            inputs_embeds = self.controller(input_ids, rel_scores)
+
             # Convert encoder inputs in embeddings if needed
             encoder_outputs = self.encoder(
-                input_ids=input_ids,
+                input_ids=None,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
                 head_mask=head_mask,
@@ -138,7 +122,6 @@ class T5ForNTR(T5ForConditionalGeneration):
 
         sequence_output = decoder_outputs[0]
 
-
         # Set device for model parallelism
         if self.model_parallel:
             torch.cuda.set_device(self.encoder.first_device)
@@ -153,20 +136,12 @@ class T5ForNTR(T5ForConditionalGeneration):
         lm_logits = self.lm_head(sequence_output)
 
         loss = None
-        loss_ce = 0
         if labels is not None:
-            # nll loss
             loss_fct = CrossEntropyLoss(ignore_index=-100)
-            loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-            loss = loss_ce 
-
-            if steps % 10 == 0:
-                print(f"NLL: {loss_ce}")
-                with torch.no_grad():
-                    temp=self.generate(input_ids=input_ids)
-                    print(self.tokenizer.decode(temp[0], skip_special_tokens=True))
-                    labels_reformulate = [l for l in labels[0] if l != -100]
-                    print(self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+            # move labels to correct device to enable PP
+            labels = labels.to(lm_logits.device)
+            loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
+            # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
 
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs

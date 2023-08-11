@@ -28,14 +28,7 @@ class TrainerBase(Seq2SeqTrainer):
 
         return outputs
 
-    def _verbose_prediction(
-        self, 
-        model, 
-        input_ids, 
-        attention_mask, 
-        labels,
-        m
-    ):
+    def _verbose_prediction(self, model, input_ids, attention_mask, labels, m):
         model.eval()
         with torch.no_grad():
             # generate the normal one
@@ -44,8 +37,8 @@ class TrainerBase(Seq2SeqTrainer):
             if m>1:
                 input_ids = input_ids.repeat_interleave(m, 0)
                 attention_mask = attention_mask.repeat_interleave(m, 0)
-                clf_scores = torch.arange(0, m, 1)/(m-1)
-                clf_scores = clf_scores.repeat(n)
+                scores = torch.arange(0, m, 1)/(m-1)
+                scores = scores.repeat(n)
                 out = model.generate(
                         input_ids, 
                         attention_mask=attention_mask, 
@@ -68,13 +61,11 @@ class TrainerBase(Seq2SeqTrainer):
 
             print('===')
             labels_reformulate = [l for l in labels[0] if l != -100]
-            for i in range(4):
-                labels_reformulate += [l for l in labels[4+i] if l != -100]
-                print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
+            print("Truth query+:", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
 
             print('===')
             for i in range(m):
-                print(f"D2Q ({i:<3}):", 
+                print(f"Predicted query ({i:<3}):", 
                         model.tokenizer.decode(temp[i], skip_special_tokens=True)
                 )
 
@@ -89,12 +80,11 @@ class TrainerForQG(TrainerBase):
 
         # inputs
         labels = inputs.get("labels").to(model.device)
-        clf_labels = inputs.get("clf_labels") #hard label
-        clf_scores = inputs.get("clf_scores") #soft label
+        rel_labels = inputs.get("rel_labels") #hard label
+        rel_scores = inputs.get("rel_scores") #soft label
 
         # outputs
         lm_logits = outputs.get("logits")
-        clf_logits = outputs.get("clf_logits")
 
         ## (1) text generation loss
         loss_gen = gen_mle_loss(
@@ -104,36 +94,13 @@ class TrainerForQG(TrainerBase):
         loss_gen_pos = loss_gen.get('pos', 0)
         loss_gen_neg = loss_gen.get('neg', 0)
 
-        ### (1.a) text generation loss with gumbel softmax
-        # loss_gen_gumbel = gen_mle_gumbel_loss(
-        #         lm_logits, labels, clf_labels, 
-        #         model.config.vocab_size, training_steps
-        # )
-        # loss_gen_pos = loss_gen_gumbel.get('pos', 0)
-        # loss_gen_neg = loss_gen_gumbel.get('neg', 0)
-
         loss_gen = (loss_gen_pos+loss_gen_neg) / 2
-
-        ## (2) query logits contrastive loss
-        loss_cont = outputs.get("cont_loss", 0)
-
-        ## (3) relevance prediction soft loss
-        loss_rel = 0
-        loss_rel = ql_kl_loss(clf_logits, clf_scores)
-
-        ## (4) KL loss (reparam)
-        loss_reparam = outputs.get('reparam_loss', 0)
-
         loss = loss_gen
-        if training_steps is not None:
-            loss += loss_cont
 
         # [NOTE] add evaluation for monitoring
         if training_steps % 50 == 0:
             selected = (clf_labels==1)
-            print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg} \
-                    \nKL: (reparam) {loss_reparam} (rel) {loss_rel} \
-                    \nCE: (condition) {loss_cont}")
+            print(f"\nNLL: (pos) {loss_gen_pos} (neg) {loss_gen_neg}")
 
             inputs_for_eval = {
                     "input_ids": inputs['input_ids'][selected],
