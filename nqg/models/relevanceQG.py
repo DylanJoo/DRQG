@@ -224,7 +224,7 @@ class RelBartQG(BartQG):
             # )
 
             cont_loss += pairwise_cont_loss(
-                    hidden_states=doc_repr_ctrl, 
+                    hidden_states=query_repr_ctrl,  # query_repr_ctrl
                     hidden_base=doc_repr, 
                     bs=self.batch_size, norm=True
             )

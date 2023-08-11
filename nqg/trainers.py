@@ -67,8 +67,9 @@ class TrainerBase(Seq2SeqTrainer):
             m = len(temp) if m == 1 else m
 
             print('===')
+            labels_reformulate = [l for l in labels[0] if l != -100]
             for i in range(4):
-                labels_reformulate = [l for l in labels[i] if l != -100]
+                labels_reformulate += [l for l in labels[4+i] if l != -100]
                 print("D2Q+ *", model.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
 
             print('===')

@@ -54,6 +54,7 @@ class DocRelPrompt(nn.Module):
     def forward(self, relevance, hidden_states_src=None, input_ids=None, steps=None):
         if hidden_states_src is None:
             hidden_states_src = self.orig_embeds(input_ids)
+
         device = hidden_states_src.device
         self.n_samples = len(relevance) // hidden_states_src.size(0)
 

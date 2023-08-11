@@ -1,5 +1,5 @@
 BASE=bart-relqg
-MODEL=$BASE/relQG/
+MODEL=$BASE/relQG-cont-dq/
 rm -rvf $MODEL/
 
 export CUDA_VISIBLE_DEVICES=2
