@@ -8,7 +8,7 @@ from tqdm import tqdm
 from dataclasses import dataclass, field
 from datasets import load_dataset
 from transformers import AutoConfig, AutoTokenizer
-from transformers import T5ForConditionalGeneration
+from models import FlanT5
 from utils import interpolate
 
 class QuestionGenerator:

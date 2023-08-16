@@ -9,6 +9,10 @@ from transformers.tokenization_utils_base import PaddingStrategy, PreTrainedToke
 
 @dataclass
 class DataCollatorBase:
+    """ This datacollator is specified for evaluation process.
+    While the initial arugments are also available for others in training.
+    """
+    is_eval: Union[bool, str] = True
     tokenizer: Union[PreTrainedTokenizerBase] = None
     pad_to_multiple_of: Optional[int] = None
     padding: Union[bool, str, PaddingStrategy] = True
@@ -16,52 +20,35 @@ class DataCollatorBase:
     max_p_length: Optional[int] = 512
     max_q_length: Optional[int] = 64
     return_tensors: str = "pt"
-    is_eval: Union[bool] = False
-    prefix: str = ""
-    irrelevant_included: bool = field(default=False)
-    relevant_included: bool = field(default=True)
+    scores: List[float] = None
+    prefix: Optional[str] = ""
+    device: Optional[str] = None
 
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def __call__(self, listOfDict: List[Dict[str, Any]]) -> Dict[str, Any]:
 
-        texts_p = [batch['passage'] for batch in features]
-        texts_q1 = [batch['positive'] for batch in features]
-        texts_q0 = [batch['negative'] for batch in features]
-
-        if self.irrelevant_included and self.relevant_included:
-            texts_q = [random.sample((q1, q0), k=1)[0] \
-                    for q1, q0 in zip(texts_q1, texts_q0)]
-        else:
-            if self.irrelevant_included:
-                texts_q = texts_q0
-            if self.relevant_included:
-                texts_q = texts_q1
+        # 
+        texts = []
+        passages = [batch['passage'] for batch in listOfDict]
+        for passage in passages:
+            for score in self.scores:
+                printed_score = round(score*100)
+                texts.append(self.prefix.format(printed_score, passage))
 
         inputs = self.tokenizer(
-                [f"{self.prefix}{p}" for p in texts_p],
+                texts,
                 max_length=self.max_p_length,
                 truncation=True,
                 padding=True,
                 return_tensors='pt'
         )
-        target_ids = self.tokenizer(
-                texts_q,
-                max_length=self.max_q_length,
-                padding=True,
-                return_tensors='pt'
-        ).input_ids
-        target_ids[target_ids == self.tokenizer.pad_token_id] = -100
-        inputs['labels'] = target_ids
 
-        if self.is_eval:
-            inputs['passage'] = texts_p
-            inputs['positive'] = texts_q1
-            inputs['negative'] = texts_q0
+        for k in inputs:
+            inputs[k] = inputs[k].to(self.device)
 
-        return inputs
+        return inputs, passages
 
 @dataclass
 class DataCollatorForCtrlQG(DataCollatorBase):
-    is_train: Union[bool, str] = False
     is_eval: Union[bool, str] = False
     m_negatives: int = 2
     m_positives: int = 2
@@ -138,3 +125,45 @@ class DataCollatorForCtrlQG(DataCollatorBase):
 
         return inputs
 
+@dataclass
+class DataCollatorForQG(DataCollatorBase):
+    irrelevant_included: bool = field(default=False)
+    relevant_included: bool = field(default=True)
+
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+        texts_p = [batch['passage'] for batch in features]
+        texts_q1 = [batch['positive'] for batch in features]
+        texts_q0 = [batch['negative'] for batch in features]
+
+        if self.irrelevant_included and self.relevant_included:
+            texts_q = [random.sample((q1, q0), k=1)[0] \
+                    for q1, q0 in zip(texts_q1, texts_q0)]
+        else:
+            if self.irrelevant_included:
+                texts_q = texts_q0
+            if self.relevant_included:
+                texts_q = texts_q1
+
+        inputs = self.tokenizer(
+                [f"{self.prefix}{p}" for p in texts_p],
+                max_length=self.max_p_length,
+                truncation=True,
+                padding=True,
+                return_tensors='pt'
+        )
+        target_ids = self.tokenizer(
+                texts_q,
+                max_length=self.max_q_length,
+                padding=True,
+                return_tensors='pt'
+        ).input_ids
+        target_ids[target_ids == self.tokenizer.pad_token_id] = -100
+        inputs['labels'] = target_ids
+
+        if self.is_eval:
+            inputs['passage'] = texts_p
+            inputs['positive'] = texts_q1
+            inputs['negative'] = texts_q0
+
+        return inputs
