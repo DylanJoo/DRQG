@@ -23,3 +23,6 @@ bart-option1/
 
 # evaluation
 evaluation/**/*.jsonl
+
+# archived
+archived/

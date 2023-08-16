@@ -23,11 +23,11 @@ class TrainerBase(Seq2SeqTrainer):
         loss = super().compute_loss(model, inputs, return_outputs)
 
         if training_steps % 50 == 0:
-            print(f"\nNLL: {outputs}")
+            print(f"\nNLL: {loss}")
             self._verbose_prediction(model, passage, 10)
         return loss
 
-    def _verbose_prediction(self, passage, num_pred=10):
+    def _verbose_prediction(self, model, passage, num_pred=10):
         """
         param: passage: one passage for prediction.
         param: num_pred: number of interpolated output (range from 0-100)
@@ -47,12 +47,12 @@ class TrainerBase(Seq2SeqTrainer):
                 padding=True,
                 return_tensors='pt'
         )
+        for k in inputs:
+            inputs[k] = inputs[k].to(model.device)
 
         model.eval()
         with torch.no_grad():
-            attention_mask = attention_mask.repeat_interleave(m, 0)
-            outputs = model.generate(**inputs, scores=score, num_beams=1)
-            m = len(outputs) if m == 1 else m
+            outputs = model.generate(**inputs, num_beams=1)
 
             print('============')
             print("Passage", passage)
@@ -88,7 +88,7 @@ class TrainerForQG(TrainerBase):
         loss = loss_gen
 
         if training_steps % 50 == 0:
-            print(f"\nNLL: {outputs}")
+            print(f"\nNLL: {loss}")
             self._verbose_prediction(model, passage, 10)
 
         # Save past state if it exists

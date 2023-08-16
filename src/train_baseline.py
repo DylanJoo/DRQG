@@ -14,7 +14,7 @@ import os
 os.environ["WANDB_DISABLED"] = "false"
 
 def prepare_prompt_idx(opt, tokenizer):
-    get_tokenized_idx = (lambda x: tokenizer.encode(x, add_special_tokens=False))
+    get_tokenized_idx = lambda x: tokenizer.encode(x, add_special_tokens=False)
 
     if opt.instruct_prompt:
         opt.instruct_prompt_idx = get_tokenized_idx(opt.instruct_prompt)
@@ -60,7 +60,7 @@ def main():
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
-            prefix="Generate a question with relevance score {0} for the passage: {1}"
+            prefix=model_args.baseline_prefix
     )
 
     # Data
@@ -91,9 +91,8 @@ def main():
             data_collator=data_collator,
     )
     trainer.set_tokenizer(tokenizer)
-    trainer.set_prefix("Generate a question with relevance score {0} for the passage: {1}")
+    trainer.set_prefix(model_args.baseline_prefix)
     
-    # ***** strat training *****
     results = trainer.train(
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )

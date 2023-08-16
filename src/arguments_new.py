@@ -15,6 +15,7 @@ class HFModelArgs:
 class ModelArgs:
     # disable_dropout: bool = field(default=False)
     add_classification_head: bool = field(default=False)
+    baseline_prefix: bool = field(default=False)
 
     # Controller
     head_size: int = field(default=64)
