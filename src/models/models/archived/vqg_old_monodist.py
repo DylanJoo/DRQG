@@ -21,11 +21,7 @@ class T5VQG(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
     def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=None):
-========
-    def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=0):
->>>>>>>> main:src/models/archived/models_dev.py
         super().__init__(config)
         # Debugging 
         self.debug = debug # model_args.mode
@@ -56,24 +52,6 @@ class T5VQG(T5ForConditionalGeneration):
         self.model_parallel = False
         self.device_map = None
 
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
-========
-        # Debugging
-        self.debug = debug
-
-    def _initialize_variational_modules(self, t5_config, config, tokenizer):
-        """ [TODO] add docstringss """
-        self.latent_size = config.latent_size
-        latent_size = config.latent_size
-        # self.hidden2pmean = nn.Linear(t5_config.d_model, latent_size)
-        # self.hidden2nmean = nn.Linear(t5_config.d_model, latent_size)
-        # self.hidden2plogv = nn.Linear(t5_config.d_model, latent_size)
-        # self.hidden2nlogv = nn.Linear(t5_config.d_model, latent_size)
-        self.hidden2mean = nn.Linear(t5_config.d_model, latent_size)
-        self.hidden2logv = nn.Linear(t5_config.d_model, latent_size)
-        self.latent2hidden = nn.Linear(latent_size, t5_config.d_model)
-
->>>>>>>> main:src/models/archived/models_dev.py
         self.tokenizer = tokenizer
 
     def set_gaussian_n_samples_for_generation(self, n_side: int):
@@ -178,7 +156,7 @@ class T5VQG(T5ForConditionalGeneration):
             inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=attention_mask if self.debug != 2 else None,
+            encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,
@@ -206,12 +184,6 @@ class T5VQG(T5ForConditionalGeneration):
 
         if labels is not None:
             loss_fct = CrossEntropyLoss(ignore_index=-100)
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
-========
-            # Separate losses into the positive one and negative one
-            # loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-
->>>>>>>> main:src/models/archived/models_dev.py
             labels_pos = copy.deepcopy(labels)
             labels_neg = copy.deepcopy(labels)
 
@@ -226,12 +198,8 @@ class T5VQG(T5ForConditionalGeneration):
 
             # add varaiational losses
             if steps % 50 == 0:
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
                 print(f"\nNLL: (positive) {loss_ce_pos}\t(negative) {loss_ce_neg}\
                         \nKLD: {loss_reparam[0]} (weight) {loss_reparam[1]}")
-========
-                print(f"\nNLL: (positive) {loss_ce_pos}\t(negative) {loss_ce_neg}\nKLD: {loss_reparam}\tCOS: {loss_discr}")
->>>>>>>> main:src/models/archived/models_dev.py
                 # inferece during training
                 if steps % 50 == 0:
                     with torch.no_grad():
@@ -273,7 +241,6 @@ class T5VQG(T5ForConditionalGeneration):
         :param encoder_outputs: the T5 encoder's (T5Stack) output.
         :return hidden_states: the revised hidden_states
         """
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
         hidden_states = encoder_outputs[0]
         batch_size, seq_length, d_model = hidden_states.shape
         pn_boundary = batch_size // 2
@@ -304,36 +271,9 @@ class T5VQG(T5ForConditionalGeneration):
             zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
             residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
             hidden_states = hidden_states + residuals
-========
-        if steps is None: # i.e. evaluation
-            return hidden_states, (0, 0)
-
-        batch_size, seq_length, d_model = hidden_states.shape
-        pn_boundary = batch_size // 2
-
-        # Positive 
-        mean = self.hidden2mean(hidden_states[:pn_boundary, :1, :])
-        logv = self.hidden2logv(hidden_states[:pn_boundary, :1, :])
-        positive = self.latent2hidden(mean)
-
-        # Negative 
-        r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        std = torch.exp(0.5 * logv)
-        z = r * std + mean
-        negative = self.latent2hidden(z)
-
-        # residual learning
-        zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
-        residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
-        hidden_states = hidden_states + residuals
->>>>>>>> main:src/models/archived/models_dev.py
-
-        # print(positive[:, :, 1:5])
-        # print(negative[:, :, 1:5])
 
         # Compute variational losses
         loss_reparam = self.compute_loss_reparam(mean, logv, steps)
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
 
         return hidden_states, (loss_reparam)
 
@@ -342,42 +282,14 @@ class T5VQG(T5ForConditionalGeneration):
         loss_kl = kl_loss(logv.view(-1, self.latent_size), mean.view(-1, self.latent_size))
 
         if steps is not None:
-========
-        loss_discr = self.compute_loss_discrepancy(positive, negative)
-
-        return hidden_states, (loss_reparam, loss_discr)
-    
-    def compute_loss_discrepancy(self, pmean, nmean):
-        # cosine similarity loss
-        loss_fct = CosineEmbeddingLoss()
-        pmean = pmean.view(-1, self.latent_size)
-        nmean = nmean.view(-1, self.latent_size)
-        labels = torch.tensor([-1] * pmean.size(0)).to(pmean.device)
-        loss = loss_fct(pmean, nmean, labels)
-
-        # [TODO] MSE loss
-        return loss
-
-    def compute_loss_reparam(self, mean, logv, steps):
-        loss_kl_w = 1
-        loss_kl = kl_loss(logv.view(-1, self.latent_size), 
-                          mean.view(-1, self.latent_size)) 
-        # calcuate the weighted losses
-        if steps:
->>>>>>>> main:src/models/archived/models_dev.py
             loss_kl_w = kl_weight(
                 self.vae_config.annealing_fn, 
                 steps, 
                 self.vae_config.k, 
                 self.vae_config.x0
             )
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
         if self.debug == 2:
             loss_kl_w = 1
 
         return loss_kl_w * loss_kl, loss_kl_w
 
-========
-        loss = loss_kl_w * loss_kl
-        return loss
->>>>>>>> main:src/models/archived/models_dev.py

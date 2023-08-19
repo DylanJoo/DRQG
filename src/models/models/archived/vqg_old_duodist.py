@@ -1,5 +1,5 @@
 """
-TODO: Making this module to be the inherited class of vqg_single_dist
+TODO: 
 """
 import torch
 from typing import Optional, Tuple, Union
@@ -21,15 +21,8 @@ class T5VQG(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
     def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=None):
-========
-    def __init__(self, config: T5Config, vae_config, tokenizer=None, debug=0):
->>>>>>>> main:src/models/archived/models_dev.py
         super().__init__(config)
-        # Debugging 
-        self.debug = debug # model_args.mode
-
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
 
@@ -56,36 +49,18 @@ class T5VQG(T5ForConditionalGeneration):
         self.model_parallel = False
         self.device_map = None
 
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
-========
         # Debugging
-        self.debug = debug
+        self.tokenizer = tokenizer
+        self.debug = debug # model_args.mode
 
-    def _initialize_variational_modules(self, t5_config, config, tokenizer):
+    def _initialize_variational_modules(self, t5_config, config):
         """ [TODO] add docstringss """
         self.latent_size = config.latent_size
         latent_size = config.latent_size
-        # self.hidden2pmean = nn.Linear(t5_config.d_model, latent_size)
-        # self.hidden2nmean = nn.Linear(t5_config.d_model, latent_size)
-        # self.hidden2plogv = nn.Linear(t5_config.d_model, latent_size)
-        # self.hidden2nlogv = nn.Linear(t5_config.d_model, latent_size)
-        self.hidden2mean = nn.Linear(t5_config.d_model, latent_size)
-        self.hidden2logv = nn.Linear(t5_config.d_model, latent_size)
-        self.latent2hidden = nn.Linear(latent_size, t5_config.d_model)
-
->>>>>>>> main:src/models/archived/models_dev.py
-        self.tokenizer = tokenizer
-
-    def set_gaussian_n_samples_for_generation(self, n_side: int):
-        self.std_list = list(range(-n_side, n_side+1, 1))
-        self.n_samples = 1 + 2*n_side
-
-    def _initialize_variational_modules(self, t5_config, config):
-        """ [TODO] Inheritance"""
-        self.latent_size = config.latent_size
-        latent_size = config.latent_size
-        self.hidden2mean = nn.Linear(t5_config.d_model, latent_size, bias=False)
-        self.hidden2logv = nn.Linear(t5_config.d_model, latent_size, bias=False)
+        self.hidden2pmean = nn.Linear(t5_config.d_model, latent_size, bias=False)
+        self.hidden2plogv = nn.Linear(t5_config.d_model, latent_size, bias=False)
+        self.hidden2nmean = nn.Linear(t5_config.d_model, latent_size, bias=False)
+        self.hidden2nlogv = nn.Linear(t5_config.d_model, latent_size, bias=False)
         self.latent2hidden = nn.Linear(latent_size, t5_config.d_model, bias=False)
         self.vae_config = config
 
@@ -135,7 +110,7 @@ class T5VQG(T5ForConditionalGeneration):
             hidden_states, loss_variational = self.forward_variational(
                     encoder_outputs, steps=steps
             )
-            loss_reparam = loss_variational
+            loss_reparam, loss_discr = loss_variational
 
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
             encoder_outputs = BaseModelOutput(
@@ -148,9 +123,9 @@ class T5VQG(T5ForConditionalGeneration):
             hidden_states, loss_variational = self.forward_variational(
                     encoder_outputs, steps=steps
             )
-            loss_reparam = loss_variational
-        else: # in inference mode
-            loss_reparam = 0
+            loss_reparam, loss_discr = loss_variational
+        else: # in evaluation mode
+            loss_reparam, loss_discr = 0, 0
             hidden_states = encoder_outputs[0]
 
         if self.model_parallel:
@@ -178,11 +153,11 @@ class T5VQG(T5ForConditionalGeneration):
             inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=attention_mask if self.debug != 2 else None,
+            encoder_attention_mask=attention_mask,
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,
-            output_attentions=output_attentions,
+            output_attentions=output_attentions if steps else True,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
@@ -206,12 +181,6 @@ class T5VQG(T5ForConditionalGeneration):
 
         if labels is not None:
             loss_fct = CrossEntropyLoss(ignore_index=-100)
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
-========
-            # Separate losses into the positive one and negative one
-            # loss_ce = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-
->>>>>>>> main:src/models/archived/models_dev.py
             labels_pos = copy.deepcopy(labels)
             labels_neg = copy.deepcopy(labels)
 
@@ -226,12 +195,9 @@ class T5VQG(T5ForConditionalGeneration):
 
             # add varaiational losses
             if steps % 50 == 0:
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
                 print(f"\nNLL: (positive) {loss_ce_pos}\t(negative) {loss_ce_neg}\
-                        \nKLD: {loss_reparam[0]} (weight) {loss_reparam[1]}")
-========
-                print(f"\nNLL: (positive) {loss_ce_pos}\t(negative) {loss_ce_neg}\nKLD: {loss_reparam}\tCOS: {loss_discr}")
->>>>>>>> main:src/models/archived/models_dev.py
+                        \nKLD: (weighted) {loss_reparam[0]:.2f} (positive) {loss_reparam[1]} (negative) {loss_reparam[2]}\
+                        \nCOS: {loss_discr}")
                 # inferece during training
                 if steps % 50 == 0:
                     with torch.no_grad():
@@ -246,7 +212,7 @@ class T5VQG(T5ForConditionalGeneration):
                         print("D2Q-:", self.tokenizer.decode(temp[n], skip_special_tokens=True))
                         print("D2Q-*", self.tokenizer.decode(labels_reformulate, skip_special_tokens=True))
 
-            loss = loss_ce + loss_reparam[0]
+            loss = loss_ce + loss_reparam[0] + loss_discr
 
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
@@ -266,118 +232,89 @@ class T5VQG(T5ForConditionalGeneration):
 
     def forward_variational(
         self, 
-        encoder_outputs,
+        encoder_outputs, 
         steps: Optional[int] = None
     ) -> Optional[torch.FloatTensor]:
         """ The standard version of forward passing (training) 
         :param encoder_outputs: the T5 encoder's (T5Stack) output.
         :return hidden_states: the revised hidden_states
         """
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
         hidden_states = encoder_outputs[0]
         batch_size, seq_length, d_model = hidden_states.shape
         pn_boundary = batch_size // 2
 
         # Get controller tokens
         embeds = hidden_states[:, :1, :]
-        
-        # Polarity
-        mean = self.hidden2mean(embeds[pn_boundary:, :, :])
-        logv = self.hidden2logv(embeds[pn_boundary:, :, :])
-        std = torch.exp(0.5 * logv)
+
+        # Positive 
+        pmean = self.hidden2pmean(embeds[:pn_boundary, :, :])
+        plogv = self.hidden2plogv(embeds[:pn_boundary, :, :])
         r = torch.randn([pn_boundary, 1, self.latent_size], device=hidden_states.device)
-        z = r * std + mean
+        pstd = torch.exp(0.5 * plogv)
+        z = r * pstd + pmean if steps is not None else pmean
+        positive = self.latent2hidden(z)
+
+        # Negative 
+        nmean = self.hidden2nmean(embeds[pn_boundary:, :, :])
+        nlogv = self.hidden2nlogv(embeds[pn_boundary:, :, :])
+        r = torch.randn([pn_boundary, 1, self.latent_size], device=hidden_states.device)
+        nstd = torch.exp(0.5 * nlogv)
+        z = r * pstd + nmean if steps is not None else nmean
+        negative = self.latent2hidden(z)
+
 
         if self.debug == 1:
-            # append prompty token
-            # h_prime (single) with h
-            positive = self.latent2hidden(mean) # without noise
-            negative = self.latent2hidden(z)    # with noise
             residuals = torch.cat((positive, negative), 0)
             hidden_states = hidden_states[:, 1:, :]
             hidden_states = torch.cat((residuals, hidden_states), 1)
         else:
             # residual learning
-            # [h_prime (single) + h (single)] with h
-            positive = self.latent2hidden(mean) # without noise
-            negative = self.latent2hidden(z)    # with noise
             zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
             residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
             hidden_states = hidden_states + residuals
-========
-        if steps is None: # i.e. evaluation
-            return hidden_states, (0, 0)
-
-        batch_size, seq_length, d_model = hidden_states.shape
-        pn_boundary = batch_size // 2
-
-        # Positive 
-        mean = self.hidden2mean(hidden_states[:pn_boundary, :1, :])
-        logv = self.hidden2logv(hidden_states[:pn_boundary, :1, :])
-        positive = self.latent2hidden(mean)
-
-        # Negative 
-        r = torch.randn([pn_boundary, 1, self.latent_size]).to(hidden_states.device)
-        std = torch.exp(0.5 * logv)
-        z = r * std + mean
-        negative = self.latent2hidden(z)
-
-        # residual learning
-        zeros = torch.zeros(batch_size, seq_length-1, d_model).to(hidden_states.device)
-        residuals = torch.cat((torch.cat((positive, negative), 0), zeros), 1)
-        hidden_states = hidden_states + residuals
->>>>>>>> main:src/models/archived/models_dev.py
-
-        # print(positive[:, :, 1:5])
-        # print(negative[:, :, 1:5])
 
         # Compute variational losses
-        loss_reparam = self.compute_loss_reparam(mean, logv, steps)
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
-
-        return hidden_states, (loss_reparam)
-
-    def compute_loss_reparam(self, mean, logv, steps):
-        loss_kl_w = 1
-        loss_kl = kl_loss(logv.view(-1, self.latent_size), mean.view(-1, self.latent_size))
-
-        if steps is not None:
-========
-        loss_discr = self.compute_loss_discrepancy(positive, negative)
+        loss_reparam = self.compute_loss_reparam(pmean, plogv, nmean, nlogv, steps)
+        loss_discr = self.compute_loss_discrepancy(pmean, nmean)
 
         return hidden_states, (loss_reparam, loss_discr)
     
-    def compute_loss_discrepancy(self, pmean, nmean):
+    def compute_loss_discrepancy(self, pmean, nmean, mode='cosine'):
         # cosine similarity loss
-        loss_fct = CosineEmbeddingLoss()
-        pmean = pmean.view(-1, self.latent_size)
-        nmean = nmean.view(-1, self.latent_size)
-        labels = torch.tensor([-1] * pmean.size(0)).to(pmean.device)
-        loss = loss_fct(pmean, nmean, labels)
+        if mode == 'cosine':
+            loss_fct = CosineEmbeddingLoss()
+            labels = [-1] * pmean.size(0) * pmean.size(1)
+            loss = loss_fct(pmean.view(-1, self.latent_size),
+                            nmean.view(-1, self.latent_size),
+                            torch.tensor(labels).to(pmean.device))
 
-        # [TODO] MSE loss
+        # contrastive loss
+        # B x 1 x H --> B x H --> B x B
+        if mode == 'contrastive': 
+            loss_fct = nn.CrossEntropyLoss()
+            logits_matrix  = pmean.squeeze(1) @ nmean.squeeze(1).T
+            labels = torch.zeros(pmean.size(0), dtype=torch.long, device=pmean.device)
+            loss = loss_fct(logits_matrix, labels)
         return loss
 
-    def compute_loss_reparam(self, mean, logv, steps):
+    def compute_loss_reparam(self, pmean, plogv, nmean, nlogv, steps):
         loss_kl_w = 1
-        loss_kl = kl_loss(logv.view(-1, self.latent_size), 
-                          mean.view(-1, self.latent_size)) 
-        # calcuate the weighted losses
-        if steps:
->>>>>>>> main:src/models/archived/models_dev.py
+
+        loss_kl_pos = kl_loss(
+                plogv.view(-1, self.latent_size), pmean.view(-1, self.latent_size)
+        )
+        loss_kl_neg = kl_loss(
+                nlogv.view(-1, self.latent_size), nmean.view(-1, self.latent_size)
+        )
+
+        if steps is not None:
             loss_kl_w = kl_weight(
                 self.vae_config.annealing_fn, 
                 steps, 
                 self.vae_config.k, 
                 self.vae_config.x0
             )
-<<<<<<<< HEAD:src/models/archived/vqg_old_monodist.py
         if self.debug == 2:
             loss_kl_w = 1
+        return (loss_kl_w * (loss_kl_pos + loss_kl_neg), ) + (loss_kl_pos, loss_kl_neg)
 
-        return loss_kl_w * loss_kl, loss_kl_w
-
-========
-        loss = loss_kl_w * loss_kl
-        return loss
->>>>>>>> main:src/models/archived/models_dev.py
