@@ -1,0 +1,16 @@
+__pycache__/  
+**/logs/
+*.swp
+logs/
+wandb/
+results/
+
+# checkpoints
+models/*/
+checkpoints/
+
+# evaluation
+evaluation/**/*.jsonl
+
+# archived
+archived/
