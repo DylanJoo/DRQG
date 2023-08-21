@@ -1,6 +1,6 @@
 TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
+EVAL_FILE=data/ce.minilm.hardneg.vL.eval.small.jsonl
 
-# use the numeric string token as condition
 train_flan_baseline1:
 	python3 train_baseline.py \
 	  --model_name_or_path google/flan-t5-base \
@@ -22,7 +22,6 @@ train_flan_baseline1:
 	  --do_train \
 	  --do_eval 
 
-# use the special token as condition
 train_flan_baseline2:
 	python3 train_baseline.py \
 	  --model_name_or_path google/flan-t5-base \
@@ -46,9 +45,7 @@ train_flan_baseline2:
 
 # Evaluate/generate the experimental results0
 BASELINE1=models/flan-t5-base-qg-num/checkpoint-2000
-BASELINE2=models/flan-t5-base-qg-extra/checkpoint-2000
-EVAL_FILE=data/ce.minilm.hardneg.vL.eval.small.jsonl
-generate_baseline:
+generate_baseline1:
 	# baseline model 1
 	python3 generate.py \
 	  --model_path ${BASELINE1} \
@@ -60,8 +57,9 @@ generate_baseline:
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --prefix "Generate a question with relevance score {0} for the passage: {1}" 
-	# 
-	# baseline model 1
+
+BASELINE2=models/flan-t5-base-qg-extra/checkpoint-2000
+generate_baseline2:
 	python3 generate.py \
 	  --model_path ${BASELINE2} \
 	  --model_name google/flan-t5-base \
