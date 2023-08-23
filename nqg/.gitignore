@@ -1,0 +1,25 @@
+__pycache__/  
+**/logs/
+*.swp
+logs/
+wandb/
+
+# checkpoints
+checkpoints/
+t5vqgv1*/
+t5vqgv0*/
+t5pqg*/
+bart/
+bart*/
+
+t5vqg_v1*/
+t5vqg_v0*/
+t5pqg*/
+t5vqgdev/
+*vqg*/
+*d2q*/
+bartdqg/
+bart-option1/
+
+# evaluation
+evaluation/**/*.jsonl
