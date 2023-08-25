@@ -1,2 +1,2 @@
 from ._base import FlanT5
-from .promptQG import PrefixFlanT5
+from .promptQG import SoftPromptFlanT5

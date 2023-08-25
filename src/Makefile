@@ -2,19 +2,20 @@ TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.j
 EVAL_FILE=data/ce.minilm.hardneg.vL.eval.small.jsonl
 
 # baseline with full tunning
-export CUDA_VISIBLE_DEVICES=1 
+SIZE=large
 train_baseline1:
+	export CUDA_VISIBLE_DEVICES=2
 	python3 train_baseline.py \
-	  --model_name_or_path google/flan-t5-base \
-	  --tokenizer_name google/flan-t5-base \
-	  --config_name google/flan-t5-base \
-	  --output_dir models/checkpoints/flan-t5-base-num-prefix \
+	  --model_name_or_path google/flan-t5-${SIZE} \
+	  --tokenizer_name google/flan-t5-${SIZE} \
+	  --config_name google/flan-t5-${SIZE} \
+	  --output_dir models/checkpoints/flan-t5-${SIZE}-num-prefix \
 	  --max_p_length 256 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 4 \
 	  --m_negative_per_example 2 \
 	  --m_positive_per_example 2 \
-	  --learning_rate 1e-5 \
+	  --learning_rate 1e-4 \
 	  --evaluation_strategy steps \
 	  --max_steps 10000 \
 	  --save_steps 2000 \
@@ -27,16 +28,16 @@ train_baseline1:
 
 train_baseline2:
 	python3 train_baseline.py \
-	  --model_name_or_path google/flan-t5-base \
-	  --tokenizer_name google/flan-t5-base \
-	  --config_name google/flan-t5-base \
-	  --output_dir models/checkpoints/flan-t5-base-extra-prefix \
+	  --model_name_or_path google/flan-t5-${SIZE} \
+	  --tokenizer_name google/flan-t5-${SIZE} \
+	  --config_name google/flan-t5-${SIZE} \
+	  --output_dir models/checkpoints/flan-t5-${SIZE}-extra-prefix \
 	  --max_p_length 256 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 4 \
 	  --m_negative_per_example 2 \
 	  --m_positive_per_example 2 \
-	  --learning_rate 1e-5 \
+	  --learning_rate 1e-4 \
 	  --evaluation_strategy steps \
 	  --max_steps 10000 \
 	  --save_steps 2000 \
@@ -48,53 +49,52 @@ train_baseline2:
 	  --do_eval 
 
 # Evaluate/generate the experimental results0
-BASELINE1=models/checkpoints/flan-t5-base-qg-num/checkpoint-2000
+BASELINE1=models/checkpoints/flan-t5-base-num-prefix/checkpoint-2000
 generate_baseline1:
 	# baseline model 1
 	python3 generate.py \
 	  --model_path ${BASELINE1} \
 	  --model_name google/flan-t5-base \
 	  --input_jsonl ${EVAL_FILE} \
-	  --output_jsonl results/baseline1.jsonl \
+	  --output_jsonl results/baseline1_prefix.jsonl \
 	  --device cuda:1 \
 	  --batch_size 8 \
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --prefix "Generate a question with relevance score {0} for the passage: {1}" 
 
-BASELINE2=models/checkpoints/flan-t5-base-qg-extra/checkpoint-2000
+BASELINE2=models/checkpoints/flan-t5-base-extra-prefix/checkpoint-2000
 generate_baseline2:
 	python3 generate.py \
 	  --model_path ${BASELINE2} \
 	  --model_name google/flan-t5-base \
 	  --input_jsonl ${EVAL_FILE} \
-	  --output_jsonl results/baseline2.jsonl \
+	  --output_jsonl results/baseline2_prefix.jsonl \
 	  --device cuda:1 \
 	  --batch_size 8 \
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --prefix "Generate a question with relevance label <extra_id_{0}> for the passage: {1}"
 
-# hard prompt 
-# export CUDA_VISIBLE_DEVICES=1 
-# train_hard_baseline1:
-# 	python3 train_promptQG.py \
-# 	  --model_name_or_path google/flan-t5-base \
-# 	  --tokenizer_name google/flan-t5-base \
-# 	  --config_name google/flan-t5-base \
-# 	  --output_dir models/checkpoints/flan-t5-base-num \
-# 	  --max_p_length 256 \
-# 	  --max_q_length 16 \
-# 	  --per_device_train_batch_size 4 \
-# 	  --m_negative_per_example 2 \
-# 	  --m_positive_per_example 2 \
-# 	  --learning_rate 1e-4 \
-# 	  --evaluation_strategy steps \
-# 	  --max_steps 10000 \
-# 	  --save_steps 2000 \
-# 	  --eval_steps 500 \
-# 	  --train_file ${TRAIN_FILE} \
-# 	  --baseline_prefix "Generate a question with relevance score {0} for the passage: {1}" \
-# 	  --prefix_tuning true \
-# 	  --do_train \
-# 	  --do_eval 
+# soft prompt
+train_softprompt_d2q:
+	export CUDA_VISIBLE_DEVICES=1 
+	python3 train_softprompt.py \
+	  --model_name_or_path google/flan-t5-large \
+	  --tokenizer_name google/flan-t5-large \
+	  --config_name google/flan-t5-large \
+	  --output_dir models/checkpoints/flan-t5-large-soft-d2q \
+	  --max_p_length 256 \
+	  --max_q_length 16 \
+	  --per_device_train_batch_size 16 \
+	  --m_positive_per_example 1 \
+	  --m_negative_per_example 0 \
+	  --learning_rate 1e-4 \
+	  --evaluation_strategy steps \
+	  --max_steps 10000 \
+	  --save_steps 2000 \
+	  --eval_steps 500 \
+	  --train_file ${TRAIN_FILE} \
+	  --instruct_prompt "Generate a question for the passage: " \
+	  --do_train \
+	  --do_eval 

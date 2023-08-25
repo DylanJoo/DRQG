@@ -15,18 +15,20 @@ class HFModelArgs:
 class ModelArgs:
     # disable_dropout: bool = field(default=False)
     add_classification_head: bool = field(default=False)
-    baseline_prefix: Optional[str] = field(default='')
+
+    # Baseline and hard prompt # {1} means passage
+    baseline_prefix: Optional[str] = field(default='{1}')
+
+    # Softprompt/EarlyCtrlQG
+    instruct_prompt: Optional[str] = field(default=None)
+    instruct_prompt_idx: Optional[str] = field(default=None)
+    relevance_prompt: Optional[str] = field(default=None)
+    relevance_prompt_idx: Optional[str] = field(default=None)
 
     # Controller
     head_size: int = field(default=64)
     pooling: Optional[str] = field(default='mean')
     activation: Optional[str] = field(default='sigmoid')
-
-    # EarlyCtrlQG
-    instruct_prompt: Optional[bool] = field(default=False)
-    instruct_prompt_idx: Optional[str] = field(default=None)
-    relevance_prompt: Optional[bool] = field(default=False)
-    relevance_prompt_idx: Optional[str] = field(default=None)
 
     # EarlyCtrlQG
     # pos_anchors : Optional[str] = field(default=None)

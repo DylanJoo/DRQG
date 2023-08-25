@@ -64,14 +64,12 @@ class TrainerForQG(TrainerBase):
                 rel_labels,
                 model.config.vocab_size
         )
-        loss_gen_pos = loss_gen.get('pos', 0)
-        loss_gen_neg = loss_gen.get('neg', 0)
+        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']
 
-        loss_gen = (loss_gen_pos+loss_gen_neg) / 2
-        loss = loss_gen
+        loss = (loss_gen_pos + loss_gen_neg) / 2
 
         if training_steps % 50 == 0:
-            print(f"\nNLL: {loss}")
+            print(f"\nNLL: {loss} = {loss_gen_pos} + {loss_gen_neg}")
             self._verbose_prediction(model, passage)
 
         # Save past state if it exists

@@ -8,7 +8,7 @@ from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
 from models import FlanT5
 
-class PrefixFlanT5(FlanT5):
+class SoftPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
                  enc_prompt_idx: Optional[List[int]] = None):
@@ -21,10 +21,10 @@ class PrefixFlanT5(FlanT5):
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = PromptT5Stack(
+        self.encoder = SoftPromptT5Stack(
                 prompt_idx=enc_prompt_idx, 
+                embed_tokens=self.shared,
                 config=encoder_config, 
-                embed_tokens=self.shared
         )
 
         decoder_config = copy.deepcopy(config)
@@ -42,68 +42,38 @@ class PrefixFlanT5(FlanT5):
         self.model_parallel = False
         self.device_map = None
 
-    # def forward(self, 
-    #             input_ids, 
-    #             attention_mask, 
-    #             hard_prompt_ids=None, 
-    #             encoder_outputs=None, 
-    #             steps=None, 
-    #             **kwargs):
-    #
-    #     if encoder_outputs is None:
-    #         encoder_outputs = self.encoder(
-    #                 input_ids=input_ids, 
-    #                 attention_mask=attention_mask, 
-    #                 hard_prompt_ids=hard_prompt_ids
-    #         )
-    #         attention_mask = self.encoder._expand(
-    #                 attention_mask, hard_prompt_ids.shape[1]
-    #         )
-    #
-    #     return super().forward(
-    #             input_ids=input_ids,
-    #             attention_mask=attention_mask,
-    #             encoder_outputs=encoder_outputs,
-    #             **kwargs
-    #     )
+class SoftPromptT5Stack(T5Stack):
 
-
-class PromptT5Stack(T5Stack):
-
-    def __init__(self, prompt_idx=None, **kwargs):
+    def __init__(self, prompt_idx=None, embed_tokens=None, **kwargs):
         super().__init__(**kwargs)
-        self.prompt_idx = prompt_idx
-        self.prompt_embed = None
+        self.prompt_idx = torch.LongTensor(prompt_idx)
+        self.wte = embed_tokens
+        self.prompt_embed = nn.Parameter(torch.rand(
+            len(prompt_idx), embed_tokens.embedding_dim
+        ))
 
-    def init_embeddings(self):
-        self.prompt_embed = self.embed_tokens.weight[\
-                self.prompt_idx].clone().detach()
-
-    def _expand(self, mask, length):
-        additional_mask = torch.ones((mask.size(0), length), device=self.device)
-        return torch.cat([additional_mask, mask], -1)
+    def init_from_vocab(self):
+        self.prompt_embed = nn.Parameter(
+                self.wte(self.prompt_idx).clone().detach()
+        )
 
     def forward(self, 
                 input_ids=None, 
                 attention_mask=None, 
                 inputs_embeds=None, 
-                soft_prompt=False, 
                 **kwargs):
 
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)
+            inputs_embeds = self.wte(input_ids)
         B = inputs_embeds.shape[0]
 
-        if soft_prompt:
-            ## Expand customized prompts (length is self.expanded_length)
-            ## in from of `inputs_embeds` 
-            prompts = self.prompt_embed.repeat(B, 1, 1)
-            inputs_embeds = torch.cat([prompts, inputs_embeds], dim=1)
-            ## and the attention_mask as well
-            attention_mask = self._expand(attention_mask, prompts.shape[1])
+        ## Expand customized prompts in front of `inputs_embeds` 
+        prompts = self.prompt_embed.repeat(B, 1, 1)
+        inputs_embeds = torch.cat([prompts, inputs_embeds], dim=1)
+        ## and the attention_mask as well
+        # attention_mask = self._expand(attention_mask, prompts.shape[1])
 
         return super().forward(
-                input_ids=None,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
                 **kwargs

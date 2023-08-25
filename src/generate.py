@@ -78,6 +78,7 @@ if __name__ == "__main__":
     # Generation
     with torch.no_grad(), open(args.output_jsonl, 'w') as fout:
         for batch_inputs, batch_texts in tqdm(dataloader):
+            batch_inputs = batch_inputs.to(args.device)
             output_ids = model.generate(
                     **batch_inputs,
                     num_beams=args.num_beams,

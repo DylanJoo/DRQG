@@ -41,22 +41,18 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
-    from models import PrefixFlanT5 
-    model = PrefixFlanT5.from_pretrained(hfmodel_args.model_name_or_path)
-    model.encoder.init_embeddings()
+    from models import SoftPromptFlanT5 
+    model = SoftPromptFlanT5.from_pretrained(hfmodel_args.model_name_or_path)
+    model.encoder.init_from_vocab()
 
-    # # model freezed
-    # for name, param in model.named_parameters():
-    #     # tune the shared embeddings
-    #     if training_args.prefix_tuning and ('shared' in name):
-    #         param.requires_grad = True
-    #         print('param {} will be optimized.'.format(name))
-    #     # soft embeddings
-    #     elif 'prompt_embed' in name:
-    #         param.requires_grad = True
-    #         print('param {} will be optimized.'.format(name))
-    #     else:
-    #         param.requires_grad = False
+    # model freezed
+    for name, param in model.named_parameters():
+        # tune the shared embeddings
+        if 'prompt_embed' in name:
+            param.requires_grad = True
+            print('param {} will be optimized.'.format(name))
+        else:
+            param.requires_grad = False
 
     # Generation config
     generation_config = GenerationConfig.from_model_config(model.config)

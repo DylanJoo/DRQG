@@ -19,7 +19,7 @@ class DataCollatorBase:
     max_p_length: Optional[int] = 512
     max_q_length: Optional[int] = 64
     return_tensors: str = "pt"
-    prefix: Optional[str] = ""
+    prefix: Optional[str] = "{1}"
     scores: List[float] = None
     device: Optional[str] = None
 
@@ -39,7 +39,7 @@ class DataCollatorBase:
                 truncation=True,
                 padding=True,
                 return_tensors='pt'
-        ).to(self.device)
+        )
 
         return inputs, passages
 
@@ -109,7 +109,7 @@ class DataCollatorForBaseline(DataCollatorBase):
                 texts_src,
                 max_length=self.max_p_length,
                 truncation=True,
-                padding='max_length',
+                padding=True,
                 return_tensors=self.return_tensors
         )
         targets = self.tokenizer(
@@ -131,7 +131,8 @@ class DataCollatorForBaseline(DataCollatorBase):
 
 
 @dataclass
-class DataCollatorForPromptQG(DataCollatorBase):
+class DataCollatorForPromptQG(DataCollatorForBaseline):
+    prompt_length: int = 0
     m_negatives: int = 2
     m_positives: int = 2
 
@@ -140,58 +141,14 @@ class DataCollatorForPromptQG(DataCollatorBase):
                  is_eval: Optional[bool] = False) -> Dict[str, Any]:
 
         if is_eval:
-            return super().__call__(features)
+            inputs, passage = super().__call__(features, True)
+            inputs['attention_mask'] = self._expand(inputs['attention_mask'])
+            return inputs, passage
+        else:
+            inputs = super().__call__(features, False)
+            inputs['attention_mask'] = self._expand(inputs['attention_mask'])
+            return inputs
 
-        # text and id info 
-        texts_src = []
-        texts_tgt = []
-        scores = []
-        labels = []
-
-        # collect passage to query
-        for i, batch in enumerate(features):
-
-            ## m positiive
-            src1, tgt1, score1 = self.prepare_input(
-                    batch['passage'], 
-                    batch['positive'], 
-                    batch['positive_score'],
-                    self.m_positives
-            )
-            ## m negative
-            src0, tgt0, score0 = self.prepare_input(
-                    batch['passage'], 
-                    batch['negative'][::-1], 
-                    batch['negative_score'][::-1],
-                    self.m_negatives
-            )
-
-            texts_src += src1 + src0
-            texts_tgt += tgt1 + tgt0
-            labels += [1]*len(src1) + [0]*len(src0)
-            scores += score1 + score0
-
-        # tokenization
-        inputs = self.tokenizer(
-                texts_src,
-                max_length=self.max_p_length,
-                truncation=True,
-                padding='max_length',
-                return_tensors=self.return_tensors
-        )
-        targets = self.tokenizer(
-                texts_tgt,
-                max_length=self.max_q_length,
-                truncation=True,
-                padding=True,
-                return_tensors=self.return_tensors
-        )
-
-        target_mask = targets['attention_mask'].bool()
-        target_ids = targets['input_ids'].masked_fill(~target_mask, -100)
-        inputs['labels'] = target_ids
-        inputs['decoder_attention_mask'] = target_mask
-        inputs['rel_labels'] = torch.Tensor(labels)
-        inputs['passage'] = features[0]['passage']
-        return inputs
-
+    def _expand(self, mask):
+        additional_mask = torch.ones((mask.size(0), self.prompt_length))
+        return torch.cat([additional_mask, mask], -1)

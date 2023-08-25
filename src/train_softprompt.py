@@ -41,28 +41,21 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
-    from models import FlanT5
-    model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
+    from models import SoftPromptFlanT5
+    model = SoftPromptFlanT5.from_pretrained(
+            hfmodel_args.model_name_or_path,
+            model_args.instruct_prompt_idx
+    )
 
     ## Freezing
-    ### Prompt tuning (hard)
-    if training_args.prefix_tuning:
-        for name, param in model.named_parameters():
-            if 'shared' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
-
     ### Prompt tuning (soft)
-    if model_args.instruct_prompt:
-        model.encoder.init_from_vocab()
-        for name, param in model.named_parameters():
-            if 'prompt' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
+    model.encoder.init_from_vocab()
+    for name, param in model.named_parameters():
+        if 'prompt' in name:
+            param.requires_grad = True
+            print('param {} will be optimized.'.format(name))
+        else:
+            param.requires_grad = False
 
     ## Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
@@ -70,17 +63,18 @@ def main():
 
     # Data
     # Datacollator
-    from data import DataCollatorForBaseline
+    from data import DataCollatorForPromptQG
     used_scores = list(range(0, 101, 101//10))
     used_scores = [s*0.01 for s in used_scores]
-    data_collator = DataCollatorForBaseline(
+    data_collator = DataCollatorForPromptQG(
             tokenizer=tokenizer, 
             max_p_length=data_args.max_p_length,
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
             prefix=model_args.baseline_prefix,
-            scores=used_scores
+            scores=used_scores,
+            prompt_length=len(model_args.instruct_prompt_idx)
     )
 
     # Data
