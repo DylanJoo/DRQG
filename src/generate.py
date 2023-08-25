@@ -58,14 +58,15 @@ if __name__ == "__main__":
     data_collator = DataCollatorBase(
             tokenizer=tokenizer, 
             max_p_length=args.max_p_length,
-            scores=used_scores, 
             device=args.device,
+            scores=used_scores,
             prefix=args.prefix
     )
 
     # Data
     ## dataset, dataloader
     dataset = load_dataset("json", data_files=args.input_jsonl)['train']
+
     dataloader = DataLoader(
             dataset,
             batch_size=args.batch_size,

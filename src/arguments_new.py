@@ -15,7 +15,7 @@ class HFModelArgs:
 class ModelArgs:
     # disable_dropout: bool = field(default=False)
     add_classification_head: bool = field(default=False)
-    baseline_prefix: bool = field(default=False)
+    baseline_prefix: Optional[str] = field(default='')
 
     # Controller
     head_size: int = field(default=64)
@@ -80,3 +80,4 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
     set_embeddings: bool = field(default=True)
+    prefix_tuning: bool = field(default=False)

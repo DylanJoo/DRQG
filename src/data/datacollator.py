@@ -12,7 +12,6 @@ class DataCollatorBase:
     """ This datacollator is specified for evaluation process.
     While the initial arugments are also available for others in training.
     """
-    is_eval: Union[bool, str] = True
     tokenizer: Union[PreTrainedTokenizerBase] = None
     pad_to_multiple_of: Optional[int] = None
     padding: Union[bool, str, PaddingStrategy] = True
@@ -20,15 +19,15 @@ class DataCollatorBase:
     max_p_length: Optional[int] = 512
     max_q_length: Optional[int] = 64
     return_tensors: str = "pt"
-    scores: List[float] = None
     prefix: Optional[str] = ""
+    scores: List[float] = None
     device: Optional[str] = None
 
-    def __call__(self, listOfDict: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
-        # 
-        texts = []
-        passages = [batch['passage'] for batch in listOfDict]
+        texts = [] 
+        passages = [batch['passage'] for batch in features]
+
         for passage in passages:
             for score in self.scores:
                 printed_score = round(score*100)
@@ -40,130 +39,159 @@ class DataCollatorBase:
                 truncation=True,
                 padding=True,
                 return_tensors='pt'
-        )
-
-        for k in inputs:
-            inputs[k] = inputs[k].to(self.device)
+        ).to(self.device)
 
         return inputs, passages
 
+    def prepare_input(self, passage, queries, rel_scores, m=1):
+
+        texts_src = []
+        texts_tgt = []
+        scores = []
+
+        for j in range(m):
+            try:
+                texts_tgt += [queries[j]]
+                scores += [rel_scores[j]]
+            except: 
+                offset = int(j % len(queries))
+                texts_tgt += [queries[offset]]
+                scores += [rel_scores[offset]]
+
+            printed_score = round(scores[-1]*100)
+            texts_src += [self.prefix.format(printed_score, passage)]
+
+        return texts_src, texts_tgt, scores
+
 @dataclass
-class DataCollatorForCtrlQG(DataCollatorBase):
-    is_eval: Union[bool, str] = False
+class DataCollatorForBaseline(DataCollatorBase):
     m_negatives: int = 2
     m_positives: int = 2
-    prefix: str = "{0}"
 
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def __call__(self, 
+                 features: List[Dict[str, Any]],
+                 is_eval: Optional[bool] = False) -> Dict[str, Any]:
+
+        if is_eval:
+            return super().__call__(features)
 
         # text and id info 
-        texts_p = []
-        texts_q = []
-        labels = []
+        texts_src = []
+        texts_tgt = []
         scores = []
-        batch_id = []
+        labels = []
 
+        # collect passage to query
         for i, batch in enumerate(features):
-            p = batch['passage']
 
-            # positive
-            q1_batch = batch['positive']
-            score1_batch = batch['positive_score']
-            for j in range(self.m_positives):
-                labels += [1]
-                try:
-                    texts_q += [q1_batch[j]]
-                    scores += [score1_batch[j]]
-                except: # sometimes #available is less than #specififed 
-                    offset = int(j % len(q1_batch))
-                    texts_q += [q1_batch[offset]]
-                    scores += [score1_batch[offset]]
-                printed_score = round(scores[-1]*100)
-                texts_p += [self.prefix.format(printed_score, p)]
+            ## m positiive
+            src1, tgt1, score1 = self.prepare_input(
+                    batch['passage'], 
+                    batch['positive'], 
+                    batch['positive_score'],
+                    self.m_positives
+            )
+            ## m negative
+            src0, tgt0, score0 = self.prepare_input(
+                    batch['passage'], 
+                    batch['negative'][::-1], 
+                    batch['negative_score'][::-1],
+                    self.m_negatives
+            )
 
-            # negative
-            q0_batch = batch['negative'][::-1]
-            score0_batch = batch['negative_score'][::-1]
-            for j in range(self.m_negatives):
-                labels += [0]
-                try:
-                    texts_q += [q0_batch[j]]
-                    scores += [score0_batch[j]]
-                except:
-                    offset = int(j % len(q0_batch)) 
-                    texts_q += [q0_batch[offset]]
-                    scores += [score0_batch[offset]]
-                printed_score = round(scores[-1]*100)
-                texts_p += [self.prefix.format(printed_score, p)]
+            texts_src += src1 + src0
+            texts_tgt += tgt1 + tgt0
+            labels += [1]*len(src1) + [0]*len(src0)
+            scores += score1 + score0
 
+        # tokenization
         inputs = self.tokenizer(
-                texts_p,
+                texts_src,
                 max_length=self.max_p_length,
                 truncation=True,
                 padding='max_length',
                 return_tensors=self.return_tensors
         )
-
         targets = self.tokenizer(
-                texts_q,
+                texts_tgt,
                 max_length=self.max_q_length,
                 truncation=True,
-                padding='max_length',
+                padding=True,
                 return_tensors=self.return_tensors
         )
 
-        target_ids = targets['input_ids']
         target_mask = targets['attention_mask'].bool()
-        target_ids = target_ids.masked_fill(~target_mask, -100)
-
-        # tensor inputs
+        target_ids = targets['input_ids'].masked_fill(~target_mask, -100)
         inputs['labels'] = target_ids
         inputs['decoder_attention_mask'] = target_mask
         inputs['rel_labels'] = torch.Tensor(labels)
         inputs['rel_scores'] = torch.Tensor(scores)
-        inputs['passage'] = p
-
+        inputs['passage'] = features[0]['passage']
         return inputs
+
 
 @dataclass
-class DataCollatorForQG(DataCollatorBase):
-    irrelevant_included: bool = field(default=False)
-    relevant_included: bool = field(default=True)
+class DataCollatorForPromptQG(DataCollatorBase):
+    m_negatives: int = 2
+    m_positives: int = 2
 
-    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def __call__(self, 
+                 features: List[Dict[str, Any]], 
+                 is_eval: Optional[bool] = False) -> Dict[str, Any]:
 
-        texts_p = [batch['passage'] for batch in features]
-        texts_q1 = [batch['positive'] for batch in features]
-        texts_q0 = [batch['negative'] for batch in features]
+        if is_eval:
+            return super().__call__(features)
 
-        if self.irrelevant_included and self.relevant_included:
-            texts_q = [random.sample((q1, q0), k=1)[0] \
-                    for q1, q0 in zip(texts_q1, texts_q0)]
-        else:
-            if self.irrelevant_included:
-                texts_q = texts_q0
-            if self.relevant_included:
-                texts_q = texts_q1
+        # text and id info 
+        texts_src = []
+        texts_tgt = []
+        scores = []
+        labels = []
 
+        # collect passage to query
+        for i, batch in enumerate(features):
+
+            ## m positiive
+            src1, tgt1, score1 = self.prepare_input(
+                    batch['passage'], 
+                    batch['positive'], 
+                    batch['positive_score'],
+                    self.m_positives
+            )
+            ## m negative
+            src0, tgt0, score0 = self.prepare_input(
+                    batch['passage'], 
+                    batch['negative'][::-1], 
+                    batch['negative_score'][::-1],
+                    self.m_negatives
+            )
+
+            texts_src += src1 + src0
+            texts_tgt += tgt1 + tgt0
+            labels += [1]*len(src1) + [0]*len(src0)
+            scores += score1 + score0
+
+        # tokenization
         inputs = self.tokenizer(
-                [f"{self.prefix}{p}" for p in texts_p],
+                texts_src,
                 max_length=self.max_p_length,
                 truncation=True,
-                padding=True,
-                return_tensors='pt'
+                padding='max_length',
+                return_tensors=self.return_tensors
         )
-        target_ids = self.tokenizer(
-                texts_q,
+        targets = self.tokenizer(
+                texts_tgt,
                 max_length=self.max_q_length,
+                truncation=True,
                 padding=True,
-                return_tensors='pt'
-        ).input_ids
-        target_ids[target_ids == self.tokenizer.pad_token_id] = -100
+                return_tensors=self.return_tensors
+        )
+
+        target_mask = targets['attention_mask'].bool()
+        target_ids = targets['input_ids'].masked_fill(~target_mask, -100)
         inputs['labels'] = target_ids
-
-        if self.is_eval:
-            inputs['passage'] = texts_p
-            inputs['positive'] = texts_q1
-            inputs['negative'] = texts_q0
-
+        inputs['decoder_attention_mask'] = target_mask
+        inputs['rel_labels'] = torch.Tensor(labels)
+        inputs['passage'] = features[0]['passage']
         return inputs
+

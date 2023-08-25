@@ -1,80 +1,84 @@
-from typing import List, Optional, Tuple, Union, Dict, Any
-
 import torch
-import inspect
 from torch import nn
-from torch.nn import CrossEntropyLoss
-
-from transformers import AutoModelForSeq2SeqLM
-from transformers.modeling_outputs import Seq2SeqLMOutput
-from controller import D
+from typing import List, Optional, Tuple, Union, Dict, Any
+from transformers import T5Config 
+from transformers.models.bart.modeling_bart import (
+    BartModel,
+    shift_tokens_right, 
+    BartClassificationHead
+)
+from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
 from _base import FlanT5
 
-import copy
+class MemoryFlanT5(FlanT5):
 
-class EarlyCtrlQG(FlanT5):
-    def __init__(self, config):
-        super().__init_(config)
+    def __init__(self, memory_type='enlarge', **kwargs):
+        """ add a memory projection layer.
 
-        # [Pre-prompt] 
-        # [TODO] write static functions for them?
-        self.controller = AdaPrompt(
-                wte=self.shared, 
-                hidden_size=self.config.d_model,
-                init_idx=cvqg_config.prompts_idx,
-                lbl_init_idx=cvqg_config.label_prompts_idx,
-                activation=cvqg_config.activation
-        )
-        self.batch_size = kwargs.pop('batch_size', None)
-        self.aggregate = kwargs.pop('aggregate', False)
+        :param: memory_type ['enlarge', 'layer_wise'] 
+         enlarge is up-projection from `d_model` to `d_model*n_layers`.
+         layer_wise is projection from `d_mdoel` to `d_model` layer-wise.
+        """
+        super().__init__(self, **kwargs)
+        if memory_type == 'enlarge':
+            d_memory = config.num_decoder_layers 
+            d_memory *= config.d_model
+        elif memory_proj == 'layer_wise':
+            d_memory *= config.d_model
 
-    @add_start_docstrings_to_model_forward(T5_INPUTS_DOCSTRING)
-    @replace_return_docstrings(output_type=Seq2SeqLMOutput, config_class=_CONFIG_FOR_DOC)
+        self.embed_size_per_head = config.d_model // config.num_heads
+        self.memory_type = memory_type
+        self.memory_layer = nn.Linear(condig.d_model, d_memory, bias=False)
+
+    def memory_projection(self, encoder_outputs):
+        """ this projection is to extract the feature from encoder outputs; 
+        it performs in two ways, last hidden state or all hidden states.
+        """
+        B = encoder_outputs[0].shape[0]
+        Nh = self.config.decoder_attention_heads
+
+        if self.memory_type == 'enlarge':
+            memory = self.memory_layer(encoder_outputs['last_hidden_states'])
+        elif self.memory_type == 'layer_wise':
+            memory = self.memory_layer(torch.cat( layer[:-1, :, :] \
+                    for layer in encoder_outputs['hidden_states']
+            ))
+        memory = memory.view(
+                B, M,
+                self.config.decoder_layers,
+                self.config.num_heads,
+                self.embed_size_per_head
+        ).permute(2, 0, 3, 1, 4)
+
+        return tuple((None, None, ca, ca) for ca in memory)
+
     def forward(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.FloatTensor] = None,
-        decoder_input_ids: Optional[torch.LongTensor] = None,
-        decoder_attention_mask: Optional[torch.BoolTensor] = None,
-        head_mask: Optional[torch.FloatTensor] = None,
-        decoder_head_mask: Optional[torch.FloatTensor] = None,
-        cross_attn_head_mask: Optional[torch.Tensor] = None,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
         encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
-        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        decoder_inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        steps: Optional[int] = None,
-        rel_labels: Optional[torch.LongTensor] = None,
-        rel_scores: Optional[torch.LongTensor] = None,
-    ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
-
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        **kwargs
+    ) -> Union[Tuple, Seq2SeqLMOutput]:
+        """
+        :param input_ids: input tokenized ids
+        :param attention_mask: tokenized attention mask
+        :param encoder_outputs: the encoder's output class during training or 
+            first prediction pass.
+        :param past_key_values: the cached key value states during decoding
+        """
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        # FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
-        if head_mask is not None and decoder_head_mask is None:
-            if self.config.num_layers == self.config.num_decoder_layers:
-                warnings.warn(__HEAD_MASK_WARNING_MSG, FutureWarning)
-                decoder_head_mask = head_mask
 
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
-            # [pre-prompt]
-            inputs_embeds = self.controller(input_ids, rel_scores)
-
             # Convert encoder inputs in embeddings if needed
             encoder_outputs = self.encoder(
-                input_ids=None,
+                input_ids=input_ids,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
                 head_mask=head_mask,
                 output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
+                output_hidden_states=True,
                 return_dict=return_dict,
             )
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
@@ -88,9 +92,7 @@ class EarlyCtrlQG(FlanT5):
 
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
-
         if labels is not None and decoder_input_ids is None and decoder_inputs_embeds is None:
-            # get decoder inputs from shifting lm labels to the right
             decoder_input_ids = self._shift_right(labels)
 
         # Set device for model parallelism
@@ -103,6 +105,11 @@ class EarlyCtrlQG(FlanT5):
                 attention_mask = attention_mask.to(self.decoder.first_device)
             if decoder_attention_mask is not None:
                 decoder_attention_mask = decoder_attention_mask.to(self.decoder.first_device)
+
+        # [NOTE] Memory projection
+        ## project right after the encoding was done.
+        if encoder_outputs is not None and past_key_values is not None:
+            past_key_values = self.memory_projection(encoder_outputs)
 
         # Decode
         decoder_outputs = self.decoder(
@@ -129,8 +136,6 @@ class EarlyCtrlQG(FlanT5):
             sequence_output = sequence_output.to(self.lm_head.weight.device)
 
         if self.config.tie_word_embeddings:
-            # Rescale output before projecting on vocab
-            # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/transformer.py#L586
             sequence_output = sequence_output * (self.model_dim**-0.5)
 
         lm_logits = self.lm_head(sequence_output)
@@ -141,8 +146,6 @@ class EarlyCtrlQG(FlanT5):
             # move labels to correct device to enable PP
             labels = labels.to(lm_logits.device)
             loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-            # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
-
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
             return ((loss,) + output) if loss is not None else output

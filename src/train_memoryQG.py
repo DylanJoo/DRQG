@@ -44,32 +44,23 @@ def main():
     from models import FlanT5
     model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
 
-    ## Freezing
-    if training_args.prefix_tuning:
-        for name, param in model.named_parameters():
-            if 'shared' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
-
-    ## Generation config
+    # Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
     # Data
     # Datacollator
-    from data import DataCollatorForBaseline
-    used_scores = list(range(0, 101, 101//10))
-    used_scores = [s*0.01 for s in used_scores]
-    data_collator = DataCollatorForBaseline(
+    from data import DataCollatorForCtrlQG
+    data_collator = DataCollatorForCtrlQG(
             tokenizer=tokenizer, 
+            padding=True,
+            return_tensors='pt',
+            is_train=True,
             max_p_length=data_args.max_p_length,
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
-            prefix=model_args.baseline_prefix,
-            scores=used_scores
+            prefix=model_args.baseline_prefix
     )
 
     # Data
@@ -100,6 +91,8 @@ def main():
             data_collator=data_collator,
     )
     trainer.set_tokenizer(tokenizer)
+    trainer.set_prefix(model_args.baseline_prefix)
+    
     results = trainer.train(
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )
