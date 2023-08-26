@@ -76,7 +76,7 @@ generate_baseline2:
 	  --num_pred 11 \
 	  --prefix "Generate a question with relevance label <extra_id_{0}> for the passage: {1}"
 
-# soft prompt
+# soft prompt (instruction N dim; i.e., d2q)
 train_softprompt_d2q:
 	export CUDA_VISIBLE_DEVICES=1 
 	python3 train_softprompt.py \
@@ -92,9 +92,34 @@ train_softprompt_d2q:
 	  --learning_rate 1e-4 \
 	  --evaluation_strategy steps \
 	  --max_steps 10000 \
-	  --save_steps 2000 \
+	  --save_steps 4000 \
 	  --eval_steps 500 \
 	  --train_file ${TRAIN_FILE} \
-	  --instruct_prompt "Generate a question for the passage: " \
+	  --instruction_prompt "Generate a question for the passage: " \
+	  --do_train \
+	  --do_eval 
+
+
+export CUDA_VISIBLE_DEVICES=1 
+# soft prompt (instruction N dim + relevance 1 dim)
+train_softprompt_rel:
+	python3 train_softprompt.py \
+	  --model_name_or_path google/flan-t5-base \
+	  --tokenizer_name google/flan-t5-base \
+	  --config_name google/flan-t5-base \
+	  --output_dir models/checkpoints/flan-t5-base-soft-rel \
+	  --max_p_length 256 \
+	  --max_q_length 16 \
+	  --per_device_train_batch_size 4 \
+	  --m_positive_per_example 2 \
+	  --m_negative_per_example 2 \
+	  --learning_rate 1e-4 \
+	  --evaluation_strategy steps \
+	  --max_steps 10000 \
+	  --save_steps 4000 \
+	  --eval_steps 500 \
+	  --train_file ${TRAIN_FILE} \
+	  --instruction_prompt "Generate a question for the passage with relevance label: " \
+	  --relevance_prompt "false true" \
 	  --do_train \
 	  --do_eval 

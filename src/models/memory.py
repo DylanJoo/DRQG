@@ -1,23 +1,19 @@
+import copy
 import torch
 from torch import nn
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import T5Config 
-from transformers.models.bart.modeling_bart import (
-    BartModel,
-    shift_tokens_right, 
-    BartClassificationHead
-)
+from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
-from _base import FlanT5
+from models import FlanT5
 
 class MemoryFlanT5(FlanT5):
 
     def __init__(self, memory_type='enlarge', **kwargs):
         """ add a memory projection layer.
 
-        :param: memory_type ['enlarge', 'layer_wise'] 
-         enlarge is up-projection from `d_model` to `d_model*n_layers`.
-         layer_wise is projection from `d_mdoel` to `d_model` layer-wise.
+        :param: memory_type via 'enlarge' up-projection, 
+          or 'layer_wise' flat projection 
         """
         super().__init__(self, **kwargs)
         if memory_type == 'enlarge':

@@ -6,6 +6,11 @@ class FlanT5(T5ForConditionalGeneration):
         super().__init__(config)
         self.n_samples = 1
 
-    def forward(self, steps=None, rel_labels=None, rel_scores=None, passage=None, **kwargs):
+    def forward(self, 
+                steps=None, 
+                rel_labels=None, 
+                rel_scores=None, 
+                passage=None, 
+                **kwargs):
         return super().forward(**kwargs)
 

@@ -20,8 +20,8 @@ class ModelArgs:
     baseline_prefix: Optional[str] = field(default='{1}')
 
     # Softprompt/EarlyCtrlQG
-    instruct_prompt: Optional[str] = field(default=None)
-    instruct_prompt_idx: Optional[str] = field(default=None)
+    instruction_prompt: Optional[str] = field(default=None)
+    instruction_prompt_idx: Optional[str] = field(default=None)
     relevance_prompt: Optional[str] = field(default=None)
     relevance_prompt_idx: Optional[str] = field(default=None)
 
