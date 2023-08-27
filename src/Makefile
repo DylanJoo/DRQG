@@ -91,7 +91,7 @@ generate_baseline1-large:
 	  --input_jsonl ${EVAL_FILE} \
 	  --output_jsonl results/baseline1_large_prefix.jsonl \
 	  --device cuda:1 \
-	  --batch_size 8 \
+	  --batch_size 4 \
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --prefix "Generate a question with relevance score {0} for the passage: {1}" 
@@ -127,7 +127,7 @@ generate_baseline_d2q:
 	  --input_jsonl ${EVAL_FILE} \
 	  --output_jsonl results/baseline_d2q_prefix.jsonl \
 	  --device cuda:1 \
-	  --batch_size 8 \
+	  --batch_size 4 \
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --instruction_prompt "Generate a question for the passage: " 
