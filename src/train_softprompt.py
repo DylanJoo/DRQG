@@ -18,10 +18,8 @@ def prepare_prompt_idx(opt, tokenizer):
 
     if opt.instruction_prompt:
         opt.instruction_prompt_idx = get_tokenized_idx(opt.instruction_prompt)
-        print('Used instruction prompt:', opt.instruction_prompt_idx)
     if opt.relevance_prompt:
         opt.relevance_prompt_idx = get_tokenized_idx(opt.relevance_prompt)
-        print('Used relevance prompt:', opt.relevance_prompt_idx)
 
 def main():
     # Parse argument for huggingface packages

@@ -2,7 +2,7 @@ from transformers import T5ForConditionalGeneration
 
 class FlanT5(T5ForConditionalGeneration):
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, *args, **kwargs):
         super().__init__(config)
         self.n_samples = 1
 

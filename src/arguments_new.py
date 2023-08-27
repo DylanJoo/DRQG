@@ -19,7 +19,7 @@ class ModelArgs:
     # Baseline and hard prompt # {1} means passage
     baseline_prefix: Optional[str] = field(default='{1}')
 
-    # Softprompt/EarlyCtrlQG
+    # Soft relevance prompt (earlyCtrlQG)
     instruction_prompt: Optional[str] = field(default=None)
     instruction_prompt_idx: Optional[str] = field(default=None)
     relevance_prompt: Optional[str] = field(default=None)
@@ -42,11 +42,6 @@ class ModelArgs:
     # annealing_fn: str = field(default='cyclic')
     # n_total_iter: Optional[int] = field(default=10000)
     # n_cycle: Optional[int] = field(default=10)
-
-    # freeze layers
-    # freeze_encoder: Optional[bool] = field(default=True)
-    # freeze_decoder: Optional[bool] = field(default=True)
-    # freeze_embeddings: Optional[bool] = field(default=True)
 
 @dataclass
 class DataArgs:

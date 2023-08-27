@@ -15,8 +15,10 @@ class SoftPromptFlanT5(FlanT5):
                  relevance_prompt_idx: Optional[List[int]] = None):
 
         super().__init__(config)
-        self.model_dim = config.d_model
+        print('Used instruction prompt:', instruction_prompt_idx)
+        print('Used relevance prompt:', relevance_prompt_idx)
 
+        self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
 
         encoder_config = copy.deepcopy(config)
