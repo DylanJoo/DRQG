@@ -214,4 +214,3 @@ class InstanceWisePrompt(nn.Module):
         else:
             mask = torch.ones((mask.size(0), -self.length), device=mask.device)
         return mask
-

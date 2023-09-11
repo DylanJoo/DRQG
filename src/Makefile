@@ -131,4 +131,4 @@ generate_softprompt_rel:
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --instruction_prompt "Generate a question for the passage with relevance label: " \
-	  --relevance_prompt "false true" \
+	  --relevance_prompt "false true"

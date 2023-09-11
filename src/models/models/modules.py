@@ -508,4 +508,4 @@ def AttentivePooling(hidden_x, label_embeds, condition):
     probs = torch.mul(probs, condition.unsqueeze(1)).mean(-1)
     hidden_x_attn = torch.mul(hidden_x, probs.unsqueeze(-1))
     return hidden_x_attn.mean(1)
-  
+

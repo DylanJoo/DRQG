@@ -3,6 +3,7 @@ __pycache__/
 *.swp
 logs/
 wandb/
+results/
 
 # checkpoints
 models/*/
