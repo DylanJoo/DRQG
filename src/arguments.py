@@ -16,34 +16,32 @@ class ModelArgs:
     # disable_dropout: bool = field(default=False)
     add_classification_head: bool = field(default=False)
 
+    # Baseline and hard prompt # {1} means passage
+    baseline_prefix: Optional[str] = field(default='{1}')
+
+    # Soft relevance prompt (earlyCtrlQG)
+    instruction_prompt: Optional[str] = field(default=None)
+    instruction_prompt_idx: Optional[str] = field(default=None)
+    relevance_prompt: Optional[str] = field(default=None)
+    relevance_prompt_idx: Optional[str] = field(default=None)
+
     # Controller
     head_size: int = field(default=64)
     pooling: Optional[str] = field(default='mean')
     activation: Optional[str] = field(default='sigmoid')
 
-    # conditional QG
-    prompts: Optional[str] = field(default=None)
-    label_prompts: Optional[str] = field(default=None)
-    prompts_idx = None
-    label_prompts_idx = None
-
-    # relevance QG
-    pos_anchors : Optional[str] = field(default=None)
-    neg_anchors : Optional[str] = field(default=None)
-    pos_anchors_idx = None
-    neg_anchors_idx = None
+    # EarlyCtrlQG
+    # pos_anchors : Optional[str] = field(default=None)
+    # neg_anchors : Optional[str] = field(default=None)
+    # pos_anchors_idx = None
+    # neg_anchors_idx = None
 
     # variational
-    latent_size: int = field(default=128)
-    has_compressed_layer: bool = field(default=False)
-    annealing_fn: str = field(default='cyclic')
-    n_total_iter: Optional[int] = field(default=10000)
-    n_cycle: Optional[int] = field(default=10)
-
-    # freeze layers
-    freeze_encoder: Optional[bool] = field(default=True)
-    freeze_decoder: Optional[bool] = field(default=True)
-    freeze_embeddings: Optional[bool] = field(default=True)
+    # latent_size: int = field(default=128)
+    # has_compressed_layer: bool = field(default=False)
+    # annealing_fn: str = field(default='cyclic')
+    # n_total_iter: Optional[int] = field(default=10000)
+    # n_cycle: Optional[int] = field(default=10)
 
 @dataclass
 class DataArgs:
@@ -79,3 +77,4 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
     set_embeddings: bool = field(default=True)
+    prefix_tuning: bool = field(default=False)

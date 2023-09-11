@@ -44,27 +44,16 @@ def main():
     from models import FlanT5
     model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
 
-    ## Freezing
-    ### Prompt tuning (hard)
-    if training_args.prefix_tuning:
-        for name, param in model.named_parameters():
-            if 'shared' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
+    # model freezed
+    for name, param in model.named_parameters():
+        # tune the shared embeddings
+        if training_args.prefix_tuning and ('shared' in name):
+            param.requires_grad = True
+            print('param {} will be optimized.'.format(name))
+        else:
+            param.requires_grad = False
 
-    ### Prompt tuning (soft)
-    if model_args.instruct_prompt:
-        model.encoder.init_from_vocab()
-        for name, param in model.named_parameters():
-            if 'prompt' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
-
-    ## Generation config
+    # Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
@@ -111,6 +100,8 @@ def main():
             data_collator=data_collator,
     )
     trainer.set_tokenizer(tokenizer)
+    trainer.set_prefix(model_args.baseline_prefix)
+    
     results = trainer.train(
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )

@@ -41,40 +41,32 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
-    from models import FlanT5
-    model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
+    from models import SoftPromptFlanT5 
+    model = SoftPromptFlanT5.from_pretrained(hfmodel_args.model_name_or_path)
+    model.encoder.init_from_vocab()
 
-    ## Freezing
-    ### Prompt tuning (hard)
-    if training_args.prefix_tuning:
-        for name, param in model.named_parameters():
-            if 'shared' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
+    # model freezed
+    for name, param in model.named_parameters():
+        # tune the shared embeddings
+        if 'prompt_embed' in name:
+            param.requires_grad = True
+            print('param {} will be optimized.'.format(name))
+        else:
+            param.requires_grad = False
 
-    ### Prompt tuning (soft)
-    if model_args.instruct_prompt:
-        model.encoder.init_from_vocab()
-        for name, param in model.named_parameters():
-            if 'prompt' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
-
-    ## Generation config
+    # Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
     model.generation_config = generation_config
 
     # Data
     # Datacollator
-    from data import DataCollatorForBaseline
+    from data import DataCollatorForPromptQG
     used_scores = list(range(0, 101, 101//10))
     used_scores = [s*0.01 for s in used_scores]
-    data_collator = DataCollatorForBaseline(
+    data_collator = DataCollatorForPromptQG(
             tokenizer=tokenizer, 
+            padding=True,
+            return_tensors='pt',
             max_p_length=data_args.max_p_length,
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
@@ -111,6 +103,7 @@ def main():
             data_collator=data_collator,
     )
     trainer.set_tokenizer(tokenizer)
+
     results = trainer.train(
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )

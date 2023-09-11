@@ -11,53 +11,35 @@ class TrainerBase(Seq2SeqTrainer):
     def set_tokenizer(self, tokenizer=None):
         self.tokenizer = tokenizer
 
-    def set_prefix(self, prefix=None):
-        self.prefix = prefix
-
     def compute_loss(self, model, inputs):
         """
         param: text_inputs: the raw inputs of passages.
         """
-        passage = inputs.pop('passage')
+        passage = inputs.pop('passage', "")
         training_steps = copy.deepcopy(self.state.global_step)
         loss = super().compute_loss(model, inputs, return_outputs)
 
         if training_steps % 50 == 0:
             print(f"\nNLL: {loss}")
-            self._verbose_prediction(model, passage, 10)
+            self._verbose_prediction(model, passage)
         return loss
 
-    def _verbose_prediction(self, model, passage, num_pred=10):
+    def _verbose_prediction(self, model, passage):
         """
+        param: model: a generator or a seq2seq model.
         param: passage: one passage for prediction.
-        param: num_pred: number of interpolated output (range from 0-100)
         """
         # construct relevance score conditions
-        scores = list(range(0, 101, 101//(num_pred-1)))
-        if self.prefix:
-            text_inputs = [self.prefix.format(s, passage) for s in scores]
-        else:
-            text_inputs = [passage for s in scores]
-            scores = torch.tensor(scores) / 100
-
-        inputs = self.tokenizer(
-                text_inputs, 
-                max_length=512,
-                truncation=True,
-                padding=True,
-                return_tensors='pt'
-        )
-        for k in inputs:
-            inputs[k] = inputs[k].to(model.device)
+        features = [{'passage': passage}]
+        inputs, _ = self.data_collator(features, is_eval=True)
+        inputs = inputs.to(model.device)
 
         model.eval()
         with torch.no_grad():
             outputs = model.generate(**inputs, num_beams=1)
-
-            print('============')
-            print("Passage", passage)
-            print('============')
-            for i, s in enumerate(scores):
+                    # rel_scores=torch.Tensor(self.data_collator.scores),
+            print('============\nPassage: ', passage, '\n============')
+            for i, s in enumerate(self.data_collator.scores):
                 print(f"({i:<3}) >>", self.tokenizer.decode(outputs[i], skip_special_tokens=True))
         model.train()
 
@@ -65,31 +47,31 @@ class TrainerForQG(TrainerBase):
 
     def compute_loss(self, model, inputs, return_outputs=False):
         passage = inputs.pop('passage')
+        rel_labels = inputs.pop('rel_labels')
         training_steps = copy.deepcopy(self.state.global_step)
         outputs = model(**inputs, steps=training_steps)
 
-        # inputs
-        labels = inputs.get("labels").to(model.device)
-
         # outputs
         lm_logits = outputs.get("logits")
+        n = lm_logits.shape[0] // 2
+
+        # inputs
+        labels = inputs.get("labels").to(lm_logits.device)
 
         ## (1) text generation loss
         loss_gen = gen_mle_loss(
                 lm_logits, 
                 labels, 
-                inputs.get('rel_labels', None),
+                rel_labels,
                 model.config.vocab_size
         )
-        loss_gen_pos = loss_gen.get('pos', 0)
-        loss_gen_neg = loss_gen.get('neg', 0)
+        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']
 
-        loss_gen = (loss_gen_pos+loss_gen_neg) / 2
-        loss = loss_gen
+        loss = (loss_gen_pos + loss_gen_neg) / 2
 
         if training_steps % 50 == 0:
-            print(f"\nNLL: {loss}")
-            self._verbose_prediction(model, passage, 10)
+            print(f"\nNLL: {loss} = {loss_gen_pos} + {loss_gen_neg}")
+            self._verbose_prediction(model, passage)
 
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
@@ -98,3 +80,27 @@ class TrainerForQG(TrainerBase):
 
         return (loss, outputs) if return_outputs else loss
     
+class TrainerForRelQG(TrainerForQG):
+
+    def _verbose_prediction(self, model, passage):
+        """
+        param: model: a generator or a seq2seq model.
+        param: passage: one passage for prediction.
+        """
+        # construct relevance score conditions
+        features = [{'passage': passage}]
+        inputs, _ = self.data_collator(features, is_eval=True)
+        inputs = inputs.to(model.device)
+
+        rel_scores = torch.Tensor(self.data_collator.scores).to(model.device)
+        model.eval()
+        with torch.no_grad():
+            outputs = model.generate(
+                    **inputs, 
+                    rel_scores=rel_scores,
+                    num_beams=1
+            )
+            print('============\nPassage: ', passage, '\n============')
+            for i, s in enumerate(self.data_collator.scores):
+                print(f"({i:<3}) >>", self.tokenizer.decode(outputs[i], skip_special_tokens=True))
+        model.train()

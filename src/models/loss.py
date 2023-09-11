@@ -83,17 +83,19 @@ def gen_mle_loss(lm_logits, labels, seq_labels, vocab_size):
     loss_gen_pos, loss_gen_neg = 0, 0
     loss_fct = CrossEntropyLoss(reduction='none')
 
-    loss_gen_neg = loss_fct(
-            lm_logits[seq_labels<1].view(-1, vocab_size), 
-            labels[seq_labels<1].view(-1)
-    ).mean()
+    if len(labels[seq_labels==1]) > 0:
+        loss_gen_pos = loss_fct(
+                lm_logits[seq_labels==1].view(-1, vocab_size), 
+                labels[seq_labels==1].view(-1)
+        ).mean()
 
-    loss_gen_pos = loss_fct(
-            lm_logits[seq_labels==1].view(-1, vocab_size), 
-            labels[seq_labels==1].view(-1)
-    ).mean()
+    if len(labels[seq_labels<1]) > 0:
+        loss_gen_neg = loss_fct(
+                lm_logits[seq_labels<1].view(-1, vocab_size), 
+                labels[seq_labels<1].view(-1)
+        ).mean()
 
-    return {"pos": loss_gen_pos, "neg": loss_gen_neg}
+    return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
 
 def ql_kl_loss(clf_logits, clf_scores):
     loss_fct = KLDivLoss(reduction='sum')
