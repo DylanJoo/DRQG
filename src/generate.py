@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from arguments_new import *
+from arguments import *
 from utils import batch_iterator
 from transformers import AutoConfig, AutoTokenizer
 

@@ -1,5 +1,5 @@
 # ---  Model settings --- #
-# baseline1: relevance as number as prompt
+# [*] baseline1: relevance as number as prompt
 # 	* full fine-tuning
 # 	* prefix tuning
 # baseline2: relevance as extra id label as prompt
@@ -14,8 +14,7 @@ EVAL_FILE=data/ce.minilm.hardneg.vL.eval.small.jsonl
 
 SIZE=base
 train_baseline1:
-	export CUDA_VISIBLE_DEVICES=2
-	python3 train_baseline.py \
+	export CUDA_VISIBLE_DEVICES=2; python3 train_baseline.py \
 	  --model_name_or_path google/flan-t5-${SIZE} \
 	  --tokenizer_name google/flan-t5-${SIZE} \
 	  --config_name google/flan-t5-${SIZE} \
@@ -36,29 +35,6 @@ train_baseline1:
 	  --do_train \
 	  --do_eval 
 
-train_baseline2:
-	python3 train_baseline.py \
-	  --model_name_or_path google/flan-t5-${SIZE} \
-	  --tokenizer_name google/flan-t5-${SIZE} \
-	  --config_name google/flan-t5-${SIZE} \
-	  --output_dir models/checkpoints/flan-t5-${SIZE}-extra-prefix \
-	  --max_p_length 256 \
-	  --max_q_length 16 \
-	  --per_device_train_batch_size 4 \
-	  --m_negative_per_example 2 \
-	  --m_positive_per_example 2 \
-	  --learning_rate 1e-4 \
-	  --evaluation_strategy steps \
-	  --max_steps 10000 \
-	  --save_steps 2000 \
-	  --eval_steps 500 \
-	  --train_file ${TRAIN_FILE} \
-	  --baseline_prefix "Generate a question with relevance label <extra_id_{0}> for the passage: {1}" \
-	  --prefix_tuning true \
-	  --do_train \
-	  --do_eval 
-
-# Evaluate/generate the experimental results0
 generate_baseline1:
 	# baseline model 1
 	python3 generate.py \
@@ -71,18 +47,6 @@ generate_baseline1:
 	  --max_p_length 256 \
 	  --num_pred 11 \
 	  --prefix "Generate a question with relevance score {0} for the passage: {1}" 
-
-generate_baseline2:
-	python3 generate.py \
-	  --model_path models/checkpoints/flan-t5-base-extra-prefix/checkpoint-2000 \
-	  --model_name google/flan-t5-base \
-	  --input_jsonl ${EVAL_FILE} \
-	  --output_jsonl results/baseline2_prefix.jsonl \
-	  --device cuda:1 \
-	  --batch_size 8 \
-	  --max_p_length 256 \
-	  --num_pred 11 \
-	  --prefix "Generate a question with relevance label <extra_id_{0}> for the passage: {1}"
 
 generate_baseline1-large:
 	python3 generate.py \
@@ -120,23 +84,22 @@ generate_baseline1-large:
 # 	  --do_train \
 # 	  --do_eval 
 
-generate_baseline_d2q:
-	python3 generate.py \
-	  --model_path models/checkpoints/flan-t5-large-soft-d2q/checkpoint-4000 \
-	  --model_name google/flan-t5-large \
-	  --input_jsonl ${EVAL_FILE} \
-	  --output_jsonl results/baseline_d2q_prefix.jsonl \
-	  --device cuda:1 \
-	  --batch_size 4 \
-	  --max_p_length 256 \
-	  --num_pred 11 \
-	  --instruction_prompt "Generate a question for the passage: " 
+# generate_baseline_d2q:
+# 	python3 generate.py \
+# 	  --model_path models/checkpoints/flan-t5-large-soft-d2q/checkpoint-4000 \
+# 	  --model_name google/flan-t5-large \
+# 	  --input_jsonl ${EVAL_FILE} \
+# 	  --output_jsonl results/baseline_d2q_prefix.jsonl \
+# 	  --device cuda:1 \
+# 	  --batch_size 4 \
+# 	  --max_p_length 256 \
+# 	  --num_pred 11 \
+# 	  --instruction_prompt "Generate a question for the passage: " 
 
 
 # soft prompt (instruction N dim + relevance 1 dim)
 train_softprompt_rel:
-	export CUDA_VISIBLE_DEVICES=1
-	python3 train_softprompt.py \
+	export CUDA_VISIBLE_DEVICES=1; python3 train_softprompt.py \
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \

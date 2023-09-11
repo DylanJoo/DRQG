@@ -8,7 +8,7 @@ from transformers import (
     GenerationConfig
 )
 from datasets import load_dataset
-from arguments_new import *
+from arguments import *
 
 import os
 os.environ["WANDB_DISABLED"] = "false"
