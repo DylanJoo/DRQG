@@ -19,6 +19,8 @@ def prepare_prompt_idx(opt, tokenizer):
         opt.instruction_prompt_idx = get_tokenized_idx(opt.instruction_prompt)
     if opt.relevance_prompt:
         opt.relevance_prompt_idx = get_tokenized_idx(opt.relevance_prompt)
+    if opt.nonrelevance_prompt:
+        opt.nonrelevance_prompt_idx = get_tokenized_idx(opt.nonrelevance_prompt)
 
 def main():
     # Parse argument for huggingface packages
@@ -43,6 +45,7 @@ def main():
             hfmodel_args.model_name_or_path,
             model_args.instruction_prompt_idx,
             model_args.relevance_prompt_idx
+            model_args.nonrelevance_prompt_idx
     )
     prompt_length = len(model_args.instruction_prompt_idx) 
     prompt_length += len(model_args.relevance_prompt_idx) 

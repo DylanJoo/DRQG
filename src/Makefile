@@ -106,7 +106,8 @@ train_softprompt_rel:
 	  --eval_steps 500 \
 	  --train_file ${TRAIN_FILE} \
 	  --instruction_prompt "Generate a question for the passage with relevance label: " \
-	  --relevance_prompt "what how where when which what" \
+	  --relevance_prompt "true true true true true true true true true true" \
+	  --nonrelevance_prompt "false false false false false false false false false false" \
 	  --random_init true \
 	  --do_train \
 	  --do_eval 

@@ -24,6 +24,8 @@ class ModelArgs:
     instruction_prompt_idx: Optional[str] = field(default=None)
     relevance_prompt: Optional[str] = field(default=None)
     relevance_prompt_idx: Optional[str] = field(default=None)
+    nonrelevance_prompt: Optional[str] = field(default=None)
+    nonrelevance_prompt_idx: Optional[str] = field(default=None)
 
     # Controller
     head_size: int = field(default=64)

@@ -76,6 +76,7 @@ class SoftRelPromptT5Stack(T5Stack):
     def __init__(self, 
                  instruction_idx=None, 
                  relevance_idx=None, 
+                 nonrelevance_idx=None, 
                  embed_tokens=None, 
                  **kwargs):
         super().__init__(**kwargs)
@@ -96,8 +97,9 @@ class SoftRelPromptT5Stack(T5Stack):
         self.positive_prompt = nn.Parameter(torch.rand(
             len(relevance_idx), embed_tokens.embedding_dim
         ))
+        self.nonrelevance_idx = torch.LongTensor(nonrelevance_idx)
         self.negative_prompt = nn.Parameter(torch.rand(
-            len(relevance_idx), embed_tokens.embedding_dim
+            len(nonrelevance_idx), embed_tokens.embedding_dim
         ))
 
     def init_from_vocab(self, positive=True, negative=True):
