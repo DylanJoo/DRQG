@@ -50,7 +50,9 @@ def main():
 
     ## Freezing
     ### Prompt tuning (soft)
-    model.encoder.init_from_vocab()
+    if training_args.random_init is False:
+        model.encoder.init_from_vocab()
+
     print('\n')
     for name, param in model.named_parameters():
         if 'prompt' in name:
