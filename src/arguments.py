@@ -19,7 +19,7 @@ class ModelArgs:
     # Baseline and hard prompt # {1} means passage
     baseline_prefix: Optional[str] = field(default='{1}')
 
-    # Soft relevance prompt (earlyCtrlQG)
+    # Soft relevance prompt 
     instruction_prompt: Optional[str] = field(default=None)
     instruction_prompt_idx: Optional[str] = field(default=None)
     relevance_prompt: Optional[str] = field(default=None)
@@ -29,12 +29,6 @@ class ModelArgs:
     head_size: int = field(default=64)
     pooling: Optional[str] = field(default='mean')
     activation: Optional[str] = field(default='sigmoid')
-
-    # EarlyCtrlQG
-    # pos_anchors : Optional[str] = field(default=None)
-    # neg_anchors : Optional[str] = field(default=None)
-    # pos_anchors_idx = None
-    # neg_anchors_idx = None
 
     # variational
     # latent_size: int = field(default=128)
@@ -76,5 +70,5 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     warmup_ratio: Union[float] = field(default=0.0)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
-    set_embeddings: bool = field(default=True)
     prefix_tuning: bool = field(default=False)
+    random_init: bool = field(default=False)

@@ -8,7 +8,7 @@ from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
 from models import FlanT5
 
-class SoftPromptFlanT5(FlanT5):
+class SoftRelPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
                  instruction_prompt_idx: Optional[List[int]] = None, 
@@ -25,7 +25,7 @@ class SoftPromptFlanT5(FlanT5):
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = SoftPromptT5Stack(
+        self.encoder = SoftRelPromptT5Stack(
                 instruction_idx=instruction_prompt_idx,
                 relevance_idx=relevance_prompt_idx,
                 embed_tokens=self.shared,
@@ -71,7 +71,7 @@ class SoftPromptFlanT5(FlanT5):
                 **kwargs
         )
 
-class SoftPromptT5Stack(T5Stack):
+class SoftRelPromptT5Stack(T5Stack):
 
     def __init__(self, 
                  instruction_idx=None, 
@@ -92,23 +92,26 @@ class SoftPromptT5Stack(T5Stack):
             self.instruction_idx = None
 
         # relevance prompting
-        if relevance_idx:
-            self.relevance_idx = torch.LongTensor(relevance_idx)
-            self.relevance_prompt = nn.Parameter(torch.rand(
-                len(relevance_idx), embed_tokens.embedding_dim
-            ))
-        else:
-            self.relevance_idx = None
+        self.relevance_idx = torch.LongTensor(relevance_idx)
+        self.positive_prompt = nn.Parameter(torch.rand(
+            len(relevance_idx), embed_tokens.embedding_dim
+        ))
+        self.negative_prompt = nn.Parameter(torch.rand(
+            len(relevance_idx), embed_tokens.embedding_dim
+        ))
 
     def init_from_vocab(self):
         if self.instruction_idx is not None:
             self.instruction_prompt = nn.Parameter(
                     self.wte(self.instruction_idx).clone().detach()
             )
-        if self.relevance_idx is not None:
-            self.relevance_prompt = nn.Parameter(
-                    self.wte(self.relevance_idx).clone().detach()
-            )
+        self.positive_prompt = nn.Parameter(
+                self.wte(self.relevance_idx).clone().detach()
+        )
+        self.negative_prompt = nn.Parameter(
+                self.wte(self.relevance_idx).clone().detach()
+        )
+
 
     def forward(self, 
                 input_ids=None,
@@ -124,6 +127,7 @@ class SoftPromptT5Stack(T5Stack):
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         B = inputs_embeds.shape[0]
+        H = inputs_embeds.shape[2] 
 
         ## Expand customized prompts in front of `inputs_embeds` 
         prompts = []
@@ -134,10 +138,13 @@ class SoftPromptT5Stack(T5Stack):
         if rel_scores is not None:
             # reshape: rel_score (B) --> (B 2)
             # concat: (2 H) --> (B 1 H)
-            relevance_prompt = torch.matmul(
-                    torch.cat([1-rel_scores, rel_scores], -1).view(2, -1).T,
-                    self.relevance_prompt
-            ).unsqueeze(1)
+            relevance_prompts = torch.matmul(
+                    rel_scores.view(-1, 1), 
+                    self.positive_prompt.view(1, -1)
+            ) + torch.matmul(
+                    (1-rel_scores).view(-1, 1), 
+                    self.negative_prompt.view(1, -1)
+            ).view(B, -1, H)
             prompts += [relevance_prompt]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
