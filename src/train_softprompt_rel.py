@@ -51,6 +51,8 @@ def main():
     ### Prompt tuning (soft)
     if training_args.random_init is False:
         model.encoder.init_from_vocab()
+    else:
+        model.encoder.init_from_vocab(False, False)
 
     print('\n')
     for name, param in model.named_parameters():

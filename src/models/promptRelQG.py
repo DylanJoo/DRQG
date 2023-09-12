@@ -100,17 +100,19 @@ class SoftRelPromptT5Stack(T5Stack):
             len(relevance_idx), embed_tokens.embedding_dim
         ))
 
-    def init_from_vocab(self):
+    def init_from_vocab(self, positive=True, negative=True):
         if self.instruction_idx is not None:
             self.instruction_prompt = nn.Parameter(
                     self.wte(self.instruction_idx).clone().detach()
             )
-        self.positive_prompt = nn.Parameter(
-                self.wte(self.relevance_idx).clone().detach()
-        )
-        self.negative_prompt = nn.Parameter(
-                self.wte(self.relevance_idx).clone().detach()
-        )
+        if positive:
+            self.positive_prompt = nn.Parameter(
+                    self.wte(self.relevance_idx).clone().detach()
+            )
+        if negative:
+            self.negative_prompt = nn.Parameter(
+                    self.wte(self.relevance_idx).clone().detach()
+            )
 
 
     def forward(self, 
