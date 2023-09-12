@@ -45,7 +45,7 @@ def main():
             model_args.relevance_prompt_idx
     )
     prompt_length = len(model_args.instruction_prompt_idx) 
-    prompt_length+= 1 if model_args.relevance_prompt is not None else 0
+    prompt_length += len(model_args.relevance_prompt_idx) 
 
     ## Freezing
     ### Prompt tuning (soft)

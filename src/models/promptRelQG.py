@@ -144,8 +144,9 @@ class SoftRelPromptT5Stack(T5Stack):
             ) + torch.matmul(
                     (1-rel_scores).view(-1, 1), 
                     self.negative_prompt.view(1, -1)
-            ).view(B, -1, H)
-            prompts += [relevance_prompt]
+            )
+            relevance_prompts = relevance_prompts.view(B, -1, H)
+            prompts += [relevance_prompts]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
         return super().forward(
