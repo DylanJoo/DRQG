@@ -103,17 +103,16 @@ class SoftRelPromptT5Stack(T5Stack):
         ))
 
     def init_from_vocab(self, positive=True, negative=True):
-        if self.instruction_idx is not None:
-            self.instruction_prompt = nn.Parameter(
-                    self.wte(self.instruction_idx).clone().detach()
-            )
+        self.instruction_prompt = nn.Parameter(
+                self.wte(self.instruction_idx).clone().detach()
+        )
         if positive:
             self.positive_prompt = nn.Parameter(
                     self.wte(self.relevance_idx).clone().detach()
             )
         if negative:
             self.negative_prompt = nn.Parameter(
-                    self.wte(self.relevance_idx).clone().detach()
+                    self.wte(self.nonrelevance_idx).clone().detach()
             )
 
 
@@ -140,8 +139,6 @@ class SoftRelPromptT5Stack(T5Stack):
             prompts += [self.instruction_prompt.repeat(B, 1, 1)]
 
         if rel_scores is not None:
-            # reshape: rel_score (B) --> (B 2)
-            # concat: (2 H) --> (B 1 H)
             relevance_prompts = torch.matmul(
                     rel_scores.view(-1, 1), 
                     self.positive_prompt.view(1, -1)
