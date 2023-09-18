@@ -127,3 +127,28 @@ generate_softprompt_rel:
 	  --instruction_prompt "Generate a question for the passage with relevance label: " \
 	  --relevance_prompt "false true"
 
+# soft prompt (instruction N dim + relevance M dim)
+train_softprompt_rel_doc:
+	export CUDA_VISIBLE_DEVICES=1; python3 train_softprompt_reldoc.py \
+	  --model_name_or_path google/flan-t5-base \
+	  --tokenizer_name google/flan-t5-base \
+	  --config_name google/flan-t5-base \
+	  --output_dir models/checkpoints/flan-t5-base-soft-reldoc \
+	  --max_p_length 256 \
+	  --max_q_length 16 \
+	  --per_device_train_batch_size 8 \
+	  --m_positive_per_example 2 \
+	  --m_negative_per_example 2 \
+	  --learning_rate 1e-3 \
+	  --evaluation_strategy steps \
+	  --max_steps 10000 \
+	  --save_steps 4000 \
+	  --eval_steps 500 \
+	  --train_file ${TRAIN_FILE} \
+	  --instruction_prompt "Generate a question based on multiple semantic vectors of the relevance and a document. relevance: " \
+	  --relevance_prompt "true true true true true true true true true true" \
+	  --nonrelevance_prompt "false false false false false false false false false false" \
+	  --prefix "document: {1}" \
+	  --random_init true \
+	  --do_train \
+	  --do_eval 

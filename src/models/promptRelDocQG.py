@@ -8,17 +8,15 @@ from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
 from models import FlanT5
 
-class SoftRelPromptFlanT5(FlanT5):
+class SoftRelPromptDocFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
                  instruction_prompt_idx: Optional[List[int]] = None, 
-                 relevance_prompt_idx: Optional[List[int]] = None,
-                 nonrelevance_prompt_idx: Optional[List[int]] = None):
+                 relevance_prompt_idx: Optional[List[int]] = None):
 
         super().__init__(config)
         print('Used instruction prompt:', instruction_prompt_idx)
         print('Used relevance prompt:', relevance_prompt_idx)
-        print('Used nonrelevance prompt:', nonrelevance_prompt_idx)
 
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
@@ -30,7 +28,6 @@ class SoftRelPromptFlanT5(FlanT5):
         self.encoder = SoftRelPromptT5Stack(
                 instruction_idx=instruction_prompt_idx,
                 relevance_idx=relevance_prompt_idx,
-                nonrelevance_idx=nonrelevance_prompt_idx,
                 embed_tokens=self.shared,
                 config=encoder_config, 
         )
@@ -67,6 +64,10 @@ class SoftRelPromptFlanT5(FlanT5):
                     rel_scores=rel_scores,
                     **kwargs
             )
+
+            # reformulate the `last_hidden_states`
+            encoder_outputs[0] = self._reformulate(encoder_outputs[0])
+
         return super().forward(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -74,7 +75,7 @@ class SoftRelPromptFlanT5(FlanT5):
                 **kwargs
         )
 
-class SoftRelPromptT5Stack(T5Stack):
+class SoftRelPromptDocT5Stack(T5Stack):
 
     def __init__(self, 
                  instruction_idx=None, 
@@ -105,6 +106,12 @@ class SoftRelPromptT5Stack(T5Stack):
             len(nonrelevance_idx), embed_tokens.embedding_dim
         ))
 
+        # projection layer
+        start = len(self.instruction_idx) - 1 # the index of 1st rel tok
+        end = start + len(self.relevance_idx) + 1 # the indeex of last rel tok
+        self.memory_indices = list(range(start, end))
+        self.doc_proj = nn.Linear(config.d_model, config.d_model)
+
     def init_from_vocab(self, positive=True, negative=True):
         self.instruction_prompt = nn.Parameter(
                 self.wte(self.instruction_idx).clone().detach()
@@ -117,7 +124,6 @@ class SoftRelPromptT5Stack(T5Stack):
             self.negative_prompt = nn.Parameter(
                     self.wte(self.nonrelevance_idx).clone().detach()
             )
-
 
     def forward(self, 
                 input_ids=None,
@@ -152,8 +158,7 @@ class SoftRelPromptT5Stack(T5Stack):
             relevance_prompts = relevance_prompts.view(B, -1, H)
             prompts += [relevance_prompts]
 
-        inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
-        return super().forward(
+        outputs = super().forward(
                 input_ids=None,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
@@ -162,3 +167,12 @@ class SoftRelPromptT5Stack(T5Stack):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict
         )
+
+        outputs[0] = self._reformulate(outputs[0])
+
+        return outputs
+
+    def _reformulate(self, sequence_output):
+        # extract the doc-rel embeddings
+        sequence_output = sequence_output[:, self.memory_indices, :]
+        return self.doc_proj(sequence_output)
