@@ -89,17 +89,17 @@ generate_softprompt:
 
 # soft prompt (instruction N dim + relevance M dim)
 train_softprompt_rel:
-	export CUDA_VISIBLE_DEVICES=1; python3 train_softprompt_rel.py \
+	python3 train_softprompt_rel.py \
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \
-	  --output_dir models/checkpoints/flan-t5-base-soft-rel \
-	  --max_p_length 256 \
+	  --output_dir models/checkpoints/flan-t5-base-soft-rel-false \
+	  --max_p_length 128 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \
 	  --m_positive_per_example 2 \
 	  --m_negative_per_example 2 \
-	  --learning_rate 1e-3 \
+	  --learning_rate 3e-3 \
 	  --evaluation_strategy steps \
 	  --max_steps 10000 \
 	  --save_steps 4000 \
@@ -107,10 +107,12 @@ train_softprompt_rel:
 	  --train_file ${TRAIN_FILE} \
 	  --instruction_prompt "Generate a question for the passage with relevance label: " \
 	  --relevance_prompt "true true true true true true true true true true" \
-	  --nonrelevance_prompt "false false false false false false false false false false" \
-	  --random_init true \
+	  --nonrelevance_prompt "<extra_id_0><extra_id_1><extra_id_2><extra_id_3><extra_id_4><extra_id_5><extra_id_6><extra_id_7><extra_id_8><extra_id_9>" \
+	  --random_init false \
+	  --lr_scheduler_type constant \
 	  --do_train \
 	  --do_eval 
+	  # --nonrelevance_prompt "false false false false false false false false false false" \
 
 generate_softprompt_rel:
 	python3 generate.py \

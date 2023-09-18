@@ -12,11 +12,13 @@ class SoftRelPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
                  instruction_prompt_idx: Optional[List[int]] = None, 
-                 relevance_prompt_idx: Optional[List[int]] = None):
+                 relevance_prompt_idx: Optional[List[int]] = None,
+                 nonrelevance_prompt_idx: Optional[List[int]] = None):
 
         super().__init__(config)
         print('Used instruction prompt:', instruction_prompt_idx)
         print('Used relevance prompt:', relevance_prompt_idx)
+        print('Used nonrelevance prompt:', nonrelevance_prompt_idx)
 
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
@@ -28,6 +30,7 @@ class SoftRelPromptFlanT5(FlanT5):
         self.encoder = SoftRelPromptT5Stack(
                 instruction_idx=instruction_prompt_idx,
                 relevance_idx=relevance_prompt_idx,
+                nonrelevance_idx=nonrelevance_prompt_idx,
                 embed_tokens=self.shared,
                 config=encoder_config, 
         )
@@ -113,7 +116,7 @@ class SoftRelPromptT5Stack(T5Stack):
             )
         if negative:
             self.negative_prompt = nn.Parameter(
-                    self.wte(self.relevance_idx).clone().detach()
+                    self.wte(self.nonrelevance_idx).clone().detach()
             )
 
 
