@@ -40,8 +40,8 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
-    from models import SoftRelPromptFlanT5
-    model = SoftRelPromptFlanT5.from_pretrained(
+    from models import SoftRelPromptDocFlanT5
+    model = SoftRelPromptDocFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
             model_args.instruction_prompt_idx,
             model_args.relevance_prompt_idx
