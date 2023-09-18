@@ -61,7 +61,7 @@ def main():
 
     print('\n')
     for name, param in model.named_parameters():
-        if 'prompt' in name:
+        if ('prompt' in name) or ('doc_proj' in name):
             param.requires_grad = True
             print('param {} will be optimized.'.format(name))
         else:
