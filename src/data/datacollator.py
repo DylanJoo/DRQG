@@ -1,11 +1,18 @@
 """ The datacollator for pcentric dataset.
 """
+import string
 import torch
 import random
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, Tuple, Any
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.tokenization_utils_base import PaddingStrategy, PreTrainedTokenizerBase
+
+def denoise(texts):
+    texts = [t.replace('the', '') for t in texts]
+    texts = [t.replace('The', '') for t in texts]
+    texts = [t.translate(str.maketrans('', '', string.punctuation)) for t in texts]
+    return texts
 
 @dataclass
 class DataCollatorBase:
@@ -110,7 +117,7 @@ class DataCollatorForBaseline(DataCollatorBase):
                 max_length=self.max_p_length,
                 truncation=True,
                 padding=True,
-                return_tensors=self.return_tensors
+                return_tensors=self.return_tensors,
         )
         targets = self.tokenizer(
                 texts_tgt,

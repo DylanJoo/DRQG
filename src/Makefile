@@ -107,12 +107,11 @@ train_softprompt_rel:
 	  --train_file ${TRAIN_FILE} \
 	  --instruction_prompt "Generate a question for the passage with relevance label: " \
 	  --relevance_prompt "true true true true true true true true true true" \
-	  --nonrelevance_prompt "<extra_id_0><extra_id_1><extra_id_2><extra_id_3><extra_id_4><extra_id_5><extra_id_6><extra_id_7><extra_id_8><extra_id_9>" \
-	  --random_init false \
+	  --nonrelevance_prompt "false false false false false false false false false false" \
+	  --random_init true \
 	  --lr_scheduler_type constant \
 	  --do_train \
 	  --do_eval 
-	  # --nonrelevance_prompt "false false false false false false false false false false" \
 
 generate_softprompt_rel:
 	python3 generate.py \
@@ -129,7 +128,7 @@ generate_softprompt_rel:
 
 # soft prompt (instruction N dim + relevance M dim)
 train_softprompt_rel_doc:
-	export CUDA_VISIBLE_DEVICES=1; python3 train_softprompt_reldoc.py \
+	python3 train_softprompt_reldoc.py \
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \
@@ -145,10 +144,10 @@ train_softprompt_rel_doc:
 	  --save_steps 4000 \
 	  --eval_steps 500 \
 	  --train_file ${TRAIN_FILE} \
-	  --instruction_prompt "Generate a question based on multiple semantic vectors of the relevance and a document. relevance: " \
+	  --instruction_prompt "Generate a question based on semantic vectors of the relevance and a document. relevance: " \
 	  --relevance_prompt "true true true true true true true true true true" \
 	  --nonrelevance_prompt "false false false false false false false false false false" \
-	  --prefix "document: {1}" \
-	  --random_init true \
+	  --baseline_prefix "document: {1}" \
+	  --random_init false \
 	  --do_train \
 	  --do_eval 

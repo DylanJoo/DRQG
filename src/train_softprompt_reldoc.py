@@ -44,7 +44,7 @@ def main():
     model = SoftRelPromptDocFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
             model_args.instruction_prompt_idx,
-            model_args.relevance_prompt_idx
+            model_args.relevance_prompt_idx,
             model_args.nonrelevance_prompt_idx
     )
     prompt_length = len(model_args.instruction_prompt_idx) 
@@ -53,7 +53,7 @@ def main():
     ## Freezing
     ### Prompt tuning (soft)
     if training_args.random_init:
-        # pos from rand, neg from rand
+        # pos from True, neg from rand
         model.encoder.init_from_vocab(True, False)
     else:
         # pos from True, neg from False
