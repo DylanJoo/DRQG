@@ -41,12 +41,13 @@ def main():
 
     # Peft Config
     peft_config = PromptTuningConfig(
+            peft_type="PROMPT_TUNING",
             task_type=TaskType.SEQ_2_SEQ_LM,
             prompt_tuning_init=PromptTuningInit.TEXT,
             num_virtual_tokens=20,
-            prompt_tuning_init_text=f"{model_args.instruction_prompt}?\n",
+            prompt_tuning_init_text=f"{model_args.instruction_prompt}?",
             inference_mode=False,
-            tokenizer_name_or_path=model_name_or_path,
+            tokenizer_name_or_path=hfmodel_args.model_name_or_path,
     )
     # Peft Model
     model = get_peft_model(model, peft_config)
@@ -67,7 +68,6 @@ def main():
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
-            prefix="{1}",
             scores=used_scores
     )
 

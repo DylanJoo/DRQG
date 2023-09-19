@@ -12,6 +12,7 @@ python3 train_peft.py \
   --m_positive_per_example 2 \
   --learning_rate 1e-3 \
   --evaluation_strategy steps \
+  --instruction_prompt "Generate a question for the passage: "  \
   --max_steps 10000 \
   --save_steps 2000 \
   --eval_steps 500 \
