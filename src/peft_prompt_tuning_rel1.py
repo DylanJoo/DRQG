@@ -44,10 +44,10 @@ def main():
 
     # Model
     from models import RelPromptFlanT5
-    model = SoftPromptFlanT5.from_pretrained(
+    model = RelPromptFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
-            None,
-            model_args.pos_neg_prompt_idx
+            single_vector=True,
+            pos_neg_prompt_idx=model_args.pos_neg_prompt_idx
     )
     model.encoder.init_from_vocab()
 

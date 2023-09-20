@@ -11,10 +11,10 @@ from models import FlanT5
 class RelPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
+                 single_vector: Optional[bool] = True, 
                  pos_neg_prompt_idx: Optional[List[int]] = None, 
                  relevant_prompt_idx: Optional[List[int]] = None, 
-                 irrelevant_prompt_idx: Optional[List[int]] = None, 
-                 single_vector: Optional[bool] = True):
+                 irrelevant_prompt_idx: Optional[List[int]] = None):
 
         super().__init__(config)
         print('Used instruction prompt:', 'deprecated when using peft')

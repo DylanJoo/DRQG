@@ -53,9 +53,9 @@ def main():
     from models import RelPromptFlanT5
     model = RelPromptFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
-            model_args.pos_neg_prompt_idx,
-            model_args.relevant_prompt_idx,
-            model_args.irrelevant_prompt_idx,
+            single_vector=False,
+            relevant_prompt_idx=model_args.relevant_prompt_idx,
+            irrelevant_prompt_idx=model_args.irrelevant_prompt_idx
     )
     model.encoder.init_from_vocab()
 
@@ -110,8 +110,8 @@ def main():
     if training_args.do_eval:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
-                    test_size=99, 
-                    train_size=min(n_examples-99, 400000), 
+                    test_size=1000, 
+                    train_size=min(n_examples-1000, 400000), 
                     seed=1997
             )
         else:

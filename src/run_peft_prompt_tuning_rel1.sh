@@ -16,8 +16,8 @@ python3 peft_prompt_tuning_rel1.py \
   --pos_neg_prompt "false true"  \
   --n_instruction_prompt 20 \
   --baseline_prefix "passage: {1}" \
-  --max_steps 10000 \
-  --save_steps 2000 \
+  --max_steps 20000 \
+  --save_steps 5000 \
   --eval_steps 500 \
   --train_file ${TRAIN_FILE} \
   --do_train \
