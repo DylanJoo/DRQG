@@ -19,13 +19,20 @@ class ModelArgs:
     # Baseline and hard prompt # {1} means passage
     baseline_prefix: Optional[str] = field(default='{1}')
 
-    # Soft relevance prompt 
+    # Soft prompt 
     instruction_prompt: Optional[str] = field(default=None)
     instruction_prompt_idx: Optional[str] = field(default=None)
+    ## Soft relevance prompt (single vector)
+    pos_neg_prompt: Optional[str] = field(default=None)
+    pos_neg_prompt_idx: Optional[str] = field(default=None)
+    ## Soft relevance prompt (multiple vector)
     relevance_prompt: Optional[str] = field(default=None)
     relevance_prompt_idx: Optional[str] = field(default=None)
     nonrelevance_prompt: Optional[str] = field(default=None)
     nonrelevance_prompt_idx: Optional[str] = field(default=None)
+
+    # Peft learning
+    n_instruction_prompt: int = field(default=20)
 
     # Controller
     head_size: int = field(default=64)
