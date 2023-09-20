@@ -11,12 +11,16 @@ from models import FlanT5
 class RelPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
-                 instruction_prompt_idx: Optional[List[int]] = None, 
-                 pos_neg_prompt_idx: Optional[List[int]] = None):
+                 pos_neg_prompt_idx: Optional[List[int]] = None, 
+                 relevant_prompt_idx: Optional[List[int]] = None, 
+                 irrelevant_prompt_idx: Optional[List[int]] = None, 
+                 single_vector: Optional[bool] = True):
 
         super().__init__(config)
-        print('Used instruction prompt:', instruction_prompt_idx)
+        print('Used instruction prompt:', 'deprecated when using peft')
         print('Used positive/negative prompt:', pos_neg_prompt_idx)
+        print('Used relevant prompt:', relevant_prompt_idx)
+        print('Used irrelevant prompt:', irrelevant_prompt_idx)
 
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
@@ -25,12 +29,19 @@ class RelPromptFlanT5(FlanT5):
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
-        self.encoder = RelPromptT5Stack(
-                instruction_idx=instruction_prompt_idx,
-                pos_neg_idx=pos_neg_prompt_idx,
-                embed_tokens=self.shared,
-                config=encoder_config, 
-        )
+        if pos_neg_prompt_idx is not None:
+            self.encoder = SingleRelPromptT5Stack(
+                    pos_neg_idx=pos_neg_prompt_idx,
+                    embed_tokens=self.shared,
+                    config=encoder_config, 
+            )
+        else:
+            self.encoder = MultiRelPromptT5Stack(
+                    relevant_idx=relevant_prompt_idx,
+                    irrelevant_idx=irrelevant_prompt_idx,
+                    embed_tokens=self.shared,
+                    config=encoder_config, 
+            )
 
         decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
@@ -71,40 +82,24 @@ class RelPromptFlanT5(FlanT5):
                 **kwargs
         )
 
-class RelPromptT5Stack(T5Stack):
+class SingleRelPromptT5Stack(T5Stack):
 
     def __init__(self, 
-                 instruction_idx=None, 
                  pos_neg_idx=None, 
                  embed_tokens=None, 
                  **kwargs):
         super().__init__(**kwargs)
 
         self.wte = embed_tokens
-
-        # instruction prompting
-        if instruction_idx:
-            self.instruction_idx = torch.LongTensor(instruction_idx)
-            self.instruction_prompt = nn.Parameter(torch.rand(
-                len(instruction_idx), embed_tokens.embedding_dim
-            ))
-        else:
-            self.instruction_idx = None
-
         self.pos_neg_idx = torch.LongTensor(pos_neg_idx)
         self.pos_neg_prompt = nn.Parameter(torch.rand(
             len(pos_neg_idx), embed_tokens.embedding_dim
         ))
 
     def init_from_vocab(self):
-        if self.instruction_idx is not None:
-            self.instruction_prompt = nn.Parameter(
-                    self.wte(self.instruction_idx).clone().detach()
-            )
-        if self.pos_neg_idx is not None:
-            self.pos_neg_prompt = nn.Parameter(
-                    self.wte(self.pos_neg_idx).clone().detach()
-            )
+        self.pos_neg_prompt = nn.Parameter(
+                self.wte(self.pos_neg_idx).clone().detach()
+        )
 
     def forward(self, 
                 input_ids=None,
@@ -123,9 +118,6 @@ class RelPromptT5Stack(T5Stack):
 
         ## Expand customized prompts in front of `inputs_embeds` 
         prompts = []
-        if self.instruction_idx is not None:
-            # instruction_prompt: (N H) --> (B N H)
-            prompts += [self.instruction_prompt.repeat(B, 1, 1)]
 
         if rel_scores is not None:
             # reshape: rel_score (B) --> (B 2)
@@ -135,6 +127,76 @@ class RelPromptT5Stack(T5Stack):
                     self.pos_neg_prompt
             ).unsqueeze(1)
             prompts += [pos_neg_prompt]
+
+        inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
+        return super().forward(
+                input_ids=None,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
+                head_mask=head_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict
+        )
+
+class MultiRelPromptT5Stack(T5Stack):
+
+    def __init__(self, 
+                 relevant_idx=None, 
+                 irrelevant_idx=None, 
+                 embed_tokens=None, 
+                 **kwargs):
+        super().__init__(**kwargs)
+
+        self.wte = embed_tokens
+        self.relevant_idx = torch.LongTensor(relevant_idx)
+        self.positive_prompt = nn.Parameter(torch.rand(
+            len(relevant_idx), embed_tokens.embedding_dim
+        ))
+        self.irrelevant_idx = torch.LongTensor(irrelevant_idx)
+        self.negative_prompt = nn.Parameter(torch.rand(
+            len(irrelevant_idx), embed_tokens.embedding_dim
+        ))
+
+    def init_from_vocab(self, positive=True, negative=True):
+        if positive:
+            self.positive_prompt = nn.Parameter(
+                    self.wte(self.relevant_idx).clone().detach()
+            )
+        if negative:
+            self.negative_prompt = nn.Parameter(
+                    self.wte(self.irrelevant_idx).clone().detach()
+            )
+
+
+    def forward(self, 
+                input_ids=None,
+                attention_mask=None,
+                inputs_embeds=None,
+                rel_scores=None,
+                head_mask=None,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
+                **kwargs):
+
+        if inputs_embeds is None:
+            inputs_embeds = self.wte(input_ids)
+        B = inputs_embeds.shape[0]
+        H = inputs_embeds.shape[2] 
+
+        ## Expand customized prompts in front of `inputs_embeds` 
+        prompts = []
+        if rel_scores is not None:
+            relevant_prompts = torch.matmul(
+                    rel_scores.view(-1, 1), 
+                    self.positive_prompt.view(1, -1)
+            ) + torch.matmul(
+                    (1-rel_scores).view(-1, 1), 
+                    self.negative_prompt.view(1, -1)
+            )
+            relevant_prompts = relevant_prompts.view(B, -1, H)
+            prompts += [relevant_prompts]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
         return super().forward(
