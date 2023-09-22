@@ -5,6 +5,43 @@ from torch.nn import functional as F
 import copy
 from torch.nn import CrossEntropyLoss, KLDivLoss, NLLLoss
 
+def gen_mle_loss(model, lm_logits, labels, seq_labels, vocab_size):
+    loss_gen_pos, loss_gen_neg = 0, 0
+    loss_fct = CrossEntropyLoss(reduction='none')
+
+    if len(labels[seq_labels==1]) > 0:
+        loss_gen_pos = loss_fct(
+                lm_logits[seq_labels==1].view(-1, vocab_size), 
+                labels[seq_labels==1].view(-1)
+        ).mean()
+
+    if len(labels[seq_labels<1]) > 0:
+        loss_gen_neg = loss_fct(
+                lm_logits[seq_labels<1].view(-1, vocab_size), 
+                labels[seq_labels<1].view(-1)
+        ).mean()
+
+    return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
+
+def neg_gen_mle_loss(model, lm_logits, labels, seq_labels, vocab_size):
+    lm_unlikelihood = 1-lm_logits.softmax(-1)
+    loss_gen_pos, loss_gen_neg = 0, 0
+    loss_fct = NLLLoss(reduction='none')
+
+    if len(labels[seq_labels==1]) > 0:
+        loss_gen_pos = loss_fct(
+                lm_unlikelihood[seq_labels==1].view(-1, vocab_size), 
+                labels[seq_labels==1].view(-1)
+        ).mean()
+
+    if len(labels[seq_labels<1]) > 0:
+        loss_gen_neg = loss_fct(
+                lm_unlikelihood[seq_labels<1].view(-1, vocab_size), 
+                labels[seq_labels<1].view(-1)
+        ).mean()
+
+    return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
+
 def indoc_cont_loss(hidden_states, bs=1, norm=False):
     device = hidden_states.device
     if (hidden_states.size(1) != 1) or (len(hidden_state.shape)>2):

@@ -55,6 +55,7 @@ class SoftPromptFlanT5(FlanT5):
                 attention_mask=None, 
                 rel_scores=None, 
                 encoder_outputs=None, 
+                return_loss=True,
                 **kwargs):
 
         if encoder_outputs is None:

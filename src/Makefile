@@ -36,6 +36,7 @@ train_baseline:
 	  --do_eval 
 
 train_softprompt_rel1:
+	# export CUDA_VISIBLE_DEVICES=1
 	python3 train_old/train_softprompt_rel1.py \
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
@@ -43,7 +44,7 @@ train_softprompt_rel1:
 	  --output_dir models/checkpoints/flan-t5-base-rel1 \
 	  --max_p_length 128 \
 	  --max_q_length 16 \
-	  --per_device_train_batch_size 8 \
+	  --per_device_train_batch_size 2 \
 	  --m_positive_per_example 2 \
 	  --m_negative_per_example 2 \
 	  --learning_rate 1e-3 \
