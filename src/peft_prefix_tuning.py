@@ -14,9 +14,8 @@ import os
 
 from peft import (
     get_peft_model, 
-    PromptTuningConfig, 
+    PrefixTuningConfig, 
     TaskType, 
-    PromptTuningInit
 )
 
 def main():
@@ -40,14 +39,14 @@ def main():
     model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
 
     # Peft Config
-    peft_config = PromptTuningConfig(
-            peft_type="PROMPT_TUNING",
+    peft_config = PrefixTuningConfig(
+            peft_type="PREFIX_TUNING",
             task_type=TaskType.SEQ_2_SEQ_LM,
-            prompt_tuning_init=PromptTuningInit.TEXT,
             num_virtual_tokens=model_args.n_instruction_prompt,
-            prompt_tuning_init_text=f"{model_args.instruction_prompt}",
+            num_layers=model.config.num_layers,
+            encoder_hidden_size=model.config.d_model,
+            prefix_projection=True,
             inference_mode=False,
-            tokenizer_name_or_path=hfmodel_args.model_name_or_path,
     )
     # Peft Model
     model = get_peft_model(model, peft_config)
@@ -65,7 +64,7 @@ def main():
     data_collator = DataCollatorForBaseline(
             tokenizer=tokenizer, 
             max_p_length=data_args.max_p_length,
-            max_q_length=data_args.max_p_length,
+            max_q_length=data_args.max_q_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
             prefix=model_args.baseline_prefix,
@@ -81,8 +80,8 @@ def main():
     if training_args.do_eval:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
-                    test_size=99, 
-                    train_size=min(n_examples-99, 400000), 
+                    test_size=1000, 
+                    train_size=min(n_examples-1000, 400000), 
                     seed=1997
             )
         else:

@@ -9,21 +9,18 @@ from transformers import (
 )
 from datasets import load_dataset
 from arguments import *
-from peft import (
-    get_peft_model, 
-    PromptTuningConfig, 
-    TaskType, 
-    PromptTuningInit
-)
 
 import os
-os.environ["WANDB_DISABLED"] = "false"
 
 def prepare_prompt_idx(opt, tokenizer):
     get_tokenized_idx = lambda x: tokenizer.encode(x, add_special_tokens=False)
 
-    if opt.pos_neg_prompt:
-        opt.pos_neg_prompt_idx = get_tokenized_idx(opt.pos_neg_prompt)
+    if opt.instruction_prompt:
+        opt.instruction_prompt_idx = get_tokenized_idx(opt.instruction_prompt)
+    if opt.relevant_prompt:
+        opt.relevant_prompt_idx = get_tokenized_idx(opt.relevant_prompt)
+    if opt.irrelevant_prompt:
+        opt.irrelevant_prompt_idx = get_tokenized_idx(opt.irrelevant_prompt)
 
 def main():
     # Parse argument for huggingface packages
@@ -43,34 +40,33 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
-    from models import RelPromptFlanT5
-    model = RelPromptFlanT5.from_pretrained(
+    from models.promptRelQG import SoftRelPromptFlanT5
+    model = SoftRelPromptFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
-            pos_neg_prompt_idx=model_args.pos_neg_prompt_idx
+            model_args.instruction_prompt_idx,
+            model_args.relevant_prompt_idx,
+            model_args.irrelevant_prompt_idx
     )
-    model.encoder.init_from_vocab()
+    prompt_length = len(model_args.instruction_prompt_idx) 
+    prompt_length += len(model_args.relevant_prompt_idx) 
 
-    # Peft Config
-    peft_config = PromptTuningConfig(
-            peft_type="PROMPT_TUNING",
-            task_type=TaskType.SEQ_2_SEQ_LM,
-            prompt_tuning_init=PromptTuningInit.TEXT,
-            num_virtual_tokens=model_args.n_instruction_prompt,
-            prompt_tuning_init_text=f"{model_args.instruction_prompt}",
-            inference_mode=False,
-            tokenizer_name_or_path=hfmodel_args.model_name_or_path,
-    )
-    # Peft Model
-    model = get_peft_model(model, peft_config)
+    ## Freezing
+    ### Prompt tuning (soft)
+    if training_args.random_init:
+        # pos from rand, neg from rand
+        model.encoder.init_from_vocab(True, False)
+    else:
+        # pos from True, neg from False
+        model.encoder.init_from_vocab()
+
+    print('\n')
     for name, param in model.named_parameters():
-        if ('encoder' in name) and ('prompt' in name):
-            print(param.requires_grad)
+        if 'prompt' in name:
             param.requires_grad = True
-        if param.requires_grad:
-            print(name)
-
-    model.print_trainable_parameters()
-    prompt_length = 1 if model_args.pos_neg_prompt is not None else 0
+            print('param {} will be optimized.'.format(name))
+        else:
+            param.requires_grad = False
+    print('\n')
 
     ## Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
@@ -101,8 +97,8 @@ def main():
     if training_args.do_eval:
         if data_args.eval_file is None:
             dataset = dataset['train'].train_test_split(
-                    test_size=99, 
-                    train_size=min(n_examples-99, 400000), 
+                    test_size=1000, 
+                    train_size=min(n_examples-1000, 400000), 
                     seed=1997
             )
         else:

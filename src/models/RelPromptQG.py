@@ -11,7 +11,6 @@ from models import FlanT5
 class RelPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
-                 single_vector: Optional[bool] = True, 
                  pos_neg_prompt_idx: Optional[List[int]] = None, 
                  relevant_prompt_idx: Optional[List[int]] = None, 
                  irrelevant_prompt_idx: Optional[List[int]] = None):
@@ -30,6 +29,7 @@ class RelPromptFlanT5(FlanT5):
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         if pos_neg_prompt_idx is not None:
+            # single relevance vector 
             self.encoder = SingleRelPromptT5Stack(
                     pos_neg_idx=pos_neg_prompt_idx,
                     embed_tokens=self.shared,
@@ -117,8 +117,6 @@ class SingleRelPromptT5Stack(T5Stack):
         B = inputs_embeds.shape[0]
 
         ## Expand customized prompts in front of `inputs_embeds` 
-        prompts = []
-
         if rel_scores is not None:
             # reshape: rel_score (B) --> (B 2)
             # concat: (2 H) --> (B 1 H)
@@ -126,7 +124,7 @@ class SingleRelPromptT5Stack(T5Stack):
                     torch.cat([1-rel_scores, rel_scores], -1).view(2, -1).T,
                     self.pos_neg_prompt
             ).unsqueeze(1)
-            prompts += [pos_neg_prompt]
+            prompts = [pos_neg_prompt]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
         return super().forward(

@@ -10,7 +10,7 @@ python3 peft_prompt_tuning_rel1.py \
   --per_device_train_batch_size 4 \
   --m_negative_per_example 2 \
   --m_positive_per_example 2 \
-  --learning_rate 1 \
+  --learning_rate 1e-2 \
   --evaluation_strategy steps \
   --instruction_prompt "Given the relevance label, generate a question for the passage. relevance label: "  \
   --pos_neg_prompt "false true"  \

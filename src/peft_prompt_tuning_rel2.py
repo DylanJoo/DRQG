@@ -57,7 +57,7 @@ def main():
             relevant_prompt_idx=model_args.relevant_prompt_idx,
             irrelevant_prompt_idx=model_args.irrelevant_prompt_idx
     )
-    model.encoder.init_from_vocab()
+    model.encoder.init_from_vocab(True, False)
 
     # Peft Config
     peft_config = PromptTuningConfig(

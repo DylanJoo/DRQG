@@ -11,7 +11,7 @@ class TrainerBase(Seq2SeqTrainer):
     def set_tokenizer(self, tokenizer=None):
         self.tokenizer = tokenizer
 
-    def compute_loss(self, model, inputs):
+    def compute_loss(self, model, inputs, return_outputs=False):
         """
         param: text_inputs: the raw inputs of passages.
         """
