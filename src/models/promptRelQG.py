@@ -72,7 +72,6 @@ class SoftRelPromptFlanT5(FlanT5):
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 encoder_outputs=encoder_outputs,
-                return_loss=True,
                 **kwargs
         )
 

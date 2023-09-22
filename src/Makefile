@@ -22,6 +22,7 @@ train_baseline:
 	  --max_p_length 256 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \
+	  --per_device_eval_batch_size 8 \
 	  --m_negative_per_example 2 \
 	  --m_positive_per_example 2 \
 	  --learning_rate 1e-4 \
@@ -44,6 +45,7 @@ train_softprompt_rel1:
 	  --max_p_length 128 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \
+	  --per_device_eval_batch_size 8 \
 	  --m_positive_per_example 2 \
 	  --m_negative_per_example 2 \
 	  --learning_rate 1e-3 \
@@ -66,6 +68,7 @@ train_softprompt_rel2:
 	  --max_p_length 128 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \
+	  --per_device_eval_batch_size 8 \
 	  --m_positive_per_example 2 \
 	  --m_negative_per_example 2 \
 	  --learning_rate 1e-3 \
@@ -90,6 +93,7 @@ train_softprompt_rel_doc:
 	  --max_p_length 256 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \
+	  --per_device_eval_batch_size 8 \
 	  --m_positive_per_example 2 \
 	  --m_negative_per_example 2 \
 	  --learning_rate 1e-3 \
