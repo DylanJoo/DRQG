@@ -81,3 +81,4 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     remove_unused_columns: bool = field(default=False)
     prefix_tuning: bool = field(default=False)
     random_init: bool = field(default=False)
+    enable_unlikelihood: bool = field(default=False)

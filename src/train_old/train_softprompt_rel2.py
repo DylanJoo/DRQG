@@ -107,8 +107,9 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers import TrainerForRelQG
-    trainer = TrainerForRelQG(
+    # from trainers import TrainerForRelQG
+    from trainers import TrainerForTesting
+    trainer = TrainerForTesting(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],
