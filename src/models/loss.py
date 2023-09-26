@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import copy
-from torch.nn import CrossEntropyLoss, KLDivLoss, NLLLoss
+from torch.nn import CrossEntropyLoss, KLDivLoss, NLLLoss, CosineEmbeddingLoss
 
 def gen_mle_loss(lm_logits, labels, seq_labels, vocab_size, gumbel=False):
     if gumbel:
@@ -51,6 +51,14 @@ def gen_mle_unloss(lm_logits, labels, seq_labels, vocab_size, gumbel=False):
         ).mean()
     return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
 
+def cosine_sim_loss(x, y, fn='cosine'):
+    if fn == 'cosine':
+        loss_fct = CosineEmbeddingLoss(margin=0.1, reduction='none')
+        x = F.normalize(x, p=2, dim=-1)
+        y = F.normalize(y, p=2, dim=-1)
+        target = torch.tensor([-1]).to(x.device)
+        return loss_fct(x, y, target).mean()
+
 def indoc_cont_loss(hidden_states, bs=1, norm=False):
     device = hidden_states.device
     if (hidden_states.size(1) != 1) or (len(hidden_state.shape)>2):
@@ -60,7 +68,7 @@ def indoc_cont_loss(hidden_states, bs=1, norm=False):
 
     hs = hidden_state.size(-1)
     if norm:
-        hidden_state = torch.nn.functional.normalize(hidden_state, p=2, dim=-1)
+        hidden_state = F.normalize(hidden_state, p=2, dim=-1)
 
     v_hidden_state = hidden_state.view(bs, -1, hs)
     # b n L H x b n H L 

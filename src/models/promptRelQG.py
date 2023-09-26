@@ -98,11 +98,11 @@ class SoftRelPromptT5Stack(T5Stack):
 
         # relevant prompting
         self.relevant_idx = torch.LongTensor(relevant_idx)
-        self.positive_prompt = nn.Parameter(torch.rand(
+        self.relevant_prompt = nn.Parameter(torch.rand(
             len(relevant_idx), embed_tokens.embedding_dim
         ))
         self.irrelevant_idx = torch.LongTensor(irrelevant_idx)
-        self.negative_prompt = nn.Parameter(torch.rand(
+        self.irrelevant_prompt = nn.Parameter(torch.rand(
             len(irrelevant_idx), embed_tokens.embedding_dim
         ))
 
@@ -111,14 +111,20 @@ class SoftRelPromptT5Stack(T5Stack):
                 self.wte(self.instruction_idx).clone().detach()
         )
         if positive:
-            self.positive_prompt = nn.Parameter(
+            self.relevant_prompt = nn.Parameter(
                     self.wte(self.relevant_idx).clone().detach()
             )
         if negative:
-            self.negative_prompt = nn.Parameter(
+            self.irrelevant_prompt = nn.Parameter(
                     self.wte(self.irrelevant_idx).clone().detach()
             )
 
+    def get_prompts_similarity(self):
+        a = self.relevant_prompt.clone().detach()
+        b = self.irrelevant_prompt.clone().detach()
+        n_prompts = self.relevant_prompt.shape[0]
+        similarity = (F.normalize(a, p=2, dim=-1)*F.normalize(b, p=2, dim=-1)).sum()
+        return similarity / n_prompts
 
     def forward(self, 
                 input_ids=None,
@@ -145,10 +151,10 @@ class SoftRelPromptT5Stack(T5Stack):
         if rel_scores is not None:
             relevant_prompts = torch.matmul(
                     rel_scores.view(-1, 1), 
-                    self.positive_prompt.view(1, -1)
+                    self.relevant_prompt.view(1, -1)
             ) + torch.matmul(
                     (1-rel_scores).view(-1, 1), 
-                    self.negative_prompt.view(1, -1)
+                    self.irrelevant_prompt.view(1, -1)
             )
             relevant_prompts = relevant_prompts.view(B, -1, H)
             prompts += [relevant_prompts]

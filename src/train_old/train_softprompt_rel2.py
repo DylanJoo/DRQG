@@ -49,15 +49,7 @@ def main():
     )
     prompt_length = len(model_args.instruction_prompt_idx) 
     prompt_length += len(model_args.relevant_prompt_idx) 
-
-    ## Freezing
-    ### Prompt tuning (soft)
-    if training_args.random_init:
-        # pos from rand, neg from rand
-        model.encoder.init_from_vocab(True, False)
-    else:
-        # pos from True, neg from False
-        model.encoder.init_from_vocab()
+    model.encoder.init_from_vocab()
 
     print('\n')
     for name, param in model.named_parameters():
@@ -107,9 +99,8 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    # from trainers import TrainerForRelQG
-    from trainers import TrainerForTesting
-    trainer = TrainerForTesting(
+    from trainers import TrainerForRelQG
+    trainer = TrainerForRelQG(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],

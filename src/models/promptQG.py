@@ -2,6 +2,7 @@ import copy
 import torch
 import inspect
 from torch import nn
+import torch.nn.functional as F
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import T5Config
 from transformers.models.t5.modeling_t5 import T5Stack
@@ -110,6 +111,12 @@ class SoftPromptT5Stack(T5Stack):
             self.relevant_prompt = nn.Parameter(
                     self.wte(self.relevant_idx).clone().detach()
             )
+
+    def get_prompts_similarity(self):
+        a = self.relevant_prompt[0].clone().detach()
+        b = self.relevant_prompt[1].clone().detach()
+        similarity = (F.normalize(a, p=2, dim=-1)*F.normalize(b, p=2, dim=-1)).sum()
+        return similarity
 
     def forward(self, 
                 input_ids=None,

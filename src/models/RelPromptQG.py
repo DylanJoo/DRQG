@@ -2,6 +2,7 @@ import copy
 import torch
 import inspect
 from torch import nn
+import torch.nn.functional as F
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import T5Config
 from transformers.models.t5.modeling_t5 import T5Stack
@@ -31,7 +32,7 @@ class RelPromptFlanT5(FlanT5):
         if pos_neg_prompt_idx is not None:
             # single relevance vector 
             self.encoder = SingleRelPromptT5Stack(
-                    pos_neg_idx=pos_neg_prompt_idx,
+                    relevant_idx=pos_neg_prompt_idx,
                     embed_tokens=self.shared,
                     config=encoder_config, 
             )
@@ -85,20 +86,20 @@ class RelPromptFlanT5(FlanT5):
 class SingleRelPromptT5Stack(T5Stack):
 
     def __init__(self, 
-                 pos_neg_idx=None, 
+                 relevant_idx=None, 
                  embed_tokens=None, 
                  **kwargs):
         super().__init__(**kwargs)
 
         self.wte = embed_tokens
-        self.pos_neg_idx = torch.LongTensor(pos_neg_idx)
-        self.pos_neg_prompt = nn.Parameter(torch.rand(
-            len(pos_neg_idx), embed_tokens.embedding_dim
+        self.relevant_idx = torch.LongTensor(relevant_idx)
+        self.relevant_prompt = nn.Parameter(torch.rand(
+            len(relevant_idx), embed_tokens.embedding_dim
         ))
 
     def init_from_vocab(self):
-        self.pos_neg_prompt = nn.Parameter(
-                self.wte(self.pos_neg_idx).clone().detach()
+        self.relevant_prompt = nn.Parameter(
+                self.wte(self.relevant_idx).clone().detach()
         )
 
     def forward(self, 
@@ -120,11 +121,11 @@ class SingleRelPromptT5Stack(T5Stack):
         if rel_scores is not None:
             # reshape: rel_score (B) --> (B 2)
             # concat: (2 H) --> (B 1 H)
-            pos_neg_prompt = torch.matmul(
+            relevant_prompt = torch.matmul(
                     torch.cat([1-rel_scores, rel_scores], -1).view(2, -1).T,
-                    self.pos_neg_prompt
+                    self.relevant_prompt
             ).unsqueeze(1)
-            prompts = [pos_neg_prompt]
+            prompts = [relevant_prompt]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
         return super().forward(
@@ -137,6 +138,12 @@ class SingleRelPromptT5Stack(T5Stack):
                 return_dict=return_dict
         )
 
+    def get_prompts_similarity(self):
+        a = self.relevant_prompt[0].clone().detach()
+        b = self.relevant_prompt[1].clone().detach()
+        similarity = (F.normalize(a, p=2, dim=-1)*F.normalize(b, p=2, dim=-1)).sum()
+        return similarity
+
 class MultiRelPromptT5Stack(T5Stack):
 
     def __init__(self, 
@@ -148,21 +155,21 @@ class MultiRelPromptT5Stack(T5Stack):
 
         self.wte = embed_tokens
         self.relevant_idx = torch.LongTensor(relevant_idx)
-        self.positive_prompt = nn.Parameter(torch.rand(
+        self.relevant_prompt = nn.Parameter(torch.rand(
             len(relevant_idx), embed_tokens.embedding_dim
         ))
         self.irrelevant_idx = torch.LongTensor(irrelevant_idx)
-        self.negative_prompt = nn.Parameter(torch.rand(
+        self.irrelevant_prompt = nn.Parameter(torch.rand(
             len(irrelevant_idx), embed_tokens.embedding_dim
         ))
 
     def init_from_vocab(self, positive=True, negative=True):
         if positive:
-            self.positive_prompt = nn.Parameter(
+            self.relevant_prompt = nn.Parameter(
                     self.wte(self.relevant_idx).clone().detach()
             )
         if negative:
-            self.negative_prompt = nn.Parameter(
+            self.irrelevant_prompt = nn.Parameter(
                     self.wte(self.irrelevant_idx).clone().detach()
             )
 
@@ -188,10 +195,10 @@ class MultiRelPromptT5Stack(T5Stack):
         if rel_scores is not None:
             relevant_prompts = torch.matmul(
                     rel_scores.view(-1, 1), 
-                    self.positive_prompt.view(1, -1)
+                    self.relevant_prompt.view(1, -1)
             ) + torch.matmul(
                     (1-rel_scores).view(-1, 1), 
-                    self.negative_prompt.view(1, -1)
+                    self.irrelevant_prompt.view(1, -1)
             )
             relevant_prompts = relevant_prompts.view(B, -1, H)
             prompts += [relevant_prompts]
@@ -206,3 +213,10 @@ class MultiRelPromptT5Stack(T5Stack):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict
         )
+
+    def get_prompts_similarity(self):
+        a = self.relevant_prompt.clone().detach()
+        b = self.irrelevant_prompt.clone().detach()
+        n_prompts = self.relevant_prompt.shape[0]
+        similarity = (F.normalize(a, p=2, dim=-1)*F.normalize(b, p=2, dim=-1)).sum()
+        return similarity / n_prompts
