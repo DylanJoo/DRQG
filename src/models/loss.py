@@ -57,9 +57,14 @@ def cosine_sim_loss(x, y, fn='cosine'):
         x = F.normalize(x, p=2, dim=-1)
         y = F.normalize(y, p=2, dim=-1)
         target = torch.tensor([-1]).to(x.device)
+    if fn == 'cosine':
+        loss_fct = CosineEmbeddingLoss(margin=0.1, reduction='none')
+        x = F.normalize(x, p=2, dim=-1)
+        y = F.normalize(y, p=2, dim=-1)
+        target = torch.tensor([-1]).to(x.device)
         return loss_fct(x, y, target).mean()
 
-def indoc_cont_loss(hidden_states, bs=1, norm=False):
+def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False):
     device = hidden_states.device
     if (hidden_states.size(1) != 1) or (len(hidden_state.shape)>2):
         hidden_state = hidden_states.mean(1)[:, None, :]
@@ -73,13 +78,12 @@ def indoc_cont_loss(hidden_states, bs=1, norm=False):
     v_hidden_state = hidden_state.view(bs, -1, hs)
     # b n L H x b n H L 
     indoc_scores = v_hidden_state @ v_hidden_state.transpose(-1, -2)
-    loss_fct = CrossEntropyLoss()
+    loss_fct = CrossEntropyLoss(reduction='none')
     n_size = indoc_scores.size(1)
     indoc_labels = torch.arange(0, n_size, device=device)
-    loss = loss_fct(
+    return loss_fct(
             indoc_scores.view(-1, n_size), indoc_labels.repeat(bs)
-    )
-    return loss
+    ).mean()
 
 def pairwise_cont_loss(hidden_states, hidden_base=None, bs=1, norm=False):
     """
