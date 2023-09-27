@@ -3,7 +3,11 @@ import math
 import torch
 import copy
 from torch.nn import functional as F
-from models.loss import gen_mle_loss, gen_mle_unloss, cosine_sim_loss
+from models.loss import (
+    gen_mle_loss, gen_mle_unloss, 
+    cosine_sim_loss, inbatch_cont_sim_loss,
+    pairwise_maxsim_loss
+)
 from transformers.modeling_outputs import BaseModelOutput
 
 class TrainerBase(Seq2SeqTrainer):
@@ -164,14 +168,35 @@ class TrainerForRelQG(TrainerForQG):
                     0.0 * (unloss_gen_pos + unloss_gen_neg)
 
         ## (3) Cosine similarity
+        ## [NOTE] Deprecated, only used for debuggin'
         loss_sim = cosine_sim_loss(
                 model.encoder.relevant_prompt, 
                 model.encoder.irrelevant_prompt
         )
-        train_logs += f"\nCosine: {loss_sim}"
+        train_logs += f"\nCosineSim: {loss_sim}"
 
-        if self.args.enable_cosine_simlarity_loss:
-            loss += loss_sim
+        ## (4) In-batch similarity
+        encoder_last_hidden_state = outputs.get('encoder_last_hidden_state')
+        loss_sim1 = inbatch_cont_sim_loss(encoder_last_hidden_state, 
+                                         self._train_batch_size,
+                                         False)
+        train_logs += f"\nInbatchSim: {loss_sim1}"
+
+        ## (5) Pairwise similarity
+        _, length, hs = encoder_last_hidden_state.shape
+        sequence_vectors = encoder_last_hidden_state.mean(-2).view(
+                -1, 2, self.data_collator.m_positives, hs
+        ).permute(1, 0, 2, 3).continuous()
+        loss_sim2 = cosine_sim_loss(
+                sequence_vectors[0].reshape(-1, hs),
+                sequence_vectors[1].reshape(-1, hs)
+        )
+        train_logs += f"\nPairwiseSim: {loss_sim2}"
+
+        if self.args.enable_simlarity_loss == 'inbatch':
+            loss += loss_sim1
+        if self.args.enable_simlarity_loss == 'pairwise':
+            loss += loss_sim2
 
         if training_steps % 50 == 0:
             print(train_logs)
