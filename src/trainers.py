@@ -6,7 +6,6 @@ from torch.nn import functional as F
 from models.loss import (
     gen_mle_loss, gen_mle_unloss, 
     cosine_sim_loss, inbatch_cont_sim_loss,
-    pairwise_maxsim_loss
 )
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -122,23 +121,29 @@ class TrainerForRelQG(TrainerForQG):
         labels = inputs.get("labels").to(self.args.device)
         labels_reverse = self.reverse_positions(labels)
         training_steps = copy.deepcopy(self.state.global_step)
-        # n = inputs['input_ids'].shape[0] // 2
 
         # compute losses
         ## (1) text generation loss
+        # outputs = model(**inputs, steps=training_steps)
+        # lm_logits = outputs.get("logits")
+        # L = lm_logits.shape[1]
+        #
+        # loss_gen = gen_mle_loss(lm_logits, labels, rel_labels, True)
+        # loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']
+        # train_logs = f"\nNLL: (pos) {loss_gen_pos} + (neg) {loss_gen_neg}"
+
+        ## (2) calibration margin loss
+        ### positive candidates
         outputs = model(**inputs, steps=training_steps)
         lm_logits = outputs.get("logits")
+        L = lm_logits.shape[1]
 
-        loss_gen = gen_mle_loss(
-                lm_logits, 
-                labels, 
-                rel_labels,
-                model.config.vocab_size
-        )
+        #### [NOTE] Different from standard token-wise CE loss
+        loss_gen = gen_mle_loss(lm_logits, labels, rel_labels, False)
         loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']
-        train_logs = f"\nNLL: (pos) {loss_gen_pos} + (neg) {loss_gen_neg}"
+        train_logs = f"\nNLL: (pos) {loss_gen_pos.mean()/L} + (neg) {loss_gen_neg.mean()/L}"
 
-        ## (2) text unlikelihood generation loss
+        ### negative candidates
         encoder_outputs = BaseModelOutput(
                 last_hidden_state=outputs.encoder_last_hidden_state,
                 hidden_states=outputs.encoder_hidden_states,
@@ -149,23 +154,30 @@ class TrainerForRelQG(TrainerForQG):
                 encoder_outputs=encoder_outputs
         )
         lm_logits_reverse = outputs_reverse.get('logits')
+        loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
+        loss_neg_gen_pos, loss_neg_gen_neg = loss_gen['pos'], loss_gen['neg']
+        train_logs += f"\nNeg-NLL: (neg->pos) {loss_neg_gen_pos.mean()/L} + (pos->neg) {loss_neg_gen_neg.mean()/L}"
 
-        loss_gen = gen_mle_unloss(
-                lm_logits_reverse,
-                labels_reverse,
-                rel_labels,
-                model.config.vocab_size,
-                gumbel=False
-        )
-        unloss_gen_pos, unloss_gen_neg = loss_gen['pos'], loss_gen['neg']
-        train_logs += f"\nUn-NLL: (neg->pos) {unloss_gen_pos} + (pos->neg) {unloss_gen_neg}"
+        beta = 0.1 
+        loss_gap_pos = torch.clamp(beta+loss_gen_pos-loss_neg_gen_neg, min=0).mean()
+        loss_gap_neg = torch.clamp(beta+loss_gen_neg-loss_neg_gen_pos, min=0).mean()
+        train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
 
-        if self.args.enable_unlikelihood:
-            loss = 0.25 * (loss_gen_pos + loss_gen_neg) + \
-                    0.25 * (unloss_gen_pos + unloss_gen_neg)
-        else:
-            loss = 0.5 * (loss_gen_pos + loss_gen_neg) + \
-                    0.0 * (unloss_gen_pos + unloss_gen_neg)
+        ## (2) text unlikelihood generation loss
+        # encoder_outputs = BaseModelOutput(
+        #         last_hidden_state=outputs.encoder_last_hidden_state,
+        #         hidden_states=outputs.encoder_hidden_states,
+        #         attentions=outputs.encoder_attentions
+        # )
+        # outputs_reverse = model(
+        #         decoder_input_ids=model._shift_right(labels_reverse),
+        #         encoder_outputs=encoder_outputs
+        # )
+        # lm_logits_reverse = outputs_reverse.get('logits')
+        #
+        # loss_gen = gen_mle_unloss(lm_logits_reverse, labels_reverse, rel_labels)
+        # unloss_gen_pos, unloss_gen_neg = loss_gen['pos'], loss_gen['neg']
+        # train_logs += f"\nUn-NLL: (neg->pos) {unloss_gen_pos} + (pos->neg) {unloss_gen_neg}"
 
         ## (3) Cosine similarity
         ## [NOTE] Deprecated, only used for debuggin'
@@ -178,25 +190,24 @@ class TrainerForRelQG(TrainerForQG):
         ## (4) In-batch similarity
         encoder_last_hidden_state = outputs.get('encoder_last_hidden_state')
         loss_sim1 = inbatch_cont_sim_loss(encoder_last_hidden_state, 
-                                         self._train_batch_size,
-                                         False)
+                                          self._train_batch_size,
+                                          False)
         train_logs += f"\nInbatchSim: {loss_sim1}"
 
-        ## (5) Pairwise similarity
-        _, length, hs = encoder_last_hidden_state.shape
-        sequence_vectors = encoder_last_hidden_state.mean(-2).view(
-                -1, 2, self.data_collator.m_positives, hs
-        ).permute(1, 0, 2, 3).continuous()
-        loss_sim2 = cosine_sim_loss(
-                sequence_vectors[0].reshape(-1, hs),
-                sequence_vectors[1].reshape(-1, hs)
-        )
-        train_logs += f"\nPairwiseSim: {loss_sim2}"
+        if self.args.enable_unlikelihood:
+            loss = 0.25 * (loss_gen_pos + loss_gen_neg) + \
+                    0.25 * (unloss_gen_pos + unloss_gen_neg)
+
+        elif self.args.enable_calibration:
+            loss = 0.25 * (loss_gap_pos + loss_gap_neg) + \
+                    0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L)
+
+        else:
+            loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
+                    0.0 * (unloss_gen_pos + unloss_gen_neg)
 
         if self.args.enable_simlarity_loss == 'inbatch':
             loss += loss_sim1
-        if self.args.enable_simlarity_loss == 'pairwise':
-            loss += loss_sim2
 
         if training_steps % 50 == 0:
             print(train_logs)

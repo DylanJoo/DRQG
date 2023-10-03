@@ -77,10 +77,11 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     learning_rate: Optional[float] = field(default=5e-5)
     lr_scheduler_type: Union[str] = field(default='linear')
     warmup_ratio: Union[float] = field(default=0.0)
-    overwrite_output_dir: bool = field(default=False)
+    overwrite_output_dir: bool = field(default=True)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
     prefix_tuning: bool = field(default=False)
     random_init: bool = field(default=False)
     enable_unlikelihood: bool = field(default=False)
-    enable_cosine_simlarity_loss: bool = field(default=False)
+    enable_calibration: Optional[str] = field(default=None)
+    enable_simlarity_loss: Optional[str] = field(default=None)

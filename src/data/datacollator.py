@@ -8,12 +8,6 @@ from typing import Optional, Union, List, Dict, Tuple, Any
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.tokenization_utils_base import PaddingStrategy, PreTrainedTokenizerBase
 
-def denoise(texts):
-    texts = [t.replace('the', '') for t in texts]
-    texts = [t.replace('The', '') for t in texts]
-    texts = [t.translate(str.maketrans('', '', string.punctuation)) for t in texts]
-    return texts
-
 @dataclass
 class DataCollatorBase:
     """ This datacollator is specified for evaluation process.
@@ -106,6 +100,11 @@ class DataCollatorForBaseline(DataCollatorBase):
                     self.m_negatives
             )
 
+            ## positive: 1, 0.9, 0.8 ...
+            ## negative: 0, 0.1, 0.2 ... --> 0.2, 0.1, 0
+            ## change them into the same ordering
+            src0, tgt0, score0 = src0[::-1], tgt0[::-1], score0[::-1]
+
             texts_src += src1 + src0
             texts_tgt += tgt1 + tgt0
             labels += [1]*len(src1) + [0]*len(src0)
@@ -130,7 +129,6 @@ class DataCollatorForBaseline(DataCollatorBase):
         target_mask = targets['attention_mask'].bool()
         target_ids = targets['input_ids'].masked_fill(~target_mask, -100)
         inputs['labels'] = target_ids
-        # inputs['decoder_attention_mask'] = target_mask
         inputs['rel_labels'] = torch.Tensor(labels)
         inputs['rel_scores'] = torch.Tensor(scores)
         inputs['passage'] = features[0]['passage']
