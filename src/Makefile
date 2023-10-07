@@ -6,7 +6,7 @@ train_softprompt_rel1:
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \
-	  --output_dir models/checkpoint/flan-t5-base-rel1-margin-gap-ibce \
+	  --output_dir models/checkpoint/flan-t5-base-rel1-margin-gap/ \
 	  --max_p_length 128 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \
@@ -26,7 +26,6 @@ train_softprompt_rel1:
 	  --do_train \
 	  --do_eval \
 	  --enable_calibration true \
-	  --enable_simlarity_loss inbatch
 
 train_softprompt_rel2:
 	python3 train_old/train_softrelprompt.py \

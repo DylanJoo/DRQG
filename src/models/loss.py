@@ -26,24 +26,30 @@ def gen_mle_loss(lm_logits, labels, seq_labels, average=True):
     else:
         return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
 
-def gen_mle_unloss(lm_logits, labels, seq_labels, vocab_size):
+def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
     lm_prob = torch.clamp( (1-lm_logits.softmax(-1)), min=1e-5)
     # lm_prob = torch.clamp( (-lm_logits).softmax(-1), min=1e-5 )
     lm_likelihood = lm_prob.log()
     loss_gen_pos, loss_gen_neg = 0, 0
     loss_fct = NLLLoss(reduction='none')
+    B, L, V = lm_logits.shape
 
     if len(labels[seq_labels==1]) > 0:
-        loss_gen_pos = loss_fct(
-                lm_likelihood[seq_labels==1].view(-1, vocab_size), 
+        loss_gen_pos_from_neg = loss_fct(
+                lm_likelihood[seq_labels==1].view(-1, V), 
                 labels[seq_labels==1].view(-1)
-        ).mean()
+        ).view(-1, L).sum(1)
     if len(labels[seq_labels<1]) > 0:
-        loss_gen_neg = loss_fct(
-                lm_likelihood[seq_labels<1].view(-1, vocab_size), 
+        loss_gen_neg_from_pos = loss_fct(
+                lm_likelihood[seq_labels<1].view(-1, V), 
                 labels[seq_labels<1].view(-1)
-        ).mean()
-    return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
+        ).view(-1, L).sum(1)
+
+    if average:
+        return {'neg2pos': loss_gen_pos_from_neg.mean()/L, 
+                'pos2neg': loss_gen_neg_from_pos.mean()/L}
+    else:
+        return {'neg2pos': loss_gen_pos_from_neg, 'pos2neg': loss_gen_neg_from_pos}
 
 def slic_margin_loss(logits_bar, logits_hat, maks_bar, mask_hat, seq_labels):
     bertscore = greedy_cos_idf(logits_bar, mask_bar, 
@@ -61,7 +67,7 @@ def cosine_sim_loss(x, y, fn='cosine'):
         target = torch.tensor([-1]).to(x.device)
         return loss_fct(x, y, target).mean()
 
-def inbatch_cont_sim_loss(hidden_states, bs=1, ms=1, norm=False):
+def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False):
     device = hidden_states.device
     hs = hidden_states.size(-1)
     if (hidden_states.size(1) != 1) or (len(hidden_states.shape)>2):
@@ -78,7 +84,7 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, ms=1, norm=False):
     loss_fct = CrossEntropyLoss(reduction='none')
     n_size = indoc_scores.size(0)
     indoc_labels = torch.arange(0, n_size, device=device)
-    return loss_fct(indoc_scores, indoc_labels).mean()
+    return loss_fct(indoc_scores, indoc_labels).mean() 
 
 def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
 
