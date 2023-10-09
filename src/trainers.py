@@ -142,15 +142,15 @@ class TrainerForRelQG(TrainerForQG):
         encoder_last_hidden_state = outputs.get('encoder_last_hidden_state')
         loss_sim = inbatch_cont_sim_loss(encoder_last_hidden_state, 
                                          self._train_batch_size,
-                                         True, reduction=True)
+                                         True, reduction=False)
         train_logs += f"\nInbatchSim: {loss_sim.mean()}"
 
         if self.args.enable_simlarity_loss == 'inbatch':
-            loss += loss_sim # averaging
-            # loss = 0.5 * ( 
-            #         (loss_gen_pos * loss_sim[rel_labels==1]).mean() + 
-            #         (loss_gen_neg * loss_sim[rel_labels!=0]).mean()
-            # ) # weighted by similarity
+            # loss += loss_sim # averaging
+            loss = 0.5 * ( 
+                    (loss_gen_pos * loss_sim[rel_labels==1].exp()).mean() + 
+                    (loss_gen_neg * loss_sim[rel_labels!=0].exp()).mean()
+            ) # weighted by similarity
 
         ### Cosine similarity (Deprecated, only used for debuggin)
         loss_sim = cosine_sim_loss(

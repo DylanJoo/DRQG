@@ -6,7 +6,7 @@ train_softprompt_rel1:
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \
-	  --output_dir models/checkpoint/flan-t5-base-rel1-ibce/ \
+	  --output_dir models/checkpoint/flan-t5-base-rel1-ibce-adaptive2/ \
 	  --max_p_length 128 \
 	  --max_q_length 16 \
 	  --per_device_train_batch_size 8 \

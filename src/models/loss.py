@@ -87,9 +87,9 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None):
     n_size = indoc_scores.size(0)
     indoc_labels = torch.arange(0, n_size, device=device)
     if reduction:
-        return (loss_fct(indoc_scores, indoc_labels)/bs).mean()
+        return (loss_fct(indoc_scores, indoc_labels)/B).mean()
     else:
-        return loss_fct(indoc_scores, indoc_labels).mean()
+        return loss_fct(indoc_scores, indoc_labels)/B
 
 def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
 
