@@ -59,17 +59,19 @@ def slic_margin_loss(logits_bar, logits_hat, maks_bar, mask_hat, seq_labels):
     loss_f1_neg = bertscore[2][seq_labels!=1].mean()
     return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
 
-def cosine_sim_loss(x, y, fn='cosine'):
-    if fn == 'cosine':
-        loss_fct = CosineEmbeddingLoss(margin=0.1, reduction='none')
-        x = F.normalize(x, p=2, dim=-1)
-        y = F.normalize(y, p=2, dim=-1)
-        target = torch.tensor([-1]).to(x.device)
-        return loss_fct(x, y, target).mean()
+def cosine_sim_loss(x, y):
+    loss_fct = CosineEmbeddingLoss(margin=0.1, reduction='none')
+    x = F.normalize(x, p=2, dim=-1)
+    y = F.normalize(y, p=2, dim=-1)
+    target = torch.tensor([-1]).to(x.device)
+    return loss_fct(x, y, target).mean()
 
-def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False):
+def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None):
+    """
+    [NOTE] Further improvment: in-batch document-wise (calculating once for same doc)
+    """
     device = hidden_states.device
-    hs = hidden_states.size(-1)
+    B, L, H = hidden_states.shape
     if (hidden_states.size(1) != 1) or (len(hidden_states.shape)>2):
         hidden_state = hidden_states.mean(1)
     else:
@@ -78,13 +80,16 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False):
     if norm:
         hidden_state = F.normalize(hidden_state, p=2, dim=-1)
 
-    hidden_state = hidden_state.view(-1, hs)
+    hidden_state = hidden_state.view(-1, H)
     # bs H x H bs
     indoc_scores = hidden_state @ hidden_state.permute(1, 0)
     loss_fct = CrossEntropyLoss(reduction='none')
     n_size = indoc_scores.size(0)
     indoc_labels = torch.arange(0, n_size, device=device)
-    return loss_fct(indoc_scores, indoc_labels).mean() 
+    if reduction:
+        return (loss_fct(indoc_scores, indoc_labels)/bs).mean()
+    else:
+        return loss_fct(indoc_scores, indoc_labels).mean()
 
 def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
 
