@@ -1,17 +1,26 @@
 # DRQG
-This code is for synthesizing training examples for text ranking models.
-We aim to analyze what training data is suitable for fine-tuning a out-domain text ranking model.
+---
+READ: Relevance-aware distributional question generation
 
 ---
 ## Prerequisite
-MSMARCO passage ranking dataset:
-- Queries, Collections, Triplet pairs
 
-Packages
+### Dataset 
+- Pseudo-relevant pairs: MSMARCO passage ranking 
+We use ... 
+
+- SciFact corpus: the selected evidence from S2ORC.
+We use ...
+
+### Packages
 ```
 pyserini
 transformers
 ```
+
+## Evaluation 
+We proposed two metrics for the intermediate question genration
+
 ## Fine-tune generators
 TBD
 
