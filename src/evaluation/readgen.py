@@ -17,6 +17,7 @@ class READGen:
         ## readgen config
         self.num_relevance_scores = num_relevance_scores
         self.output_path = output_jsonl
+        self.device = device
 
         ## model config and tokenizers
         self.model = SoftPromptFlanT5.from_pretrained(
@@ -43,8 +44,8 @@ class READGen:
 
     def batch_generate(self, text_inputs, **kwargs):
         # prepare inputs 
-        M = len(text_inputs)
-        rel_scores = self.relevance_scores.repeat(M)
+        M = len(text_inputs) # batch_size
+        N = len(self.relevance_scores) # N
 
         # tokenization
         inputs = self.tokenizer(
@@ -52,23 +53,24 @@ class READGen:
                 max_length=kwargs.pop('max_length', 512),
                 truncation=kwargs.pop('truncation', True),
                 padding=kwargs.pop('padding', True),
-                return_tensors=True
+                return_tensors='pt'
         ).to(self.device)
 
-        N = len(rel_scores)
-        input_ids = inputs['input_ids'].repeat_interleave(N, 1)
-        attn_mask = inputs['attention_mask'].repeat_interleave(N, 1)
+        input_ids = inputs['input_ids'].repeat_interleave(N, 0)
+        attn_mask = inputs['attention_mask'].repeat_interleave(N, 0)
+        rel_scores = self.relevance_scores.repeat(M)
+        attn_mask = self._expand(attn_mask)
 
         # generate
-        output_ids = model.generate(
+        output_ids = self.model.generate(
                 input_ids=input_ids,
-                attention_mask=attn_mask._expand(attn_mask),
+                attention_mask=attn_mask,
                 rel_scores=rel_scores,
                 **kwargs
         )
 
         # outputs (if any)
-        output_texts = tokenizer.batch_decode(
+        output_texts = self.tokenizer.batch_decode(
                 output_ids, skip_special_tokens=True
         )
         ## return a list of list, each list contains N predicted query

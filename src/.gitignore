@@ -7,7 +7,7 @@ results/
 
 # checkpoints
 models/*/
-checkpoints/
+model/checkpoint
 
 # evaluation
 evaluation/**/*.jsonl

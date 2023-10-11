@@ -11,6 +11,7 @@ from arguments import *
 from utils import batch_iterator
 from transformers import AutoConfig, AutoTokenizer
 from evaluation import READGen
+from datasets import Dataset
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     # Generation
     data_iterator = batch_iterator(dataset, args.batch_size, False)
     with torch.no_grad(), open(args.output_jsonl, 'w') as fout:
-        for batch in tqdm(data_iterator, total=len(dataset).args.batch_size+1):
+        for batch in tqdm(data_iterator, total=len(dataset)//args.batch_size+1):
             outputs = generator.batch_generate(
                     batch['passage'],
                     max_length=512,
@@ -81,7 +82,7 @@ if __name__ == "__main__":
             for i, docid in enumerate(batch['doc_id']):
                 fout.write(json.dumps({
                     "doc_id": docid,
-                    "relevance_scores": generator.relevance_scores,
+                    "relevance_scores": generator.relevance_scores.cpu().tolist(),
                     "generated_query": outputs[i]
                 }) + '\n')
 

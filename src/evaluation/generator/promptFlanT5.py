@@ -103,20 +103,17 @@ class SoftPromptT5Stack(T5Stack):
 
         ## Expand customized prompts in front of `inputs_embeds` 
         prompts = []
-        if self.instruction_idx is not None:
-            # instruction_prompt: (N H) --> (B N H)
-            prompts += [self.instruction_prompt.repeat(B, 1, 1)]
+        prompts += [self.instruction_prompt.repeat(B, 1, 1)]
 
-        if rel_scores is not None:
-            relevant_prompts = torch.matmul(
-                    rel_scores.view(-1, 1), 
-                    self.relevant_prompt.view(1, -1)
-            ) + torch.matmul(
-                    (1-rel_scores).view(-1, 1), 
-                    self.irrelevant_prompt.view(1, -1)
-            )
-            relevant_prompts = relevant_prompts.view(B, -1, H)
-            prompts += [relevant_prompts]
+        relevant_prompts = torch.matmul(
+                rel_scores.view(-1, 1), 
+                self.relevant_prompt.view(1, -1)
+        ) + torch.matmul(
+                (1-rel_scores).view(-1, 1), 
+                self.irrelevant_prompt.view(1, -1)
+        )
+        relevant_prompts = relevant_prompts.view(B, -1, H)
+        prompts += [relevant_prompts]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
         return super().forward(

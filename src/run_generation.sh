@@ -1,13 +1,14 @@
-python3 generate.py \
-        --corpus_jsonl ~/dataset/scifact/corpus.jsonl \
-        --model_name google/flan-t5-base \
+for folder in models/drqg/flan*;do
+    name=${folder##*/}
+    python3 generate.py \
+        --corpus_jsonl ~/datasets/scifact/corpus.jsonl \
+        --model_name models/drqg/${name}/checkpoint-20000 \
         --tokenizer_name google/flan-t5-base \
-        --output_jsonl results/test.jsonl \
-        --device cuda:0 \
+        --output_jsonl results/${name}.jsonl \
+        --device cuda:2 \
         --num_relevance_scores 10 \
         --batch_size 2 \
-        --num_beams 1 \
         --max_length 512 \
         --max_new_tokens 64 \
-        --do_sample \
-        --top_k 10
+        --num_beams 1
+done
