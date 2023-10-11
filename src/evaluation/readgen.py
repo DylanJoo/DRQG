@@ -1,6 +1,7 @@
 import torch
+from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import AutoConfig, AutoTokenizer
-from generator import SoftPromptFlanT5
+from .generator import SoftPromptFlanT5
 
 class READGen:
     def __init__(
@@ -10,6 +11,7 @@ class READGen:
         relevance_scores: str = None, 
         num_relevance_scores: int = 10, 
         output_jsonl: Optional[str] = None,
+        device: str = 'cpu',
         **kwargs
     ):
         ## readgen config
@@ -19,9 +21,11 @@ class READGen:
         ## model config and tokenizers
         self.model = SoftPromptFlanT5.from_pretrained(
                 model_path,
-                AutoConfig.from_pretrained(model_path),
-                kwargs.get('num_instruction_prompt_idx', 13),
-                kwargs.get('num_relevance_prompt_idx', 1)
+                config=AutoConfig.from_pretrained(model_path),
+                num_instruction_prompt_idx=\
+                        kwargs.get('num_instruction_prompt_idx', 13),
+                num_relevance_prompt_idx=\
+                        kwargs.get('num_relevance_prompt_idx', 1)
         )
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.prompt_length = sum(self.model.prompt_length)
@@ -47,7 +51,7 @@ class READGen:
                 text_inputs, 
                 max_length=kwargs.pop('max_length', 512),
                 truncation=kwargs.pop('truncation', True),
-                padding=kwargs.pop('padding', True)
+                padding=kwargs.pop('padding', True),
                 return_tensors=True
         ).to(self.device)
 

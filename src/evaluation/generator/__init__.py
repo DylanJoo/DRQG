@@ -1,1 +1,1 @@
-from promptFlanT5 import SoftPromptFlanT5
+from .promptFlanT5 import SoftPromptFlanT5

@@ -28,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_new_tokens", default=64, type=int)
     parser.add_argument("--do_sample", default=False, action='store_true')
     parser.add_argument("--top_k", default=10, type=int)
+    parser.add_argument("--top_p", default=1.0, type=float)
 
     args = parser.parse_args()
 
@@ -37,10 +38,11 @@ if __name__ == "__main__":
             tokenizer_name=args.tokenizer_name,
             relevance_scores=None,
             num_relevance_scores=args.num_relevance_scores,
-            output_jsonl=args.output_jsonl
+            output_jsonl=args.output_jsonl,
+            device=args.device
     )
-    generator.to(args.device)
-    generator.eval()
+    generator.model.to(args.device)
+    generator.model.eval()
 
     # Data
     ## [NOTE] preprocess here.
@@ -72,6 +74,7 @@ if __name__ == "__main__":
                     num_beams=args.num_beams,
                     do_sample=args.do_sample,
                     top_k=args.top_k,
+                    top_p=args.top_p,
             )
 
             # writer

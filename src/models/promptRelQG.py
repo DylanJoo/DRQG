@@ -19,6 +19,9 @@ class SoftRelPromptFlanT5(FlanT5):
         print('Used instruction prompt:', instruction_prompt_idx)
         print('Used relevant prompt:', relevant_prompt_idx)
         print('Used irrelevant prompt:', irrelevant_prompt_idx)
+        self.prompt_length = (
+                len(instruction_prompt_idx), len(relevant_prompt_idx)
+        )
 
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
@@ -106,6 +109,7 @@ class SoftRelPromptT5Stack(T5Stack):
             len(irrelevant_idx), embed_tokens.embedding_dim
         ))
 
+
     def init_from_vocab(self, positive=True, negative=True):
         self.instruction_prompt = nn.Parameter(
                 self.wte(self.instruction_idx).clone().detach()
@@ -118,13 +122,6 @@ class SoftRelPromptT5Stack(T5Stack):
             self.irrelevant_prompt = nn.Parameter(
                     self.wte(self.irrelevant_idx).clone().detach()
             )
-
-    def get_prompts_similarity(self):
-        a = self.relevant_prompt.clone().detach()
-        b = self.irrelevant_prompt.clone().detach()
-        n_prompts = self.relevant_prompt.shape[0]
-        similarity = (F.normalize(a, p=2, dim=-1)*F.normalize(b, p=2, dim=-1)).sum()
-        return similarity / n_prompts
 
     def forward(self, 
                 input_ids=None,

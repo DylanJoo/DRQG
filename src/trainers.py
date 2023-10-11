@@ -89,6 +89,7 @@ class TrainerForRelQG(TrainerForQG):
         labels = inputs.get("labels").to(self.args.device)
         labels_reverse = self.reverse_positions(labels)
         training_steps = copy.deepcopy(self.state.global_step)
+        prompt_length = model.prompt_length
 
         # compute losses
         ## (1) text generation loss
@@ -101,7 +102,7 @@ class TrainerForRelQG(TrainerForQG):
         train_logs = f"\nMax LE: (pos) {loss_gen_pos.mean()/L} + (neg) {loss_gen_neg.mean()/L}"
         loss = 0.5 * ( loss_gen_pos.mean()/L + loss_gen_neg.mean()/L )
 
-        ## (2)&(3) 
+        ## (2) & (3) 
         ### Reusing identical encoded representation
         encoder_outputs = BaseModelOutput(
                 last_hidden_state=outputs.encoder_last_hidden_state,
@@ -139,18 +140,22 @@ class TrainerForRelQG(TrainerForQG):
 
         ## Maximize discripancy 
         ### (4) In-batch similarity
-        encoder_last_hidden_state = outputs.get('encoder_last_hidden_state')
-        loss_sim = inbatch_cont_sim_loss(encoder_last_hidden_state, 
+        sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
+        loss_sim = inbatch_cont_sim_loss(sequence_hidden_states, 
                                          self._train_batch_size,
-                                         True, reduction=False)
+                                         reduction=False,
+                                         temperature=0.75)
         train_logs += f"\nInbatchSim: {loss_sim.mean()}"
 
         if self.args.enable_simlarity_loss == 'inbatch':
-            # loss += loss_sim # averaging
-            loss = 0.5 * ( 
-                    (loss_gen_pos * loss_sim[rel_labels==1].exp()).mean() + 
-                    (loss_gen_neg * loss_sim[rel_labels!=0].exp()).mean()
-            ) # weighted by similarity
+            # (1) averaging: 
+            loss += loss_sim.mean()
+            # (2) adaptive [multplication] (x, the relevat failed)
+            # (3) adaptive [exponential multiplcation] (x) 
+            # loss = 0.5 * ( 
+            #         (loss_gen_pos * loss_sim[rel_labels==1].exp()).mean()/L + 
+            #         (loss_gen_neg * loss_sim[rel_labels!=0].exp()).mean()/L
+            # ) 
 
         ### Cosine similarity (Deprecated, only used for debuggin)
         loss_sim = cosine_sim_loss(

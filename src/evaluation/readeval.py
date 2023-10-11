@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 from tqdm import tqdm
-from readgen import READGen as generator
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from encode import GTREncoder
+from .encoder import GTREncoder
+from .readgen import READGen as generator
 
 class READEval:
     def __init__(
@@ -12,7 +12,7 @@ class READEval:
         dataset=None,
         encoder_name='DylanJHJ/gtr-t5-base',
         ranker_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
-        device='cuda'
+        device='cuda',
         generator=None, 
     ):
         self.dataset = dataset

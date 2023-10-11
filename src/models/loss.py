@@ -66,7 +66,7 @@ def cosine_sim_loss(x, y):
     target = torch.tensor([-1]).to(x.device)
     return loss_fct(x, y, target).mean()
 
-def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None):
+def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, temperature=1):
     """
     [NOTE] Further improvment: in-batch document-wise (calculating once for same doc)
     """
@@ -80,16 +80,16 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None):
     if norm:
         hidden_state = F.normalize(hidden_state, p=2, dim=-1)
 
-    hidden_state = hidden_state.view(-1, H)
+    hidden_state = hidden_state.view(-1, H) / temperature
     # bs H x H bs
     indoc_scores = hidden_state @ hidden_state.permute(1, 0)
     loss_fct = CrossEntropyLoss(reduction='none')
     n_size = indoc_scores.size(0)
     indoc_labels = torch.arange(0, n_size, device=device)
     if reduction:
-        return (loss_fct(indoc_scores, indoc_labels)/B).mean()
+        return loss_fct(indoc_scores, indoc_labels).mean()
     else:
-        return loss_fct(indoc_scores, indoc_labels)/B
+        return loss_fct(indoc_scores, indoc_labels)
 
 def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
 

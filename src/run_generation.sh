@@ -3,11 +3,11 @@ python3 generate.py \
         --model_name google/flan-t5-base \
         --tokenizer_name google/flan-t5-base \
         --output_jsonl results/test.jsonl \
-        --device cuda \
+        --device cuda:0 \
         --num_relevance_scores 10 \
         --batch_size 2 \
         --num_beams 1 \
         --max_length 512 \
         --max_new_tokens 64 \
         --do_sample \
-        --top_k 0.9
+        --top_k 10

@@ -15,7 +15,7 @@ class SoftPromptFlanT5(T5ForConditionalGeneration):
         super().__init__(config)
         self.model_dim = config.d_model
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
-        self.prompt_length = (num_instruction_prompt_id, num_relevance_prompt_idx)
+        self.prompt_length = (num_instruction_prompt_idx, num_relevance_prompt_idx)
 
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
@@ -84,7 +84,6 @@ class SoftPromptT5Stack(T5Stack):
         self.irrelevant_prompt = nn.Parameter(torch.rand(
             num_relevance_idx, embed_tokens.embedding_dim
         ))
-        self.prompt_length = num_instruction_idx + num_relevant_idx
 
     def forward(self, 
                 input_ids=None,

@@ -1,1 +1,1 @@
-from gtr import GTREncoder
+from .gtr import GTREncoder
