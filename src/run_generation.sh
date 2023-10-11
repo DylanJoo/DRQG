@@ -1,0 +1,13 @@
+python3 generate.py \
+        --corpus_jsonl ~/dataset/scifact/data/corpus.jsonl \
+        --model_name google/flan-t5-base \
+        --tokenizer_name google/flan-t5-base \
+        --output_jsonl results/test.jsonl \
+        --device cuda \
+        --num_relevance_scores 10 \
+        --batch_size 2 \
+        --num_beams 1 \
+        --max_length 512 \
+        --max_new_tokens 64 \
+        --do_sample \
+        --top_k 0.9

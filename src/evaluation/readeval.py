@@ -3,49 +3,180 @@ import numpy as np
 from tqdm import tqdm
 from readgen import READGen as generator
 from datasets import load_dataset
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from encode import GTREncoder
 
 class READEval:
     def __init__(
         self, 
         dataset=None,
-        generator=None, 
-        used_scores: List[int] = None, 
-        datacollator=None, 
+        encoder_name='DylanJHJ/gtr-t5-base',
+        ranker_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
         device='cuda'
+        generator=None, 
     ):
         self.dataset = dataset
-        self.generator = generator
         self.device = device
-        self.scores = torch.Tensor([0.01*s for s in used_scores])
+        self.generator = generator
 
-    def evaluate(self, text_inputs, **kwargs):
-        eval_score = []
+        # diversity
+        self.encoder = GTREncoder.from_pretrained(encoder_name)
+        self.encoder_tokenizer = AutoTokenizer.from_pretrained(encoder_name)
+        self.encoder.eval()
+        self.encoder.to(device)
+        ## [NOTE] Can also try one-embedder with prompts
 
-        # generate the outputs
-        outputs = self.generator.generate(text_inputs, **kwargs)
+        # ranking (crossencoder)
+        self.ranker = AutoModelForSequenceClassification.from_pretrained(ranker_name)
+        self.ranker_tokenizer = AutoTokenizer.from_pretrained.from_pretrained(ranker_name)
+        self.ranker.eval()
+        self.ranker.to(device)
+        ## [NOTE] Can also try t5rerank with prompts
 
-        # output contains N predictions of an example
-        for output in outputs:
-            self.dis_diversity(output)
-            eval_score.append()
-        # generation
-        ## prepare input data 
-        ## input setup 
-        rel_scores = self.used_scores.repeat()
+        # evaluation
+        self.scores = []
+
+    @torch.no_grad()
+    def get_relevance_scores(
+        self, 
+        qtexts, 
+        ptexts, 
+        return_relevance=False
+    ):
+        """ Followed the instructions in sbert repo.  """
+        features = self.ranker_tokenizer(
+                qtexts, ptexts,
+                padding=True, 
+                truncation='only_second', 
+                return_tensors="pt"
+        )
+        scores = self.ranker(**features).logits
+        return scores.flatten().cpu()
+
+    @torch.no_grad()
+    def get_embeddings(
+        self, 
+        qtexts, 
+        return_distance=False
+    ):
+        """ Followed the instruction in sbert repo.  """
+        features = self.encoder_tokenizer(
+                qtexts,
+                padding=True,
+                truncation=True,
+                return_tensors='pt'
+        )
+        embeddings = self.encoder.encode(**encoder)
+        return embeddings.detach().cpu().flatten()
+
+    def evaluate_consistency(
+        self, 
+        total_query_group, 
+        batch_size=1, 
+        **kwargs
+    ):
+        N = len(total_query_group)
+        group_boundaries = []
+        all_embeddings = []
+        count = 0
+
+        # batch encoding
+        for batch_query_group in tqdm(
+                batch_iterator(total_query_group, batch_size),
+                total=N//batch_size + 1
+        ):
+            queries = []
+            for query_group in batch_query_group:
+                group_boundaries.append( (count, count+len(query_group)) )
+                queries += query_group
+                count += len(query_group)
+
+            ## get embeddings
+            embeddings = self.get_embeddings(queries)
+            all_embeddings.extends(embeddings)
+
+        distances = {k: [] for k in metrics}
+        for i in range(N):
+            start, end = group_boundaries[i]
+            embeddings = all_embeddings[start:end]
+
+            if 'euclidean' in metrics:
+                distances[k].append(self.calculate_euclidean(embeddings))
+            if 'angular' in metrics:
+                distances[k].append(self.calculate_pairwise_angular(embeddings))
+
+        return distances
+    def evaluate_diversity(
+        self, 
+        total_query_group, 
+        metrics=('euclidean', 'angular'),
+        batch_size=1, 
+        **kwargs
+    ):
+        N = len(total_query_group)
+        group_boundaries = []
+        all_embeddings = []
+        count = 0
+
+        # batch encoding
+        for batch_query_group in tqdm(
+                batch_iterator(total_query_group, batch_size),
+                total=N//batch_size + 1
+        ):
+            queries = []
+            for query_group in batch_query_group:
+                group_boundaries.append( (count, count+len(query_group)) )
+                queries += query_group
+                count += len(query_group)
+
+            ## get embeddings
+            embeddings = self.get_embeddings(queries)
+            all_embeddings.extends(embeddings)
+
+        distances = {k: [] for k in metrics}
+        for i in range(N):
+            start, end = group_boundaries[i]
+            embeddings = all_embeddings[start:end]
+
+            if 'euclidean' in metrics:
+                distances[k].append(self.calculate_euclidean(embeddings))
+            if 'angular' in metrics:
+                distances[k].append(self.calculate_pairwise_angular(embeddings))
+
+        return distances
+
+    @staticmethod
+    def calculate_euclidean(xs):
+        """ An example of "euclidean distance" and (l2)-norm
+        > b = np.random.multivariate_normal([1,1,1], np.eye(3)*0.1, 10).T
+        > np.linalg.norm(b - np.mean(b, 0), axis=1)
+        array([0.65276676, 0.70749294, 0.65661753])
+        > b = np.random.multivariate_normal([1,1,1], np.eye(3)*10, 10).T
+        > np.linalg.norm(b - np.mean(b, 0), axis=1)
+        array([ 8.48881862,  9.1476951 , 13.73675615])
+        """
+        xc = np.mean(xs, 0)
+        return np.linalg.norm(xs-xc, axis=1).mean()
+
+    @staticmethod
+    def calculate_pairwise_angular(xs):
+        """ An example of "angular distance" and "cosine similarity"
+        > (np.arccos(cosine_similarity(a, b))/np.pi).flatten().argsort()
+        array([4, 3, 5, 7, 8, 2, 6, 0, 1])
+        > cosine_similarity(a, b).flatten().argsort()
+        array([1, 0, 6, 2, 8, 7, 5, 3, 4])
+        """
+        cosine_matrix = cosine_similarity(xs, xs) 
+        # angular_sim_matrix = 1 - angular_dist_matrix 
+        angular_dist_matrix = np.arccos(cosine_matrix) / np.pi 
+        # get the upper triangle (without diagonal)
+        return angular_dist_matrix[np.triu_indices(xs.shape[0], k=1)].mean()
 
     def dis_diversity(self, data, prefix, batch_size):
         # distant/distribution based diversity
         eval_score, beta = [], []
-        dataloader = DataLoader(
-                tokenizer=tokenizer,
-                batch_size=batch_size,
-                pin_memory=False,
-                shuffle=False,
-                collate_fn=self.datacollator,
-                drop_last=True
-        )
 
-        for inputs, texts in tqdm(dataloader):
+        for inputs, texts in tqdm(data):
             self.generator.eval()
             self.generator.generate(
                     **inputs,

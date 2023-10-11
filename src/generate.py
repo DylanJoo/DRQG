@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus_jsonl")
     # generator
-    parser.add_argument("--model_name")
+    parser.add_argument("--model_name_or_path")
     parser.add_argument("--tokenizer_name")
     parser.add_argument("--output_jsonl")
     parser.add_argument("--device", default='cuda', type=str)
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # READ Generator
     generator = READGen(
-            model_path=args.mdoel_path, 
+            model_path=args.model_name_or_path, 
             tokenizer_name=args.tokenizer_name,
             relevance_scores=None,
             num_relevance_scores=args.num_relevance_scores,
@@ -54,7 +54,9 @@ if __name__ == "__main__":
             else:
                 content = item['abstract']
 
-            data.append('doc_id': item['doc_id'], 'passage': content)
+            data.append(
+                    {'doc_id': item['doc_id'], 'passage': content}
+            )
 
     dataset = Dataset.from_list(data)
     print(dataset)
