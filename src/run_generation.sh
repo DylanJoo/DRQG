@@ -1,5 +1,5 @@
 python3 generate.py \
-        --corpus_jsonl ~/dataset/scifact/data/corpus.jsonl \
+        --corpus_jsonl ~/dataset/scifact/corpus.jsonl \
         --model_name google/flan-t5-base \
         --tokenizer_name google/flan-t5-base \
         --output_jsonl results/test.jsonl \
