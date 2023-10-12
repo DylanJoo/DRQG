@@ -4,9 +4,11 @@ from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics.pairwise import cosine_similarity
+from scipy import stats
+# module
 from .encoder import GTREncoder
 from .readgen import READGen as generator
-# import from root
+# root
 from utils import batch_iterator
 
 class READEval:
@@ -30,17 +32,17 @@ class READEval:
         ## [NOTE] Can also try one-embedder with prompts
 
         # ranking (crossencoder)
-        # self.ranker = AutoModelForSequenceClassification.from_pretrained(ranker_name)
-        # self.ranker_tokenizer = AutoTokenizer.from_pretrained.from_pretrained(ranker_name)
-        # self.ranker.eval()
-        # self.ranker.to(device)
+        self.ranker = AutoModelForSequenceClassification.from_pretrained(ranker_name)
+        self.ranker_tokenizer = AutoTokenizer.from_pretrained(ranker_name)
+        self.ranker.eval()
+        self.ranker.to(device)
         ## [NOTE] Can also try t5rerank with prompts
 
         # evaluation
         self.scores = []
 
     @torch.no_grad()
-    def get_relevance_scores(
+    def get_logit_scores(
         self, 
         qtexts, 
         ptexts, 
@@ -76,40 +78,58 @@ class READEval:
         self, 
         total_query_group, 
         total_passages, 
+        total_scores, 
         batch_size=1, 
         **kwargs
     ):
         N = len(total_query_group)
+        all_scores = np.array(total_scores).flatten()
+        all_logit_scores = []
         group_boundaries = []
-        all_embeddings = []
         count = 0
 
         # batch encoding
-        for batch_query_group in tqdm(
-                batch_iterator(total_query_group, batch_size),
-                total=N//batch_size + 1
+        for start, end in tqdm(
+                batch_iterator(total_query_group, batch_size, True),
+                total=N//batch_size + 1,
         ):
+            batch_query_group = total_query_group[start:end]
+            batch_passages = total_passages[start:end]
+
             queries = []
-            for query_group in batch_query_group:
-                group_boundaries.append( (count, count+len(query_group)) )
+            passages = []
+            for i, query_group in enumerate(batch_query_group):
+                group_boundaries.append( 
+                        (count, count+len(query_group)) 
+                )
                 queries += query_group
+                passages += [batch_passages[i]] * len(query_group)
                 count += len(query_group)
 
-            ## get embeddings
-            embeddings = self.get_embeddings(queries)
-            all_embeddings.extends(embeddings)
+            ## get relevance scores (logit value)
+            logit_scores = self.get_logit_scores(
+                    queries, passages
+            )
+            all_logit_scores.extend(logit_scores)
 
-        distances = {k: [] for k in metrics}
+        correlations = {'pearson': [], 'spearman': []}
         for i in range(N):
             start, end = group_boundaries[i]
-            embeddings = all_embeddings[start:end]
+            logit_scores = all_logit_scores[start:end]
+            relevances = all_scores[start:end]
 
-            if 'euclidean' in metrics:
-                distances[k].append(self.calculate_euclidean(embeddings))
-            if 'angular' in metrics:
-                distances[k].append(self.calculate_pairwise_angular(embeddings))
+            pearsonr = stats.pearsonr(logit_scores, relevances).statistic
+            spearmanr = stats.spearmanr(logit_scores, relevances).statistic
 
-        return distances
+            correlations['pearson'].append(
+                    pearsonr if pearsonr is not np.nan else 0
+            )
+            correlations['spearman'].append(
+                    spearmanr if spearmanr is not np.nan else 0
+            )
+
+        return correlations
+
     def evaluate_diversity(
         self, 
         total_query_group, 

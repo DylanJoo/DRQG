@@ -43,7 +43,6 @@ if __name__ == "__main__":
                 "score": item['relevance_scores']
             })
     dataset = Dataset.from_list(data)
-    print(dataset)
 
     # READ Evaluator
     evaluator = READEval(
@@ -56,18 +55,29 @@ if __name__ == "__main__":
 
     # Eavluate diversity
     outputs = {}
-    diversity = evaluator.evaluate_diversity(
+    # diversity = evaluator.evaluate_diversity(
+    #         total_query_group=dataset['query'],
+    #         metrics=('euclidean', 'angular'),
+    #         batch_size=args.batch_size,
+    # )
+    # outputs.update(diversity)
+
+    # Evaluate consistency
+    consistency = evaluator.evaluate_consistency(
             total_query_group=dataset['query'],
-            metrics=('euclidean', 'angular'),
+            total_passages=dataset['passage'],
+            total_scores=dataset['score'],
             batch_size=args.batch_size,
     )
-    outputs.update(diversity)
+    outputs.update(consistency)
 
     # mean values
-    print("==== Evaluation Results ====\n")
-    for m in outputs:
-        print(f"# {m:<10} mean: ",np.mean(outputs[m]).round(4))
-        print(f"# {m:<10} std : ", np.std(outputs[m]).round(4))
-        print(f"# {m:<10} max : ", np.max(outputs[m]).round(4))
-        print(f"# {m:<10} min : ", np.min(outputs[m]).round(4))
-    print("\n============================")
+    print(f"{args.prediction.replace('json', '').rsplit('/', 1)[-1]}")
+    for metric in outputs:
+        print(" {:<10} (mean/std/min/max): \n{} | {} | {} | {}".format(
+            metric,
+            np.mean(outputs[metric]).round(4),
+            np.std(outputs[metric]).round(4),
+            np.min(outputs[metric]).round(4),
+            np.max(outputs[metric]).round(4)
+        ))

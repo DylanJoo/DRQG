@@ -1,1 +1,26 @@
-flan-t5-base-rel1-ibce-adaptive.jsonl
+ results/flan-t5-base-rel1-ibce-adaptive.jsonl | # passages: 5183
+ euclidean (mean/std/min/max): 0.4869000017642975 | 0.11550000309944153 | 0.0 | 0.6735000014305115
+ angular   (mean/std/min/max): 0.22030000388622284 | 0.0575999990105629 | 0.0 | 0.32589998841285706
+ results/flan-t5-base-rel1-ibce.jsonl | # passages: 5183
+ euclidean (mean/std/min/max): 0.4880000054836273 | 0.11469999700784683 | 0.0 | 0.6920999884605408
+ angular   (mean/std/min/max): 0.219200000166893 | 0.05700000002980232 | 0.0 | 0.3393000066280365
+ results/flan-t5-base-rel1-margin-gap-ibce.jsonl | # passages: 5183
+ euclidean (mean/std/min/max): 0.5547999739646912 | 0.08780000358819962 | 0.0 | 0.7085999846458435
+ angular   (mean/std/min/max): 0.2547000050544739 | 0.04580000042915344 | 0.0 | 0.3443000018596649
+ results/flan-t5-base-rel1-margin-gap.jsonl | # passages: 5183
+ euclidean (mean/std/min/max): 0.42579999566078186 | 0.13459999859333038 | 0.0 | 0.6553999781608582
+ angular   (mean/std/min/max): 0.18070000410079956 | 0.06319999694824219 | 0.0 | 0.3140999972820282
+ results/flan-t5-base-rel1-un.jsonl | # passages: 5183
+ euclidean (mean/std/min/max): 0.36660000681877136 | 0.15950000286102295 | 0.0 | 0.6514999866485596
+ angular   (mean/std/min/max): 0.15189999341964722 | 0.07129999995231628 | 0.0 | 0.30709999799728394
+ results/flan-t5-base-rel1.jsonl | # passages: 5183
+ euclidean (mean/std/min/max): 0.3314000070095062 | 0.164900004863739 | 0.0 | 0.6534000039100647
+ angular   (mean/std/min/max): 0.13510000705718994 | 0.07169999927282333 | 0.0 | 0.3084000051021576
+test.l
+ pearson    (mean/std/min/max): 
+nan | nan | nan | nan
+test.l
+ pearson    (mean/std/min/max): 
+0.5359 | 0.3731 | -0.0536 | 0.891
+ spearman   (mean/std/min/max): 
+0.5359 | 0.3731 | -0.0536 | 0.891
