@@ -55,12 +55,12 @@ if __name__ == "__main__":
 
     # Eavluate diversity
     outputs = {}
-    # diversity = evaluator.evaluate_diversity(
-    #         total_query_group=dataset['query'],
-    #         metrics=('euclidean', 'angular'),
-    #         batch_size=args.batch_size,
-    # )
-    # outputs.update(diversity)
+    diversity = evaluator.evaluate_diversity(
+            total_query_group=dataset['query'],
+            metrics=('euclidean', 'angular'),
+            batch_size=args.batch_size,
+    )
+    outputs.update(diversity)
 
     # Evaluate consistency
     consistency = evaluator.evaluate_consistency(
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     outputs.update(consistency)
 
     # mean values
-    print(f"{args.prediction.replace('json', '').rsplit('/', 1)[-1]}")
+    print(f"{args.prediction.replace('.jsonl', '').rsplit('/', 1)[-1]}")
     for metric in outputs:
         print(" {:<10} (mean/std/min/max): \n{} | {} | {} | {}".format(
             metric,
