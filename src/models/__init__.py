@@ -1,2 +1,2 @@
 from ._base import FlanT5
-from .RelPromptQG import RelPromptFlanT5
+from .promptRelQG import SoftRelPromptFlanT5
