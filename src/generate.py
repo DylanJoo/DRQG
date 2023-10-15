@@ -52,14 +52,18 @@ if __name__ == "__main__":
         for line in tqdm(f):
             item = json.loads(line.strip())
 
-            if isinstance(item['abstract'], list):
-                content = " ".join(item['abstract'])
-            else:
-                content = item['abstract']
+            # SCI-docs
+            if 'scifact' in args.corpus_jsonl:
+                if isinstance(item['abstract'], list):
+                    content = " ".join(item['abstract'])
+                else:
+                    content = item['abstract']
+                data.append({'doc_id': item['doc_id'], 'passage': content})
 
-            data.append(
-                    {'doc_id': item['doc_id'], 'passage': content}
-            )
+            # msmarco
+            if 'msmarco' in args.corpus_jsonl:
+                data.append({'doc_id': '', 'passage': item['passage']})
+
 
     dataset = Dataset.from_list(data)
     print(dataset)
