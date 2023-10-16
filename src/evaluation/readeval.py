@@ -184,7 +184,7 @@ class READEval:
         array([ 8.48881862,  9.1476951 , 13.73675615])
         """
         xc = np.mean(xs, 0)
-        return np.linalg.norm(xs-xc, axis=1).mean()
+        return np.linalg.norm(xs-xc, axis=1).mean().tolist()
 
     @staticmethod
     def calculate_pairwise_angular(xs):
@@ -200,7 +200,7 @@ class READEval:
         # angular_sim_matrix = 1 - angular_dist_matrix 
         angular_dist_matrix = np.arccos(cosine_matrix) / np.pi 
         # get the upper triangle (without diagonal)
-        return angular_dist_matrix[np.triu_indices(N, k=1)].mean()
+        return angular_dist_matrix[np.triu_indices(N, k=1)].mean().tolist()
 
     # def dis_diversity(self, data, prefix, batch_size):
     #     # distribution/distant-based diversity
