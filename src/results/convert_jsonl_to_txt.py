@@ -1,19 +1,38 @@
 import argparse
 import json
+from datasets import load_dataset
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # load model
     parser.add_argument("--jsonl", default='sample.jsonl', type=str)
+    parser.add_argument("--corpus", default='../data/msmarco.dev.jsonl', type=str)
     args = parser.parse_args()
+
+    corpus = load_dataset('json', data_files=args.corpus)['train']
 
     with open(args.jsonl, 'r') as fin:
 
-        for line in fin:
+        for i, line in enumerate(fin):
             result = json.loads(line.strip())
-            scores = result['condition_score']
+            scores = result['relevance_scores']
             queries = result['generated_query']
-            print(f"{result['passage']}\n>>")
+
+            print(f"{corpus[i]['passage']}\n>>")
+
+            positive = corpus[i]['positive'][:2]
+            positive_score = corpus[i]['positive_score'][:2]
+            negative = corpus[i]['negative'][:2]
+            negative_score = corpus[i]['negative_score'][:2]
+
+            for (q, s) in zip(positive, positive_score):
+                s = round(s, 2)
+                print(f"{s:<3} {q}")
+            for (q, s) in zip(negative, negative_score):
+                s = round(s, 2)
+                print(f"{s:<3} {q}")
+
+            print(">>")
             for (q, s) in zip(queries, scores):
                 s = round(s, 2)
                 print(f"{s:<3} {q}")
