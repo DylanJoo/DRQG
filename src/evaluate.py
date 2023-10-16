@@ -10,6 +10,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus_jsonl")
     parser.add_argument("--prediction")
+    parser.add_argument("--output_jsonl", default=None, type=str)
     # evaluator
     parser.add_argument("--encoder_name")
     parser.add_argument("--ranker_name")
@@ -81,3 +82,6 @@ if __name__ == "__main__":
             np.min(outputs[metric]).round(4),
             np.max(outputs[metric]).round(4)
         ))
+    if args.output_jsonl is not None:
+        with open(args.output_jsonl, 'w') as f:
+            f.write(json.dumps(outputs))
