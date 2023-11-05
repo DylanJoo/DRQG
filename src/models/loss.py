@@ -22,10 +22,13 @@ def gen_mle_loss(lm_logits, labels, seq_labels, average=True):
         ).view(-1, L).sum(1)
 
     if average:
-        return {'pos': loss_gen_pos.mean()/L, 'neg': loss_gen_neg.mean()/L}
+        return {'pos': loss_gen_pos.mean()/L, 
+                'neg': loss_gen_neg.mean()/L}
     else:
-        return {'pos': loss_gen_pos, 'neg': loss_gen_neg}
+        return {'pos': loss_gen_pos, 
+                'neg': loss_gen_neg}
 
+# Unlikelihood training (Calibration #1): maximized margin gap using generation probabilty
 def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
     lm_prob = torch.clamp( (1-lm_logits.softmax(-1)), min=1e-5)
     # lm_prob = torch.clamp( (-lm_logits).softmax(-1), min=1e-5 )
@@ -49,15 +52,41 @@ def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
         return {'neg2pos': loss_gen_pos_from_neg.mean()/L, 
                 'pos2neg': loss_gen_neg_from_pos.mean()/L}
     else:
-        return {'neg2pos': loss_gen_pos_from_neg, 'pos2neg': loss_gen_neg_from_pos}
+        return {'neg2pos': loss_gen_pos_from_neg, 
+                'pos2neg': loss_gen_neg_from_pos}
 
-def slic_margin_loss(logits_bar, logits_hat, maks_bar, mask_hat, seq_labels):
+# Calibration #2: maximized margin gap using multi-vector BERTscore-styled function
+def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels):
     bertscore = greedy_cos_idf(logits_bar, mask_bar, 
                                logits_hat, mask_hat)
 
     loss_f1_pos = bertscore[2][seq_labels==1].mean()
     loss_f1_neg = bertscore[2][seq_labels!=1].mean()
     return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
+
+## [NOTE] this function has no `idf` setups.
+def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
+
+    batch_size = ref_embedding.size(0)
+
+    ref_embedding.div_(torch.norm(ref_embedding, dim=-1).unsqueeze(-1))
+    hyp_embedding.div_(torch.norm(hyp_embedding, dim=-1).unsqueeze(-1))
+
+    sim = torch.bmm(hyp_embedding, ref_embedding.transpose(1, 2))
+    masks = torch.bmm(hyp_masks.unsqueeze(2).float(), ref_masks.unsqueeze(1).float())
+    masks = masks.expand(batch_size, -1, -1).contiguous().view_as(sim)
+    masks = masks.float().to(sim.device)
+    sim = sim * masks
+
+    precision_scores, indices_precision = sim.max(dim=2)
+    recall_scores, indices_recall = sim.max(dim=1)
+
+    P = precision_scores.sum(dim=1)
+    R = recall_scores.sum(dim=1)
+    F1 = 2 * P * R / (P + R)
+    F1 = F1.masked_fill(torch.isnan(F1), 0.)
+
+    return P, R, F1
 
 def cosine_sim_loss(x, y):
     loss_fct = CosineEmbeddingLoss(margin=0.1, reduction='none')
@@ -91,28 +120,6 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, tempe
     else:
         return loss_fct(indoc_scores, indoc_labels)
 
-def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
-
-    batch_size = ref_embedding.size(0)
-
-    ref_embedding.div_(torch.norm(ref_embedding, dim=-1).unsqueeze(-1))
-    hyp_embedding.div_(torch.norm(hyp_embedding, dim=-1).unsqueeze(-1))
-
-    sim = torch.bmm(hyp_embedding, ref_embedding.transpose(1, 2))
-    masks = torch.bmm(hyp_masks.unsqueeze(2).float(), ref_masks.unsqueeze(1).float())
-    masks = masks.expand(batch_size, -1, -1).contiguous().view_as(sim)
-    masks = masks.float().to(sim.device)
-    sim = sim * masks
-
-    precision_scores, indices_precision = sim.max(dim=2)
-    recall_scores, indices_recall = sim.max(dim=1)
-
-    P = precision_scores.sum(dim=1)
-    R = recall_scores.sum(dim=1)
-    F1 = 2 * P * R / (P + R)
-    F1 = F1.masked_fill(torch.isnan(F1), 0.)
-
-    return P, R, F1
 
 # def pairwise_maxsim_loss(hidden_states, bs=1, ms=2, norm=False):
 #     device = hidden_states.device
