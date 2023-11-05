@@ -129,6 +129,7 @@ class DataCollatorForBaseline(DataCollatorBase):
         target_mask = targets['attention_mask'].bool()
         target_ids = targets['input_ids'].masked_fill(~target_mask, -100)
         inputs['labels'] = target_ids
+        inputs['decoder_attention_mask'] = target_mask
         inputs['rel_labels'] = torch.Tensor(labels)
         inputs['rel_scores'] = torch.Tensor(scores)
         inputs['passage'] = features[0]['passage']

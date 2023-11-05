@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_length", default=512, type=int)
     parser.add_argument("--max_new_tokens", default=64, type=int)
     parser.add_argument("--do_sample", default=False, action='store_true')
-    parser.add_argument("--top_k", default=10, type=int)
+    parser.add_argument("--top_k", default=None, type=int)
     parser.add_argument("--top_p", default=1.0, type=float)
 
     args = parser.parse_args()

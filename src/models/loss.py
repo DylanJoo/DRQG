@@ -55,14 +55,52 @@ def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
         return {'neg2pos': loss_gen_pos_from_neg, 
                 'pos2neg': loss_gen_neg_from_pos}
 
-# Calibration #2: maximized margin gap using multi-vector BERTscore-styled function
-def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels):
-    bertscore = greedy_cos_idf(logits_bar, mask_bar, 
-                               logits_hat, mask_hat)
+def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, measurement='f1'):
+    m = {'precision': 0, 'recall': 1, 'f1': 2}[measurement]
+    loss_f1_pos = greedy_cos_idf(
+            logits_bar[seq_labels==1], 
+            mask_bar[seq_labels==1],
+            logits_hat[seq_labels==1], 
+            mask_hat[seq_labels==1]
+    )[m]
 
-    loss_f1_pos = bertscore[2][seq_labels==1].mean()
-    loss_f1_neg = bertscore[2][seq_labels!=1].mean()
-    return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
+    loss_f1_neg = greedy_cos_idf(
+            logits_bar[seq_labels!=1], 
+            mask_bar[seq_labels!=1],
+            logits_hat[seq_labels!=1], 
+            mask_hat[seq_labels!=1]
+    )[m]
+
+    return {'pos': loss_f1_pos.mean(), 'neg': loss_f1_neg.mean()}
+
+def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
+
+    batch_size = ref_embedding.size(0)
+
+    # inplace functions
+    # ref_embedding.div_(torch.norm(ref_embedding, dim=-1).unsqueeze(-1))
+    # hyp_embedding.div_(torch.norm(hyp_embedding, dim=-1).unsqueeze(-1))
+    ref_embedding = torch.div(ref_embedding, torch.norm(ref_embedding, dim=-1).unsqueeze(-1))
+    hyp_embedding = torch.div(hyp_embedding, torch.norm(hyp_embedding, dim=-1).unsqueeze(-1))
+
+    sim = torch.bmm(hyp_embedding, ref_embedding.transpose(1, 2))
+    masks = torch.bmm(hyp_masks.unsqueeze(2).float(), ref_masks.unsqueeze(1).float())
+    masks = masks.expand(batch_size, -1, -1).contiguous().view_as(sim)
+    masks = masks.float().to(sim.device)
+    sim = sim * masks
+
+    # based on hyp_embedding
+    precision_scores, indices_precision = sim.max(dim=2) 
+    # based on ref_embedding
+    recall_scores, indices_recall = sim.max(dim=1)
+
+    P = precision_scores.sum(dim=1)
+    R = recall_scores.sum(dim=1)
+    F1 = 2 * P * R / (P + R)
+    F1 = F1.masked_fill(torch.isnan(F1), 0.)
+
+    return P, R, F1
+
 
 ## [NOTE] this function has no `idf` setups.
 def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
@@ -119,7 +157,6 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, tempe
         return loss_fct(indoc_scores, indoc_labels).mean()
     else:
         return loss_fct(indoc_scores, indoc_labels)
-
 
 # def pairwise_maxsim_loss(hidden_states, bs=1, ms=2, norm=False):
 #     device = hidden_states.device

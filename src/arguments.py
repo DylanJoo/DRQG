@@ -83,5 +83,7 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     prefix_tuning: bool = field(default=False)
     random_init: bool = field(default=False)
     enable_unlikelihood: bool = field(default=False)
-    enable_calibration: Optional[str] = field(default=None)
+    enable_margin_gap_prob: Optional[str] = field(default=None)
+    enable_margin_gap_multivec: Optional[str] = field(default=None)
     enable_simlarity_loss: Optional[str] = field(default=None)
+    tau: Optional[float] = field(default=1.0)

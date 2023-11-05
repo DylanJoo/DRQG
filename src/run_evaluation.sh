@@ -1,4 +1,4 @@
-# touch eval.log
+touch eval.log
 for file in results/*.jsonl;do
     name=${file##*/}
     python3 evaluate.py \
