@@ -1,99 +1,46 @@
 flan-t5-base-rel1-ibce-0.25
- euclidean  (mean/std/min/max): 
 0.3625 | 0.1442 | 0.0 | 0.6324
- angular    (mean/std/min/max): 
 0.1508 | 0.065 | 0.0 | 0.2934
- pearson    (mean/std/min/max): 
 0.3846 | 0.571 | -0.962 | 0.969
- spearman   (mean/std/min/max): 
 0.3801 | 0.5872 | -0.9653 | 0.9863
 flan-t5-base-rel1-ibce-0.5
- euclidean  (mean/std/min/max): 
 0.4515 | 0.1161 | 0.0 | 0.6607
- angular    (mean/std/min/max): 
 0.1987 | 0.0571 | 0.0 | 0.3195
- pearson    (mean/std/min/max): 
 0.496 | 0.487 | -0.9476 | 0.9787
- spearman   (mean/std/min/max): 
 0.4918 | 0.5016 | -0.9863 | 0.9954
 flan-t5-base-rel1-ibce-0.75
- euclidean  (mean/std/min/max): 
 0.488 | 0.1147 | 0.0 | 0.6921
- angular    (mean/std/min/max): 
 0.2192 | 0.0569 | 0.0 | 0.3393
- pearson    (mean/std/min/max): 
 0.527 | 0.4348 | -0.9398 | 0.9684
- spearman   (mean/std/min/max): 
 0.5101 | 0.4523 | -0.9723 | 0.9932
 flan-t5-base-rel1-ibce-1
- euclidean  (mean/std/min/max): 
 0.5604 | 0.0732 | 0.0913 | 0.6898
- angular    (mean/std/min/max): 
 0.2577 | 0.0402 | 0.0327 | 0.3387
- pearson    (mean/std/min/max): 
 0.6097 | 0.3346 | -0.9085 | 0.976
- spearman   (mean/std/min/max): 
 0.5771 | 0.3659 | -0.9583 | 0.9932
+
 flan-t5-base-rel1-margin-gap-multivec-precision
- euclidean  (mean/std/min/max): 
 0.3301 | 0.1653 | 0.0 | 0.6408
- angular    (mean/std/min/max): 
 0.1346 | 0.0719 | 0.0 | 0.301
- pearson    (mean/std/min/max): 
 0.3229 | 0.6047 | -0.9722 | 0.9788
- spearman   (mean/std/min/max): 
 0.3228 | 0.6198 | -0.977 | 0.984
 flan-t5-base-rel1-margin-gap-multivec-recall
- euclidean  (mean/std/min/max): 
 0.3318 | 0.1648 | 0.0 | 0.6359
- angular    (mean/std/min/max): 
 0.1353 | 0.0717 | 0.0 | 0.3002
- pearson    (mean/std/min/max): 
 0.3203 | 0.606 | -0.968 | 0.974
- spearman   (mean/std/min/max): 
 0.3189 | 0.6224 | -0.977 | 0.9863
 flan-t5-base-rel1-margin-gap-multivec
- euclidean  (mean/std/min/max): 
 0.3265 | 0.1668 | 0.0 | 0.6407
- angular    (mean/std/min/max): 
 0.133 | 0.0723 | 0.0 | 0.302
- pearson    (mean/std/min/max): 
 0.2849 | 0.6132 | -0.9692 | 0.98
- spearman   (mean/std/min/max): 
 0.2835 | 0.6304 | -0.9816 | 0.984
 flan-t5-base-rel1-margin-gap-prob
- euclidean  (mean/std/min/max): 
 0.4257 | 0.1347 | 0.0 | 0.6554
- angular    (mean/std/min/max): 
 0.1806 | 0.0632 | 0.0 | 0.3141
- pearson    (mean/std/min/max): 
 0.5998 | 0.4532 | -0.9318 | 0.9739
- spearman   (mean/std/min/max): 
-0.6024 | 0.4684 | -0.963 | 0.9909
-flan-t5-base-rel1-margin-gap
- euclidean  (mean/std/min/max): 
-0.4257 | 0.1347 | 0.0 | 0.6554
- angular    (mean/std/min/max): 
-0.1806 | 0.0632 | 0.0 | 0.3141
- pearson    (mean/std/min/max): 
-0.5998 | 0.4532 | -0.9318 | 0.9739
- spearman   (mean/std/min/max): 
 0.6024 | 0.4684 | -0.963 | 0.9909
 flan-t5-base-rel1-un
- euclidean  (mean/std/min/max): 
 0.3666 | 0.1595 | 0.0 | 0.6515
- angular    (mean/std/min/max): 
 0.1519 | 0.0713 | 0.0 | 0.3071
- pearson    (mean/std/min/max): 
 0.4541 | 0.5509 | -0.9531 | 0.9815
- spearman   (mean/std/min/max): 
 0.4486 | 0.5703 | -0.963 | 0.9932
-flan-t5-base-rel1
- euclidean  (mean/std/min/max): 
-0.3315 | 0.165 | 0.0 | 0.6534
- angular    (mean/std/min/max): 
-0.1351 | 0.0717 | 0.0 | 0.3084
- pearson    (mean/std/min/max): 
-0.3091 | 0.6147 | -0.9722 | 0.9717
- spearman   (mean/std/min/max): 
-0.31 | 0.6297 | -0.9747 | 0.9863
