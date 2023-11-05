@@ -6,6 +6,7 @@ from torch.nn import functional as F
 from models.loss import (
     gen_mle_loss, gen_mle_unloss, 
     cosine_sim_loss, inbatch_cont_sim_loss,
+    slic_margin_loss
 )
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -86,6 +87,8 @@ class TrainerForRelQG(TrainerForQG):
         # inputs
         passage = inputs.pop('passage')
         rel_labels = inputs.pop('rel_labels')
+        labels_mask = inputs.pop('decoder_attention_mask')
+        labels_mask_reverse = self.reverse_positions(labels_mask)
         labels = inputs.get("labels").to(self.args.device)
         labels_reverse = self.reverse_positions(labels)
         training_steps = copy.deepcopy(self.state.global_step)
@@ -121,22 +124,39 @@ class TrainerForRelQG(TrainerForQG):
         train_logs += f"\nMax unLE: (neg2pos) {unloss_gen_pos.mean()/L} + (pos2neg) {unloss_gen_neg.mean()/L}"
 
         if self.args.enable_unlikelihood:
-            loss = 0.25 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
-                    0.25 * (unloss_gen_pos + unloss_gen_neg)
+            loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
+                    0.5 * (unloss_gen_pos.mean()/L + unloss_gen_neg.mean()/L )
 
         ### (3) calibration margin loss
-        loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
-        loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
-        # train_logs += f"\nMin unLE: (neg2pos) {loss_gen_pos.mean()/L} + (pos2neg) {loss_gen_neg.mean()/L}"
+        #### (3.1) margin gap with sequence probs
+        if self.args.enable_margin_gap_prob:
+            loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
+            loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
+            gap_pos = loss_gen_pos-loss_gen_neg_from_pos
+            gap_neg = loss_gen_neg-loss_gen_pos_from_neg
 
-        beta = 0.1 
-        loss_gap_pos = torch.clamp(beta+loss_gen_pos-loss_gen_neg_from_pos, min=0).mean()
-        loss_gap_neg = torch.clamp(beta+loss_gen_neg-loss_gen_pos_from_neg, min=0).mean()
+            beta = 0.1 
+            loss_gap_pos = torch.clamp(beta+gap_pos, min=0).mean()
+            loss_gap_neg = torch.clamp(beta+gap_neg, min=0).mean()
+
+        #### (3.2) margin gap with multi-vecor similarity
+        if self.args.enable_margin_gap_multivec:
+            loss_gen = slic_margin_loss(
+                    logits_bar=lm_logits,
+                    logits_hat=lm_logits_reverse,
+                    mask_bar=labels_mask,
+                    mask_hat=labels_mask_reverse,
+                    seq_labels=rel_labels,
+                    measurement=self.args.enable_margin_gap_multivec
+            )
+            gap_pos, gap_neg = loss_gen['pos'], loss_gen['neg']
+            beta = 0.1 
+            loss_gap_pos = torch.clamp(beta*gap_pos, min=0).mean()
+            loss_gap_neg = torch.clamp(beta*gap_neg, min=0).mean()
+
         train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
-
-        if self.args.enable_calibration:
-            loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
-                    0.5 * (loss_gap_pos + loss_gap_neg) 
+        loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
+                0.5 * (loss_gap_pos + loss_gap_neg) 
 
         ## Maximize discripancy 
         ### (4) In-batch similarity
@@ -144,7 +164,7 @@ class TrainerForRelQG(TrainerForQG):
         loss_sim = inbatch_cont_sim_loss(sequence_hidden_states, 
                                          self._train_batch_size,
                                          reduction=False,
-                                         temperature=0.75)
+                                         temperature=self.args.tau)
         train_logs += f"\nInbatchSim: {loss_sim.mean()}"
 
         if self.args.enable_simlarity_loss == 'inbatch':
