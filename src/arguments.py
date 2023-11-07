@@ -86,4 +86,5 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     enable_margin_gap_prob: Optional[str] = field(default=None)
     enable_margin_gap_multivec: Optional[str] = field(default=None)
     enable_simlarity_loss: Optional[str] = field(default=None)
+    document_wise_contrastive: bool = field(default=False)
     tau: Optional[float] = field(default=1.0)

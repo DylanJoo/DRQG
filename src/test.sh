@@ -5,7 +5,7 @@ for m in f1; do
       --model_name_or_path google/flan-t5-base \
       --tokenizer_name google/flan-t5-base \
       --config_name google/flan-t5-base \
-      --output_dir models/checkpoint/flan-t5-base-rel1-margin-gap-multivec-f1 \
+      --output_dir models/checkpoint/flan-t5-base-rel1-ibce-doc-1
       --max_p_length 128 \
       --max_q_length 16 \
       --per_device_train_batch_size 8 \
@@ -24,6 +24,8 @@ for m in f1; do
       --irrelevant_prompt "false" \
       --do_train \
       --do_eval \
-      --enable_margin_gap_multivec f1 \
-      --run_name calibration-margin-gap-multivec-f1
+      --enable_simlarity_loss "inbatch" \
+      --document_wise_contrastive true \
+      --tau 1 \
+      --run_name ibce-1
 done

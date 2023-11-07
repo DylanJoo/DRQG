@@ -164,7 +164,8 @@ class TrainerForRelQG(TrainerForQG):
         loss_sim = inbatch_cont_sim_loss(sequence_hidden_states, 
                                          self._train_batch_size,
                                          reduction=False,
-                                         temperature=self.args.tau)
+                                         temperature=self.args.tau,
+                                         documnet_wise=self.args.document_wise_contrastive)
         train_logs += f"\nInbatchSim: {loss_sim.mean()}"
 
         if self.args.enable_simlarity_loss == 'inbatch':

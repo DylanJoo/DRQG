@@ -28,7 +28,8 @@ def gen_mle_loss(lm_logits, labels, seq_labels, average=True):
         return {'pos': loss_gen_pos, 
                 'neg': loss_gen_neg}
 
-# Unlikelihood training (Calibration #1): maximized margin gap using generation probabilty
+# Unlikelihood training 
+## adapt to calibration #1): maximized margin gap using generation probabilty
 def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
     lm_prob = torch.clamp( (1-lm_logits.softmax(-1)), min=1e-5)
     # lm_prob = torch.clamp( (-lm_logits).softmax(-1), min=1e-5 )
@@ -110,12 +111,32 @@ def cosine_sim_loss(x, y):
     target = torch.tensor([-1]).to(x.device)
     return loss_fct(x, y, target).mean()
 
-def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, temperature=1):
-    """
-    [NOTE] Further improvment: in-batch document-wise (calculating once for same doc)
-    """
+# def doc_inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, temperature=1):
+#     device = hidden_states.device
+#     BN, L, H = hidden_states.shape
+#     loss = inbatch_cont_sim_loss(hidden_states, **kwargs)
+#     bs_hidden_state = hidden_state.view(bs, BN//bs, -1, hs)
+#     # B N L H x B N H L = B N L L
+#     indoc_scores = bs_hidden_state @ bs_hidden_state.transpose(-1, -2)
+#     loss_fct = CrossEntropyLoss(reduction='none')
+#     indoc_labels = torch.arange(0, N, device=device).repeat(bs)
+#     if reduction:
+#         return loss_fct(indoc_scores, indoc_labels).mean()
+#     else:
+#         return loss_fct(indoc_scores, indoc_labels)
+#
+#     return loss
+
+def inbatch_cont_sim_loss(
+    hidden_states, 
+    bs=1, 
+    norm=False, 
+    reduction=None, 
+    temperature=1,
+    documnet_wise=False
+):
     device = hidden_states.device
-    B, L, H = hidden_states.shape
+    BN, L, H = hidden_states.shape
     if (hidden_states.size(1) != 1) or (len(hidden_states.shape)>2):
         hidden_state = hidden_states.mean(1)
     else:
@@ -124,16 +145,24 @@ def inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, tempe
     if norm:
         hidden_state = F.normalize(hidden_state, p=2, dim=-1)
 
-    hidden_state = hidden_state.view(-1, H) / temperature
-    # bs H x H bs
-    indoc_scores = hidden_state @ hidden_state.permute(1, 0)
-    loss_fct = CrossEntropyLoss(reduction='none')
-    n_size = indoc_scores.size(0)
-    indoc_labels = torch.arange(0, n_size, device=device)
-    if reduction:
-        return loss_fct(indoc_scores, indoc_labels).mean()
+    if documnet_wise:
+        # indoc: B N H x B H N
+        hidden_state = hidden_state.view(bs, BN//bs, H) / temperature
+        inbatch_scores = hidden_state @ hidden_state.permute(-1, -2)
+        inbatch_scores = inbatch_scores.view(-1, BN//bs)
+        inbatch_labels = torch.arange(0, BN//bs, device=device).repeat(bs)
     else:
-        return loss_fct(indoc_scores, indoc_labels)
+        # inbatch: BN H x H BN
+        hidden_state = hidden_state.view(-1, H) / temperature
+        inbatch_scores = hidden_state @ hidden_state.permute(-1, -2)
+        inbatch_labels = torch.arange(0, BN, device=device)
+
+    loss_fct = CrossEntropyLoss(reduction='none')
+
+    if reduction:
+        return loss_fct(inbatch_scores, inbatch_labels).mean()
+    else:
+        return loss_fct(inbatch_scores, inbatch_labels)
 
 # def pairwise_maxsim_loss(hidden_states, bs=1, ms=2, norm=False):
 #     device = hidden_states.device
