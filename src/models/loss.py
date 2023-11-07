@@ -111,22 +111,6 @@ def cosine_sim_loss(x, y):
     target = torch.tensor([-1]).to(x.device)
     return loss_fct(x, y, target).mean()
 
-# def doc_inbatch_cont_sim_loss(hidden_states, bs=1, norm=False, reduction=None, temperature=1):
-#     device = hidden_states.device
-#     BN, L, H = hidden_states.shape
-#     loss = inbatch_cont_sim_loss(hidden_states, **kwargs)
-#     bs_hidden_state = hidden_state.view(bs, BN//bs, -1, hs)
-#     # B N L H x B N H L = B N L L
-#     indoc_scores = bs_hidden_state @ bs_hidden_state.transpose(-1, -2)
-#     loss_fct = CrossEntropyLoss(reduction='none')
-#     indoc_labels = torch.arange(0, N, device=device).repeat(bs)
-#     if reduction:
-#         return loss_fct(indoc_scores, indoc_labels).mean()
-#     else:
-#         return loss_fct(indoc_scores, indoc_labels)
-#
-#     return loss
-
 def inbatch_cont_sim_loss(
     hidden_states, 
     bs=1, 
@@ -148,13 +132,13 @@ def inbatch_cont_sim_loss(
     if documnet_wise:
         # indoc: B N H x B H N
         hidden_state = hidden_state.view(bs, BN//bs, H) / temperature
-        inbatch_scores = hidden_state @ hidden_state.permute(-1, -2)
+        inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
         inbatch_scores = inbatch_scores.view(-1, BN//bs)
         inbatch_labels = torch.arange(0, BN//bs, device=device).repeat(bs)
     else:
         # inbatch: BN H x H BN
         hidden_state = hidden_state.view(-1, H) / temperature
-        inbatch_scores = hidden_state @ hidden_state.permute(-1, -2)
+        inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
         inbatch_labels = torch.arange(0, BN, device=device)
 
     loss_fct = CrossEntropyLoss(reduction='none')

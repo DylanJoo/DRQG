@@ -139,6 +139,10 @@ class TrainerForRelQG(TrainerForQG):
             loss_gap_pos = torch.clamp(beta+gap_pos, min=0).mean()
             loss_gap_neg = torch.clamp(beta+gap_neg, min=0).mean()
 
+            train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
+            loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
+                    0.5 * (loss_gap_pos + loss_gap_neg) 
+
         #### (3.2) margin gap with multi-vecor similarity
         if self.args.enable_margin_gap_multivec:
             loss_gen = slic_margin_loss(
@@ -154,9 +158,9 @@ class TrainerForRelQG(TrainerForQG):
             loss_gap_pos = torch.clamp(beta*gap_pos, min=0).mean()
             loss_gap_neg = torch.clamp(beta*gap_neg, min=0).mean()
 
-        train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
-        loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
-                0.5 * (loss_gap_pos + loss_gap_neg) 
+            train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
+            loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
+                    0.5 * (loss_gap_pos + loss_gap_neg) 
 
         ## Maximize discripancy 
         ### (4) In-batch similarity
