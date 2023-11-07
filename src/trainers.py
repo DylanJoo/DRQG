@@ -168,16 +168,9 @@ class TrainerForRelQG(TrainerForQG):
         train_logs += f"\nInbatchSim: {loss_sim.mean()}"
 
         if self.args.enable_simlarity_loss == 'inbatch':
-            # (1) averaging: 
             loss += loss_sim.mean()
-            # (2) adaptive [multplication] (x, the relevat failed)
-            # (3) adaptive [exponential multiplcation] (x) 
-            # loss = 0.5 * ( 
-            #         (loss_gen_pos * loss_sim[rel_labels==1].exp()).mean()/L + 
-            #         (loss_gen_neg * loss_sim[rel_labels!=0].exp()).mean()/L
-            # ) 
 
-        ### Cosine similarity (Deprecated, only used for debuggin)
+        ### (x) Cosine similarity 
         loss_sim = cosine_sim_loss(
                 model.encoder.relevant_prompt, 
                 model.encoder.irrelevant_prompt

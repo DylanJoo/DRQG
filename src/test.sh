@@ -1,7 +1,7 @@
 TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.jsonl
 EVAL_FILE=data/ce.minilm.hardneg.vL.eval.small.jsonl
 for m in f1; do
-    python3 train_old/train_softrelprompt.py \
+    python3 train/train_softrelprompt.py \
       --model_name_or_path google/flan-t5-base \
       --tokenizer_name google/flan-t5-base \
       --config_name google/flan-t5-base \

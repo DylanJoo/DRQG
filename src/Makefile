@@ -2,7 +2,7 @@ TRAIN_FILE=/home/jhju/datasets/nils.sentence.transformers/ce.minilm.hardneg.vL.j
 EVAL_FILE=data/ce.minilm.hardneg.vL.eval.small.jsonl
 
 train_softprompt_rel1:
-	python3 train_old/train_softrelprompt.py \
+	python3 train/train_softrelprompt.py \
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \
@@ -29,7 +29,7 @@ train_softprompt_rel1:
 	  --tau 0.25
 
 train_softprompt_rel2:
-	python3 train_old/train_softrelprompt.py \
+	python3 train/train_softrelprompt.py \
 	  --model_name_or_path google/flan-t5-base \
 	  --tokenizer_name google/flan-t5-base \
 	  --config_name google/flan-t5-base \
