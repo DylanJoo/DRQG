@@ -1,5 +1,5 @@
 # scidocs
-for folder in models/checkpoint/flan*;do
+for folder in models/checkpoint/flan*$1;do
     name=${folder##*/}
     python3 generate.py \
         --corpus_jsonl ~/datasets/scifact/corpus.jsonl \

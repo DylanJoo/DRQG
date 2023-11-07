@@ -73,9 +73,10 @@ if __name__ == "__main__":
     outputs.update(consistency)
 
     # mean values
-    print(f"{args.prediction.replace('.jsonl', '').rsplit('/', 1)[-1]}")
+    printer = f"{args.prediction.replace('.jsonl', '').rsplit('/', 1)[-1]}"
+    print(printer)
     for metric in outputs:
-        print(" {:<10} (mean/std/min/max): \n{} | {} | {} | {}".format(
+        print("{:<10}: \n{} | {} | {} | {}".format(
             metric,
             np.mean(outputs[metric]).round(4),
             np.std(outputs[metric]).round(4),
