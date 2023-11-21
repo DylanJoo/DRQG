@@ -112,6 +112,12 @@ def main():
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )
 
+    # output configs
+    model_args.dumps(training_args.output_dir+'/model_config.json')
+    hfmodel_args.dumps(training_args.output_dir+'/hfmodel_config.json')
+    data_args.dumps(training_args.output_dir+'/data_config.json')
+    training_args.dumps(training_args.output_dir+'/train_config.json')
+
     return results
 
 if __name__ == '__main__':

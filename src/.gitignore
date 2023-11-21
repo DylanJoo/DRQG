@@ -3,7 +3,10 @@ __pycache__/
 *.swp
 logs/
 wandb/
-results/
+results/*
+!results/convert_jsonl_to_txt.py
+test.sh
+eval.log
 
 # checkpoints
 models/*/

@@ -1,5 +1,5 @@
 # scidocs
-for folder in models/checkpoint/$1;do
+for folder in models/checkpoint/*$1*;do
     name=${folder##*/}
     python3 generate.py \
         --corpus_jsonl ~/datasets/scifact/corpus.jsonl \
@@ -8,6 +8,7 @@ for folder in models/checkpoint/$1;do
         --output_jsonl results/${name}.jsonl \
         --device cuda:0 \
         --num_relevance_scores 10 \
+        --num_relevance_prompt 1 \
         --batch_size 2 \
         --max_length 512 \
         --max_new_tokens 64 \

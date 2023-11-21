@@ -56,27 +56,28 @@ def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
         return {'neg2pos': loss_gen_pos_from_neg, 
                 'pos2neg': loss_gen_neg_from_pos}
 
-def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, measurement='f1'):
+def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, measurement='f1', ngrams=[1]):
     m = {'precision': 0, 'recall': 1, 'f1': 2}[measurement]
     loss_f1_pos = greedy_cos_idf(
             logits_bar[seq_labels==1], 
             mask_bar[seq_labels==1],
             logits_hat[seq_labels==1], 
-            mask_hat[seq_labels==1]
+            mask_hat[seq_labels==1],
+            ngrams
     )[m]
 
     loss_f1_neg = greedy_cos_idf(
             logits_bar[seq_labels!=1], 
             mask_bar[seq_labels!=1],
             logits_hat[seq_labels!=1], 
-            mask_hat[seq_labels!=1]
+            mask_hat[seq_labels!=1],
+            ngrams
     )[m]
 
-    return {'pos': loss_f1_pos.mean(), 'neg': loss_f1_neg.mean()}
+    return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
 
 # ## [NOTE] this function has no `idf` setups.
-def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
-
+def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngram=[1]):
     batch_size = ref_embedding.size(0)
 
     # inplace functions
@@ -91,14 +92,30 @@ def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks):
     masks = masks.float().to(sim.device)
     sim = sim * masks
 
-    # based on hyp_embedding
-    precision_scores, indices_precision = sim.max(dim=2) 
-    # based on ref_embedding
-    recall_scores, indices_recall = sim.max(dim=1)
+    bs = sim.shape[0]
+    P, R = torch.zeros(bs, device=sim.device), torch.zeros(bs, device=sim.device)
+    F1 = torch.zeros(bs, device=sim.device)
+    for n in ngram:
+        n = int(n)
+        if n==1:
+            # based on hyp_embedding, ref_embedding
+            precision_scores, indices_precision = sim.max(dim=2) 
+            recall_scores, indices_recall = sim.max(dim=1)
+        else: 
+            n_ = max(sim.size(-2), n)
+            pooler = nn.MaxPool2d((n_, sim.size(-1)), stride=(1,1))
+            precision_scores = pooler(sim)
+            n_ = max(sim.size(-1), n)
+            pooler = nn.MaxPool2d((sim.size(-2), n_), stride=(1,1))
+            recall_scores = pooler(sim)
 
-    P = precision_scores.sum(dim=1)
-    R = recall_scores.sum(dim=1)
-    F1 = 2 * P * R / (1e-5 + P + R)
+        p = precision_scores.sum(dim=1)
+        r = recall_scores.sum(dim=1)
+
+        P += p
+        R += r
+        F1 += 2 * p * r / (1e-5 + p + r)
+
     # inplace functions
     # F1 = F1.masked_fill(torch.isnan(F1), 0.)
 

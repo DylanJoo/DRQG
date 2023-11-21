@@ -145,18 +145,23 @@ class TrainerForRelQG(TrainerForQG):
 
         #### (3.2) margin gap with multi-vecor similarity
         if self.args.enable_margin_gap_multivec:
-            loss_gen = slic_margin_loss(
+            loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
+            loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
+            gap_pos = loss_gen_pos-loss_gen_neg_from_pos
+            gap_neg = loss_gen_neg-loss_gen_pos_from_neg
+
+            sim = slic_margin_loss(
                     logits_bar=lm_logits,
                     logits_hat=lm_logits_reverse,
                     mask_bar=labels_mask,
                     mask_hat=labels_mask_reverse,
                     seq_labels=rel_labels,
-                    measurement=self.args.enable_margin_gap_multivec
+                    measurement=self.args.enable_margin_gap_multivec,
+                    ngrams=self.args.enable_margin_gap_multivec_ngram
             )
-            gap_pos, gap_neg = loss_gen['pos'], loss_gen['neg']
-            beta = 0.1 
-            loss_gap_pos = torch.clamp(beta*gap_pos, min=0).mean()
-            loss_gap_neg = torch.clamp(beta*gap_neg, min=0).mean()
+            gamma = self.args.gamma
+            loss_gap_pos = torch.clamp(gamma*sim['pos']+gap_pos, min=0).mean()
+            loss_gap_neg = torch.clamp(gamma*sim['neg']+gap_neg, min=0).mean()
 
             train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \

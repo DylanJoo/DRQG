@@ -1,9 +1,21 @@
+import os
+import json
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Optional, Union, List
 from transformers import Seq2SeqTrainingArguments
 
+class Configs:
+    def dumps(self, path='temp.json'):
+        temp_dict = dataclasses.asdict(self)
+        with open(path, 'w') as f:
+            f.write(json.dumps(temp_dict)+'\n')
+        print('config {} has been saved at {}'.format(
+            self.__class__.__name__, path
+        ))
+
 @dataclass
-class HFModelArgs:
+class HFModelArgs(Configs):
     model_name_or_path: Optional[str] = field(default=None)
     config_name: Optional[str] = field(default=None)
     tokenizer_name: Optional[str] = field(default=None)
@@ -12,7 +24,7 @@ class HFModelArgs:
     use_auth_token: bool = field(default=False)
 
 @dataclass
-class ModelArgs:
+class ModelArgs(Configs):
     # disable_dropout: bool = field(default=False)
     add_classification_head: bool = field(default=False)
 
@@ -47,7 +59,7 @@ class ModelArgs:
     # n_cycle: Optional[int] = field(default=10)
 
 @dataclass
-class DataArgs:
+class DataArgs(Configs):
     dataset_config_name: Optional[str] = field(default=None)
     overwrite_cache: bool = field(default=False)
     preprocessing_num_workers: Optional[int] = field(default=None)
@@ -59,7 +71,7 @@ class DataArgs:
     m_positive_per_example: int = field(default=1)
 
 @dataclass
-class TrainingArgs(Seq2SeqTrainingArguments):
+class TrainingArgs(Configs, Seq2SeqTrainingArguments):
     output_dir: str = field(default='./temp')
     seed: int = field(default=42)
     data_seed: int = field(default=None)
@@ -82,9 +94,15 @@ class TrainingArgs(Seq2SeqTrainingArguments):
     remove_unused_columns: bool = field(default=False)
     prefix_tuning: bool = field(default=False)
     random_init: bool = field(default=False)
+    # Unliklihood
     enable_unlikelihood: bool = field(default=False)
+    # Calibration (prob)
     enable_margin_gap_prob: Optional[str] = field(default=None)
+    # Calibration (BERTScore)
     enable_margin_gap_multivec: Optional[str] = field(default=None)
+    enable_margin_gap_multivec_ngram: Optional[List[str]] = field(default=None)
+    gamma: Optional[float] = field(default=1.0)
+    # In-batch encoder similarity
     enable_simlarity_loss: Optional[str] = field(default=None)
     document_wise_contrastive: bool = field(default=False)
     tau: Optional[float] = field(default=1.0)

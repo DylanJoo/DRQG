@@ -18,19 +18,22 @@ if __name__ == '__main__':
             scores = result['relevance_scores']
             queries = result['generated_query']
 
-            print(f"{corpus[i]['passage']}\n>>")
+            if 'marco' in args.corpus:
+                print(f"{corpus[i]['passage']}\n>>")
+                positive = corpus[i]['positive'][:2]
+                positive_score = corpus[i]['positive_score'][:2]
+                negative = corpus[i]['negative'][:2]
+                negative_score = corpus[i]['negative_score'][:2]
+                for (q, s) in zip(positive, positive_score):
+                    s = round(s, 2)
+                    print(f"{s:<3} {q}")
+                for (q, s) in zip(negative, negative_score):
+                    s = round(s, 2)
+                    print(f"{s:<3} {q}")
 
-            positive = corpus[i]['positive'][:2]
-            positive_score = corpus[i]['positive_score'][:2]
-            negative = corpus[i]['negative'][:2]
-            negative_score = corpus[i]['negative_score'][:2]
-
-            for (q, s) in zip(positive, positive_score):
-                s = round(s, 2)
-                print(f"{s:<3} {q}")
-            for (q, s) in zip(negative, negative_score):
-                s = round(s, 2)
-                print(f"{s:<3} {q}")
+            if 'sci' in args.corpus:
+                print(f"{corpus[i]['title']}\n>>")
+                print(" | ".join(corpus[i]['abstract']))
 
             print(">>")
             for (q, s) in zip(queries, scores):
