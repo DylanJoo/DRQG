@@ -157,7 +157,7 @@ class TrainerForRelQG(TrainerForQG):
                     mask_hat=labels_mask_reverse,
                     seq_labels=rel_labels,
                     measurement=self.args.enable_margin_gap_multivec,
-                    ngrams=self.args.enable_margin_gap_multivec_ngram
+                    ngrams=self.args.enable_margin_gap_multivec_ngrams
             )
             gamma = self.args.gamma
             loss_gap_pos = torch.clamp(gamma*sim['pos']+gap_pos, min=0).mean()

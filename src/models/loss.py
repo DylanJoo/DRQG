@@ -77,7 +77,7 @@ def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, mea
     return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
 
 # ## [NOTE] this function has no `idf` setups.
-def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngram=[1]):
+def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngrams=[1]):
     batch_size = ref_embedding.size(0)
 
     # inplace functions
@@ -95,22 +95,23 @@ def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngram=[1]
     bs = sim.shape[0]
     P, R = torch.zeros(bs, device=sim.device), torch.zeros(bs, device=sim.device)
     F1 = torch.zeros(bs, device=sim.device)
-    for n in ngram:
+    for n in ngrams:
         n = int(n)
         if n==1:
             # based on hyp_embedding, ref_embedding
             precision_scores, indices_precision = sim.max(dim=2) 
             recall_scores, indices_recall = sim.max(dim=1)
         else: 
-            n_ = max(sim.size(-2), n)
+            n_ = min(sim.size(-2), n)
             pooler = nn.MaxPool2d((n_, sim.size(-1)), stride=(1,1))
-            precision_scores = pooler(sim)
-            n_ = max(sim.size(-1), n)
+            precision_scores = pooler(sim).squeeze()
+            n_ = min(sim.size(-1), n)
             pooler = nn.MaxPool2d((sim.size(-2), n_), stride=(1,1))
-            recall_scores = pooler(sim)
+            recall_scores = pooler(sim).squeeze()
 
-        p = precision_scores.sum(dim=1)
-        r = recall_scores.sum(dim=1)
+        ## [NOTE] It's mean here.
+        p = precision_scores.mean(dim=1).flatten() * sim.size(-2)
+        r = recall_scores.mean(dim=1).flatten() * sim.size(-1)
 
         P += p
         R += r

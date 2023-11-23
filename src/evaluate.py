@@ -72,6 +72,17 @@ if __name__ == "__main__":
     )
     outputs.update(consistency)
 
+    # Evaluate relevancy
+    # evaluator.set_monot5_as_ranker() # default as monot5-3b msmarco 10k
+    # relevancy = evaluator.evaluate_relevancy(
+    #         total_query_group=dataset['query'],
+    #         total_passages=dataset['passage'],
+    #         total_scores=dataset['score'],
+    #         batch_size=args.batch_size,
+    #         select_scores=1.0,
+    # )
+    # outputs.update(relevancy)
+
     # mean values
     printer = f"{args.prediction.replace('.jsonl', '').rsplit('/', 1)[-1]}"
     print(printer)

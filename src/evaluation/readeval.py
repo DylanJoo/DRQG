@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-import torch.nn.function as F
+import torch.nn.functional as F
 from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -37,10 +37,16 @@ class READEval:
         self.ranker_tokenizer = AutoTokenizer.from_pretrained(ranker_name)
         self.ranker.eval()
         self.ranker.to(device)
-        ## [NOTE] Can also try t5rerank with prompts
 
         # evaluation
         self.scores = []
+
+    def set_monot5_as_ranker(self, ranker_name='castorini/monot5-large-msmarco-10k'):
+        from transformers import T5ForConditionalGeneration, T5Tokenizer
+        self.ranker = T5ForConditionalGeneration.from_pretrained(ranker_name)
+        self.ranker_tokenizer = T5Tokenizer.from_pretrained(ranker_name)
+        self.ranker.eval()
+        self.ranker.to(self.device)
 
     @torch.no_grad()
     def get_relevance_probs(
@@ -52,15 +58,21 @@ class READEval:
         """ Followed the instructions in monoT5 paper """
         features = self.ranker_tokenizer(
                 [f'Query: {q} Document: {p}' for q, p in zip(qtexts, ptexts)], 
-                ['Relevant: </s>'] * len(qtexts)
+                ['Relevant: </s>'] * len(qtexts),
                 padding=True, 
                 truncation='only_first', 
                 add_special_tokens=False,
                 return_tensors="pt"
         ).to(self.device)
-        result = self.ranker(**features).logits
+
+        dummy = torch.full(
+                features.input_ids.size(), 
+                self.ranker.config.decoder_start_token_id
+        ).to(self.device)
+
+        result = self.ranker(**features, decoder_input_ids=dummy).logits
         result = result[:, 0, (1176, 6136)]
-        return F.softmax(result, dim=1)[:, 0].cpu().numpy()
+        return F.softmax(result, dim=-1)[:, 0].cpu().numpy()
 
     @torch.no_grad()
     def get_logit_scores(
@@ -95,14 +107,13 @@ class READEval:
         embeddings = self.encoder.encode(**features)
         return embeddings.detach().cpu().numpy()
 
-    def evaluate_relevance(
+    def evaluate_relevancy(
         self, 
         total_query_group, 
         total_passages, 
         total_scores, 
         batch_size=1, 
-        select_scores=None,
-        select_fn=lambda x: np.argmax(x),
+        select_score=1.0,
         **kwargs
     ):
         """ the ranker should be a pointwise ranker with probs (or the one has finite scoring)"""
@@ -111,8 +122,6 @@ class READEval:
         all_prob_scores = []
         group_boundaries = []
         count = 0
-        if select_scores is not None:
-            select_fn = (lambda x: x.index(select_scores))
 
         # batch encoding
         for start, end in tqdm(
@@ -125,20 +134,21 @@ class READEval:
 
             queries = []
             passages = []
-            scores = []
 
             for i, query_group in enumerate(batch_query_group):
                 # select a few of queries
-                for idx in select_scores(np.array(batch_scores[i])):
-                    queries += [query_group[idx]]
-                    passages += [batch_passages[idx]]
-                    count += 1
+                for idx, score in enumerate(batch_scores):
+                    if score == select_score:
+                        queries += [query_group[idx]]
+                        passages += [batch_passages[i]]
+                        count += 1
 
-            ## get relevance scores (prob value) of selected
-            prob_scores = self.get_relevance_probs(queries, passages)
-            all_prob_scores.extend(prob_scores)
+            if len(queries) > 0:
+                ## get relevance scores (prob value) of selected
+                prob_scores = self.get_relevance_probs(queries, passages)
+                all_prob_scores.extend(prob_scores)
 
-        return np.mean(all_prob_scores)
+        return {f"rel-{select_score}": all_prob_scores}
 
     def evaluate_consistency(
         self, 
