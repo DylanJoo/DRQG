@@ -77,7 +77,7 @@ def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, mea
     return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
 
 # ## [NOTE] this function has no `idf` setups.
-def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngrams=[1]):
+def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngrams):
     batch_size = ref_embedding.size(0)
 
     # inplace functions

@@ -75,9 +75,11 @@ def main():
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
+            random=training_args.sample_random, # if random, will check topk
+            k=training_args.sample_topk,
             prefix=model_args.baseline_prefix,
             scores=used_scores,
-            prompt_length=prompt_length
+            prompt_length=prompt_length,
     )
 
     # Data

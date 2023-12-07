@@ -44,18 +44,50 @@ class DataCollatorBase:
 
         return inputs, passages
 
-    def prepare_input(self, passage, queries, rel_scores, m=1):
+    # def prepare_input(self, passage, queries, rel_scores, m=1):
+    #
+    #     texts_src = []
+    #     texts_tgt = []
+    #     scores = []
+    #
+    #     for i in range(m):
+    #         j = i
+    #         try:
+    #             texts_tgt += [queries[j]]
+    #             scores += [rel_scores[j]]
+    #         except: 
+    #             offset = int(j % len(queries))
+    #             texts_tgt += [queries[offset]]
+    #             scores += [rel_scores[offset]]
+    #
+    #         printed_score = round(scores[-1]*100)
+    #         texts_src += [self.prefix.format(printed_score, passage)]
+    #
+    #     return texts_src, texts_tgt, scores
+
+    def prepare_input(self, passage, queries, rel_scores, m=2, k=1):
+        assert m >= k, f'm={m} is not larger than k={k}'
+        # assert m <= len(queries), f'm needs to be smaller than {len(queries)}'
+        assert len(queries) == len(rel_scores), f'lengths are not matched.'
 
         texts_src = []
         texts_tgt = []
         scores = []
 
-        for j in range(m):
+        n_list = list(range( max( len(queries), m )))
+        # n_list = list(range(m)
+        if self.random:
+            # min( (m-k), len(n_list[k:]) )
+            m_list = n_list[:k] + sorted(random.sample(n_list[k:], k=m-k))
+        else:
+            m_list = n_list[:m]
+
+        for i in m_list:
             try:
-                texts_tgt += [queries[j]]
-                scores += [rel_scores[j]]
+                texts_tgt += [queries[i]]
+                scores += [rel_scores[i]]
             except: 
-                offset = int(j % len(queries))
+                offset = int(i % len(queries))
                 texts_tgt += [queries[offset]]
                 scores += [rel_scores[offset]]
 
@@ -84,27 +116,28 @@ class DataCollatorForBaseline(DataCollatorBase):
 
         # collect passage to query
         for i, batch in enumerate(features):
-
             ## m positiive
+            ## positive: 1, 0.9, 0.8 ...
             src1, tgt1, score1 = self.prepare_input(
                     batch['passage'], 
                     batch['positive'], 
                     batch['positive_score'],
-                    self.m_positives
+                    m=self.m_positives,
+                    k=self.k
             )
-            ## m negative
+            ## m negative (reverse)
+            ## negative: 0.2, 0.1, 0 --> 0, 0.1, 0.2 ... 
             src0, tgt0, score0 = self.prepare_input(
                     batch['passage'], 
                     batch['negative'][::-1], 
                     batch['negative_score'][::-1],
-                    self.m_negatives
+                    m=self.m_negatives,
+                    k=self.k
             )
-
-            ## positive: 1, 0.9, 0.8 ...
-            ## negative: 0, 0.1, 0.2 ... --> 0.2, 0.1, 0
             ## change them into the same ordering
+            ## since we will use the positive and negative pairwise loss
+            ## align them with [top1, bottom2] and [top2, bottom1]
             src0, tgt0, score0 = src0[::-1], tgt0[::-1], score0[::-1]
-
             texts_src += src1 + src0
             texts_tgt += tgt1 + tgt0
             labels += [1]*len(src1) + [0]*len(src0)
@@ -125,7 +158,6 @@ class DataCollatorForBaseline(DataCollatorBase):
                 padding=True,
                 return_tensors=self.return_tensors
         )
-
         target_mask = targets['attention_mask'].bool()
         target_ids = targets['input_ids'].masked_fill(~target_mask, -100)
         inputs['labels'] = target_ids
@@ -141,6 +173,8 @@ class DataCollatorForPromptQG(DataCollatorForBaseline):
     prompt_length: int = 0
     m_negatives: int = 2
     m_positives: int = 2
+    random: bool = False
+    k: int = 1
 
     def __call__(self, 
                  features: List[Dict[str, Any]], 

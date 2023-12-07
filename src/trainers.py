@@ -118,12 +118,11 @@ class TrainerForRelQG(TrainerForQG):
         )
         lm_logits_reverse = outputs_reverse.get('logits')
 
-        ### (2) text generation unlikelihood
-        loss_gen = gen_mle_unloss(lm_logits_reverse, labels_reverse, rel_labels, False)
-        unloss_gen_pos, unloss_gen_neg = loss_gen['neg2pos'], loss_gen['pos2neg']
-        train_logs += f"\nMax unLE: (neg2pos) {unloss_gen_pos.mean()/L} + (pos2neg) {unloss_gen_neg.mean()/L}"
-
+        ### (2) text generation unlikelihood # [deprecated]
         if self.args.enable_unlikelihood:
+            loss_gen = gen_mle_unloss(lm_logits_reverse, labels_reverse, rel_labels, False)
+            unloss_gen_pos, unloss_gen_neg = loss_gen['neg2pos'], loss_gen['pos2neg']
+            train_logs += f"\nMax unLE: (neg2pos) {unloss_gen_pos.mean()/L} + (pos2neg) {unloss_gen_neg.mean()/L}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
                     0.5 * (unloss_gen_pos.mean()/L + unloss_gen_neg.mean()/L )
 
@@ -168,24 +167,26 @@ class TrainerForRelQG(TrainerForQG):
                     0.5 * (loss_gap_pos + loss_gap_neg) 
 
         ## Maximize discripancy 
-        ### (4) In-batch similarity
-        sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
-        loss_sim = inbatch_cont_sim_loss(sequence_hidden_states, 
-                                         self._train_batch_size,
-                                         reduction=False,
-                                         temperature=self.args.tau,
-                                         documnet_wise=self.args.document_wise_contrastive)
-        train_logs += f"\nInbatchSim: {loss_sim.mean()}"
-
-        if self.args.enable_simlarity_loss == 'inbatch':
-            loss += loss_sim.mean()
-
         ### (x) Cosine similarity 
         loss_sim = cosine_sim_loss(
                 model.encoder.relevant_prompt, 
                 model.encoder.irrelevant_prompt
-        )
+        ).detach().cpu()
         train_logs += f"\nCosineSim: {loss_sim}"
+
+        ### (4) In-batch similarity
+        sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
+        loss_sim = inbatch_cont_sim_loss(
+                sequence_hidden_states, 
+                self._train_batch_size,
+                reduction=False,
+                temperature=self.args.tau,
+                documnet_wise=self.args.document_wise_contrastive
+        )
+        train_logs += f"\nInbatchSim: {loss_sim.mean()}"
+
+        if self.args.enable_simlarity_loss == 'inbatch':
+            loss += loss_sim.mean()
 
         if training_steps % 50 == 0:
             print(train_logs)
@@ -196,7 +197,10 @@ class TrainerForRelQG(TrainerForQG):
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
 
-        return (loss, outputs) if return_outputs else loss
+        if return_outputs:
+            return (loss, outputs) 
+        else:
+            return loss
 
     def reverse_positions(self, labels):
         m_positive = self.data_collator.m_positives
