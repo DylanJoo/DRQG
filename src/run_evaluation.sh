@@ -1,3 +1,5 @@
+reranker_hf=/work/jhju/monot5-3b-inpars-v2-scifact
+
 touch eval.log
 for file in results/*$1*.jsonl;do
     name=${file##*/}
@@ -5,9 +7,10 @@ for file in results/*$1*.jsonl;do
         --corpus_jsonl ~/datasets/scifact/corpus.jsonl \
         --prediction $file \
         --encoder_name DylanJHJ/gtr-t5-base \
-        --ranker_name cross-encoder/ms-marco-MiniLM-L-6-v2 \
+        --regressor_name cross-encoder/ms-marco-MiniLM-L-6-v2 \
+        --reranker_name $reranker_hf \
         --device cuda:0 \
-        --batch_size 2 >> eval.log
+        --batch_size 2 >> eval.new.log
 done
 
 # touch eval.msmarco.log

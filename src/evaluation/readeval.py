@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import T5ForConditionalGeneration, T5Tokenizer
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy import stats
 # module
@@ -17,7 +18,8 @@ class READEval:
         self, 
         dataset=None,
         encoder_name='DylanJHJ/gtr-t5-base',
-        ranker_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
+        regressor_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
+        reranker_name='castorini/monot5-large-msmarco-10k',
         device='cuda',
         generator=None, 
     ):
@@ -26,27 +28,29 @@ class READEval:
         self.generator = generator
 
         # diversity
-        self.encoder = GTREncoder.from_pretrained(encoder_name)
-        self.encoder_tokenizer = AutoTokenizer.from_pretrained(encoder_name)
-        self.encoder.eval()
-        self.encoder.to(device)
+        if encoder_name:
+            self.encoder = GTREncoder.from_pretrained(encoder_name)
+            self.encoder_tokenizer = AutoTokenizer.from_pretrained(encoder_name)
+            self.encoder.eval()
+            self.encoder.to(device)
         ## [NOTE] Can also try one-embedder with prompts
 
-        # ranking (crossencoder)
-        self.ranker = AutoModelForSequenceClassification.from_pretrained(ranker_name)
-        self.ranker_tokenizer = AutoTokenizer.from_pretrained(ranker_name)
-        self.ranker.eval()
-        self.ranker.to(device)
+        # ranking for regression (crossencoder)
+        if regressor_name:
+            self.regressor = AutoModelForSequenceClassification.from_pretrained(regressor_name)
+            self.regressor_tokenizer = AutoTokenizer.from_pretrained(regressor_name)
+            self.regressor.eval()
+            self.regressor.to(device)
+
+        # ranking for reranking (crossencoder)
+        if reranker_name:
+            self.reranker = T5ForConditionalGeneration.from_pretrained(reranker_name)
+            self.reranker_tokenizer = T5Tokenizer.from_pretrained(reranker_name)
+            self.reranker.eval()
+            self.reranker.to(self.device)
 
         # evaluation
         self.scores = []
-
-    def set_monot5_as_ranker(self, ranker_name='castorini/monot5-large-msmarco-10k'):
-        from transformers import T5ForConditionalGeneration, T5Tokenizer
-        self.ranker = T5ForConditionalGeneration.from_pretrained(ranker_name)
-        self.ranker_tokenizer = T5Tokenizer.from_pretrained(ranker_name)
-        self.ranker.eval()
-        self.ranker.to(self.device)
 
     @torch.no_grad()
     def get_relevance_probs(
@@ -56,7 +60,7 @@ class READEval:
         return_probs=False
     ):
         """ Followed the instructions in monoT5 paper """
-        features = self.ranker_tokenizer(
+        features = self.reranker_tokenizer(
                 [f'Query: {q} Document: {p}' for q, p in zip(qtexts, ptexts)], 
                 ['Relevant: </s>'] * len(qtexts),
                 padding=True, 
@@ -67,10 +71,10 @@ class READEval:
 
         dummy = torch.full(
                 features.input_ids.size(), 
-                self.ranker.config.decoder_start_token_id
+                self.reranker.config.decoder_start_token_id
         ).to(self.device)
 
-        result = self.ranker(**features, decoder_input_ids=dummy).logits
+        result = self.reranker(**features, decoder_input_ids=dummy).logits
         result = result[:, 0, (1176, 6136)]
         return F.softmax(result, dim=-1)[:, 0].cpu().numpy()
 
@@ -82,13 +86,13 @@ class READEval:
         return_logit=False
     ):
         """ Followed the instructions in sbert repo.  """
-        features = self.ranker_tokenizer(
+        features = self.regressor_tokenizer(
                 qtexts, ptexts,
                 padding=True, 
                 truncation='only_second', 
                 return_tensors="pt"
         ).to(self.device)
-        scores = self.ranker(**features).logits
+        scores = self.regressor(**features).logits
         return scores.flatten().cpu().numpy()
 
     @torch.no_grad()
@@ -116,7 +120,7 @@ class READEval:
         select_score=1.0,
         **kwargs
     ):
-        """ the ranker should be a pointwise ranker with probs (or the one has finite scoring)"""
+        """ the reranker should be a pointwise reranker with probs (or the one has finite scoring)"""
         N = len(total_query_group)
         total_scores = np.array(total_scores).flatten()
         all_prob_scores = []

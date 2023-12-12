@@ -110,8 +110,10 @@ def greedy_cos_idf(ref_embedding, ref_masks, hyp_embedding, hyp_masks, ngrams):
             recall_scores = pooler(sim).squeeze()
 
         ## [NOTE] It's mean here.
-        p = precision_scores.mean(dim=1).flatten() * sim.size(-2)
-        r = recall_scores.mean(dim=1).flatten() * sim.size(-1)
+        # p = precision_scores.mean(dim=1).flatten() * sim.size(-2)
+        # r = recall_scores.mean(dim=1).flatten() * sim.size(-1)
+        p = precision_scores.mean(dim=1).flatten() 
+        r = recall_scores.mean(dim=1).flatten() 
 
         P += p
         R += r
@@ -135,7 +137,8 @@ def inbatch_cont_sim_loss(
     norm=False, 
     reduction=None, 
     temperature=1,
-    documnet_wise=False
+    document_wise=False,
+    relevance_wise=False
 ):
     device = hidden_states.device
     BN, L, H = hidden_states.shape
@@ -147,12 +150,20 @@ def inbatch_cont_sim_loss(
     if norm:
         hidden_state = F.normalize(hidden_state, p=2, dim=-1)
 
-    if documnet_wise:
+    assert (document_wise and relevance_wise) is False, 'cannot specify both'
+    if document_wise:
         # indoc: B N H x B H N
         hidden_state = hidden_state.view(bs, BN//bs, H) / temperature
         inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
         inbatch_scores = inbatch_scores.view(-1, BN//bs)
         inbatch_labels = torch.arange(0, BN//bs, device=device).repeat(bs)
+    elif relevance_wise:
+        # indoc: B N H x B H N --> N B H x N H B
+        hidden_state = hidden_state.view(bs, BN//bs, H) / temperature
+        hidden_state = hidden_state.permute(1, 0, 2)
+        inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
+        inbatch_scores = inbatch_scores.view(-1, bs)
+        inbatch_labels = torch.arange(0, bs, device=device).repeat(BN//bs)
     else:
         # inbatch: BN H x H BN
         hidden_state = hidden_state.view(-1, H) / temperature

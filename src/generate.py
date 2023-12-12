@@ -56,10 +56,12 @@ if __name__ == "__main__":
 
             # SCI-docs
             if 'scifact' in args.corpus_jsonl:
+                title = item['title']
                 if isinstance(item['abstract'], list):
-                    content = " ".join(item['abstract'])
+                    abstract = " ".join(item['abstract'])
                 else:
-                    content = item['abstract']
+                    abstract = item['abstract']
+                content = title + " " + abstract
                 data.append({'doc_id': item['doc_id'], 'passage': content})
 
             # msmarco

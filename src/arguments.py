@@ -103,8 +103,9 @@ class TrainingArgs(Configs, Seq2SeqTrainingArguments):
     enable_margin_gap_multivec_ngrams: Optional[List[str]] = field(default=None)
     gamma: Optional[float] = field(default=1.0)
     # In-batch encoder similarity
-    enable_simlarity_loss: Optional[str] = field(default=None)
+    enable_similarity_loss: Optional[str] = field(default=None)
     document_wise_contrastive: bool = field(default=False)
+    relevance_wise_contrastive: bool = field(default=False)
     tau: Optional[float] = field(default=1.0)
     # Sampling
     sample_random: bool = field(default=False)

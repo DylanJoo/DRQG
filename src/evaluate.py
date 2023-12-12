@@ -12,8 +12,9 @@ if __name__ == "__main__":
     parser.add_argument("--prediction")
     parser.add_argument("--output_jsonl", default=None, type=str)
     # evaluator
-    parser.add_argument("--encoder_name")
-    parser.add_argument("--ranker_name")
+    parser.add_argument("--encoder_name", default=None)
+    parser.add_argument("--regressor_name", default=None)
+    parser.add_argument("--reranker_name", default=None)
     parser.add_argument("--device", default='cuda', type=str)
     # generation config
     parser.add_argument("--batch_size", default=2, type=int)
@@ -28,9 +29,12 @@ if __name__ == "__main__":
             item = json.loads(line.strip())
 
             if isinstance(item['abstract'], list):
-                corpus[item['doc_id']]  = " ".join(item['abstract'])
+                title = item['title']
+                abstract  = " ".join(item['abstract'])
             else:
-                corpus[item['doc_id']] = item['abstract']
+                title = item['title']
+                abstract = item['abstract']
+            corpus[item['doc_id']] = title + " " + abstract
 
     ## load prediction
     data = []
@@ -49,39 +53,51 @@ if __name__ == "__main__":
     evaluator = READEval(
             dataset=dataset,
             encoder_name=args.encoder_name,
-            ranker_name=args.ranker_name,
+            regressor_name=args.regressor_name,
+            reranker_name=args.reranker_name,
             device=args.device,
             generator=None
     )
 
     # Eavluate diversity
     outputs = {}
-    diversity = evaluator.evaluate_diversity(
-            total_query_group=dataset['query'],
-            metrics=('euclidean', 'angular'),
-            batch_size=args.batch_size,
-    )
-    outputs.update(diversity)
+    if args.encoder_name is not None:
+        diversity = evaluator.evaluate_diversity(
+                total_query_group=dataset['query'],
+                metrics=('euclidean', 'angular'),
+                batch_size=args.batch_size,
+        )
+        outputs.update(diversity)
 
     # Evaluate consistency
-    consistency = evaluator.evaluate_consistency(
-            total_query_group=dataset['query'],
-            total_passages=dataset['passage'],
-            total_scores=dataset['score'],
-            batch_size=args.batch_size,
-    )
-    outputs.update(consistency)
+    if args.regressor_name is not None:
+        consistency = evaluator.evaluate_consistency(
+                total_query_group=dataset['query'],
+                total_passages=dataset['passage'],
+                total_scores=dataset['score'],
+                batch_size=args.batch_size,
+        )
+        outputs.update(consistency)
 
     # Evaluate relevancy
-    # evaluator.set_monot5_as_ranker() # default as monot5-3b msmarco 10k
-    # relevancy = evaluator.evaluate_relevancy(
-    #         total_query_group=dataset['query'],
-    #         total_passages=dataset['passage'],
-    #         total_scores=dataset['score'],
-    #         batch_size=args.batch_size,
-    #         select_scores=1.0,
-    # )
-    # outputs.update(relevancy)
+    if args.reranker_name is not None:
+        # evaluator.set_monot5_as_ranker() # default as monot5-3b msmarco 10k
+        relevancy = evaluator.evaluate_relevancy(
+                total_query_group=dataset['query'],
+                total_passages=dataset['passage'],
+                total_scores=dataset['score'],
+                batch_size=args.batch_size,
+                select_score=1.0,
+        )
+        outputs.update(relevancy)
+        relevancy = evaluator.evaluate_relevancy(
+                total_query_group=dataset['query'],
+                total_passages=dataset['passage'],
+                total_scores=dataset['score'],
+                batch_size=args.batch_size,
+                select_score=0.0,
+        )
+        outputs.update(relevancy)
 
     # mean values
     printer = f"{args.prediction.replace('.jsonl', '').rsplit('/', 1)[-1]}"
