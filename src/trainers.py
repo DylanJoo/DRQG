@@ -186,6 +186,9 @@ class TrainerForRelQG(TrainerForQG):
         )
         train_logs += f"\nInbatchSim: {loss_sim.mean()}"
 
+        ## KL regularization
+        # loss_kl = 
+
         if self.args.enable_similarity_loss == 'inbatch':
             loss += loss_sim.mean()
 

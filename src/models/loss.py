@@ -177,35 +177,19 @@ def inbatch_cont_sim_loss(
     else:
         return loss_fct(inbatch_scores, inbatch_labels)
 
-# def pairwise_maxsim_loss(hidden_states, bs=1, ms=2, norm=False):
-#     device = hidden_states.device
-#     hs = hidden_states.size(-1)
-#     ls = hidden_states.size(-2)
-#     if norm:
-#         hidden_states = F.normalize(hidden_states, p=2, dim=2)
-#
-#     # reshape (bs, 2(pos/neg), ms, hs) -> reshape(2, bs, ms, ls, hs)
-#     hidden_states = hidden_states.view(bs, 2, ms, ls, hs).permute(1, 0, 2, 3,4)
-#     pos_hidden_states = hidden_states[0].reshape(-1, ls, hs)
-#     pos_hidden_states = pos_hidden_states.repeat(2, 1, 1).contiguous()
-#     base_hidden_states = hidden_states.reshape(-1, ls, hs)
-#
-#     # (2bsms ls hs) x (2bsms ls hs) = (2bsms ls ls) = (2bsms ls) = (2bsms, 0)
-#     pairwise_scores = (pos_hidden_states @ base_hidden_states.permute(
-#             0, 2, 1)).max(2).values.sum(1)
-#
-#     # multiplication (bs*ms, bs*ms*2)
-#     loss_fct = CrossEntropyLoss(reduction='none')
-#     pairwise_scores = pairwise_scores.view(2, -1).permute(1, 0) 
-#     pairwise_labels = torch.zeros(pairwise_scores.size(0), dtype=torch.long, device=device)
-#     return loss_fct(pairwise_scores, pairwise_labels).mean()
-
-def ql_kl_loss(clf_logits, clf_scores):
+def encoder_outputs_kl_loss(hidden_states, clf_scores):
     loss_fct = KLDivLoss(reduction='sum')
     logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
     target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
     loss = loss_fct(logp, target)
     return loss / clf_scores.size(0)
+
+# def ql_kl_loss(clf_logits, clf_scores):
+#     loss_fct = KLDivLoss(reduction='sum')
+#     logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
+#     target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
+#     loss = loss_fct(logp, target)
+#     return loss / clf_scores.size(0)
 
 
 # def indoc_kld_loss(hidden_states, hidden_states_src=None, bs=1):
@@ -249,3 +233,27 @@ def ql_kl_loss(clf_logits, clf_scores):
 #             labels[seq_labels==1].view(-1)
 #     ).mean()
 #     return {"pos": loss_gen_pos, "neg": loss_gen_neg}
+
+# def pairwise_maxsim_loss(hidden_states, bs=1, ms=2, norm=False):
+#     device = hidden_states.device
+#     hs = hidden_states.size(-1)
+#     ls = hidden_states.size(-2)
+#     if norm:
+#         hidden_states = F.normalize(hidden_states, p=2, dim=2)
+#
+#     # reshape (bs, 2(pos/neg), ms, hs) -> reshape(2, bs, ms, ls, hs)
+#     hidden_states = hidden_states.view(bs, 2, ms, ls, hs).permute(1, 0, 2, 3,4)
+#     pos_hidden_states = hidden_states[0].reshape(-1, ls, hs)
+#     pos_hidden_states = pos_hidden_states.repeat(2, 1, 1).contiguous()
+#     base_hidden_states = hidden_states.reshape(-1, ls, hs)
+#
+#     # (2bsms ls hs) x (2bsms ls hs) = (2bsms ls ls) = (2bsms ls) = (2bsms, 0)
+#     pairwise_scores = (pos_hidden_states @ base_hidden_states.permute(
+#             0, 2, 1)).max(2).values.sum(1)
+#
+#     # multiplication (bs*ms, bs*ms*2)
+#     loss_fct = CrossEntropyLoss(reduction='none')
+#     pairwise_scores = pairwise_scores.view(2, -1).permute(1, 0) 
+#     pairwise_labels = torch.zeros(pairwise_scores.size(0), dtype=torch.long, device=device)
+#     return loss_fct(pairwise_scores, pairwise_labels).mean()
+

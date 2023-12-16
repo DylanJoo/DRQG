@@ -8,8 +8,8 @@ for folder in models/checkpoint/*$1*;do
         --output_jsonl results/${name}.jsonl \
         --device cuda:0 \
         --num_relevance_scores 10 \
-        --num_relevance_prompt 1 \
-        --batch_size 2 \
+        --num_relevance_prompt 5 \
+        --batch_size 8 \
         --max_length 512 \
         --max_new_tokens 64 \
         --num_beams 1

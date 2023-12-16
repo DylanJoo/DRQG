@@ -76,7 +76,7 @@ class READEval:
 
         result = self.reranker(**features, decoder_input_ids=dummy).logits
         result = result[:, 0, (1176, 6136)]
-        return F.softmax(result, dim=-1)[:, 0].cpu().numpy()
+        return F.softmax(result, dim=-1)[:, 0].flatten().cpu().numpy()
 
     @torch.no_grad()
     def get_logit_scores(
@@ -122,8 +122,7 @@ class READEval:
     ):
         """ the reranker should be a pointwise reranker with probs (or the one has finite scoring)"""
         N = len(total_query_group)
-        total_scores = np.array(total_scores).flatten()
-        all_prob_scores = []
+        scores = {f"rel-{select_score}": []}
         group_boundaries = []
         count = 0
 
@@ -139,20 +138,24 @@ class READEval:
             queries = []
             passages = []
 
-            for i, query_group in enumerate(batch_query_group):
+            for i in range(len(batch_query_group)):
                 # select a few of queries
-                for idx, score in enumerate(batch_scores):
-                    if score == select_score:
-                        queries += [query_group[idx]]
-                        passages += [batch_passages[i]]
+                query_group = batch_query_group[i]
+                passage = batch_passages[i]
+                score_group = batch_scores[i]
+
+                for query, score in zip(query_group, score_group):
+                    if select_score == score:
+                        queries += [query]
+                        passages += [passage]
                         count += 1
 
             if len(queries) > 0:
                 ## get relevance scores (prob value) of selected
                 prob_scores = self.get_relevance_probs(queries, passages)
-                all_prob_scores.extend(prob_scores)
+                scores[f"rel-{select_score}"].extend(prob_scores)
 
-        return {f"rel-{select_score}": all_prob_scores}
+        return scores
 
     def evaluate_consistency(
         self, 

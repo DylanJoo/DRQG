@@ -82,33 +82,38 @@ if __name__ == "__main__":
     # Evaluate relevancy
     if args.reranker_name is not None:
         # evaluator.set_monot5_as_ranker() # default as monot5-3b msmarco 10k
-        relevancy = evaluator.evaluate_relevancy(
+        relevancy_pos = evaluator.evaluate_relevancy(
                 total_query_group=dataset['query'],
                 total_passages=dataset['passage'],
                 total_scores=dataset['score'],
                 batch_size=args.batch_size,
                 select_score=1.0,
-        )
-        outputs.update(relevancy)
-        relevancy = evaluator.evaluate_relevancy(
+        )[f"rel-1.0"]
+
+        relevancy_neg = evaluator.evaluate_relevancy(
                 total_query_group=dataset['query'],
                 total_passages=dataset['passage'],
                 total_scores=dataset['score'],
                 batch_size=args.batch_size,
                 select_score=0.0,
-        )
-        outputs.update(relevancy)
+        )[f"rel-0.0"]
+
+        outputs.update({
+            'rel_1.0': np.array(relevancy_pos),
+            'rel_0.0': np.array(relevancy_neg),
+            'delta_rel': np.array(relevancy_pos) - np.array(relevancy_neg)
+        })
 
     # mean values
     printer = f"{args.prediction.replace('.jsonl', '').rsplit('/', 1)[-1]}"
     print(printer)
     for metric in outputs:
-        print("{:<10}: \n{} | {} | {} | {}".format(
+        print("{:<10}| {:.4f} | {:.4f} | {:.4f} | {:.4f}".format(
             metric,
-            np.mean(outputs[metric]).round(4),
-            np.std(outputs[metric]).round(4),
-            np.min(outputs[metric]).round(4),
-            np.max(outputs[metric]).round(4)
+            np.mean(outputs[metric]),
+            np.std(outputs[metric]),
+            np.min(outputs[metric]),
+            np.max(outputs[metric]),
         ))
 
     if args.output_jsonl is not None:
