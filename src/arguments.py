@@ -52,7 +52,7 @@ class ModelArgs(Configs):
     activation: Optional[str] = field(default='sigmoid')
 
     # variational
-    # latent_size: int = field(default=128)
+    latent_size: int = field(default=128)
     # has_compressed_layer: bool = field(default=False)
     # annealing_fn: str = field(default='cyclic')
     # n_total_iter: Optional[int] = field(default=10000)
@@ -96,12 +96,14 @@ class TrainingArgs(Configs, Seq2SeqTrainingArguments):
     random_init: bool = field(default=False)
     # Unliklihood
     enable_unlikelihood: bool = field(default=False)
+
     # Calibration (prob)
     enable_margin_gap_prob: Optional[str] = field(default=None)
     # Calibration (BERTScore)
     enable_margin_gap_multivec: Optional[str] = field(default=None)
     enable_margin_gap_multivec_ngrams: Optional[List[str]] = field(default=None)
     gamma: Optional[float] = field(default=1.0)
+
     # In-batch encoder similarity
     enable_similarity_loss: Optional[str] = field(default=None)
     document_wise_contrastive: bool = field(default=False)
@@ -110,4 +112,10 @@ class TrainingArgs(Configs, Seq2SeqTrainingArguments):
     # Sampling
     sample_random: bool = field(default=False)
     sample_topk: int = field(default=1)
+
+    # VAE KL regular
+    enable_vae_loss: bool = field(default=False)
+    k: float = field(default=0.0025)
+    x0: int = field(default=2500)
+    annealing_fn: str = field(default='logistic')
 

@@ -6,7 +6,7 @@ wandb/
 results/*
 !results/convert_jsonl_to_txt.py
 test.sh
-eval.log
+eval*log
 
 # checkpoints
 models/*/

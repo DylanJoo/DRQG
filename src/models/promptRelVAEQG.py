@@ -6,14 +6,15 @@ from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import T5Config
 from transformers.models.t5.modeling_t5 import T5Stack
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput
-from models import SoftRelPromptFlanT5
+from models import FlanT5, VAE
 
-class SoftRelPromptFlanT5VAE(SoftRelPromptFlanT5):
+class SoftRelPromptFlanT5(FlanT5):
 
     def __init__(self, config: T5Config, 
                  instruction_prompt_idx: Optional[List[int]] = None, 
                  relevant_prompt_idx: Optional[List[int]] = None,
-                 irrelevant_prompt_idx: Optional[List[int]] = None):
+                 irrelevant_prompt_idx: Optional[List[int]] = None, 
+                 latent_size: Optional[int] = 768):
 
         super().__init__(config)
         print('Used instruction prompt:', instruction_prompt_idx)
@@ -35,7 +36,7 @@ class SoftRelPromptFlanT5VAE(SoftRelPromptFlanT5):
                 relevant_idx=relevant_prompt_idx,
                 irrelevant_idx=irrelevant_prompt_idx,
                 embed_tokens=self.shared,
-                config=encoder_config, 
+                config=encoder_config
         )
 
         decoder_config = copy.deepcopy(config)
@@ -53,6 +54,10 @@ class SoftRelPromptFlanT5VAE(SoftRelPromptFlanT5):
         self.model_parallel = False
         self.device_map = None
 
+        # [Dec 2023]
+        self.vae = VAE(config=encoder_config, latent_size=latent_size)
+
+
     # [TIPS]
     ## when generation, `input_ids` and `attention_mask` are not required
     ## since `encoder_outputs` has been seperately outputed.
@@ -62,6 +67,7 @@ class SoftRelPromptFlanT5VAE(SoftRelPromptFlanT5):
                 rel_scores=None, 
                 encoder_outputs=None, 
                 return_loss=True,
+                steps=None,
                 **kwargs):
 
         if encoder_outputs is None:
@@ -71,6 +77,20 @@ class SoftRelPromptFlanT5VAE(SoftRelPromptFlanT5):
                     rel_scores=rel_scores,
                     **kwargs
             )
+
+            # decode but execute once if past_key_value is None (first run)
+            if kwargs.get('past_key_values', None) is None:
+                vae_outputs = self.vae(
+                        encoder_outputs[0], 
+                        attention_mask,
+                        steps
+                )
+                # kwargs['past_key_values'] = self.vae._reshape(vae_outputs[0])
+                kwargs['past_key_values'] = None
+
+            if len(vae_outputs) != 1:
+                self.vae_mean, self.vae_logv = vae_outputs[1:]
+
         return super().forward(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -109,7 +129,6 @@ class SoftRelPromptT5Stack(T5Stack):
             len(irrelevant_idx), embed_tokens.embedding_dim
         ))
 
-
     def init_from_vocab(self, positive=True, negative=True):
         self.instruction_prompt = nn.Parameter(
                 self.wte(self.instruction_idx).clone().detach()
@@ -142,7 +161,6 @@ class SoftRelPromptT5Stack(T5Stack):
         ## Expand customized prompts in front of `inputs_embeds` 
         prompts = []
         if self.instruction_idx is not None:
-            # instruction_prompt: (N H) --> (B N H)
             prompts += [self.instruction_prompt.repeat(B, 1, 1)]
 
         if rel_scores is not None:

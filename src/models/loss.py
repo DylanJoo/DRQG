@@ -2,6 +2,7 @@ import math
 import torch
 from torch import nn
 from torch.nn import functional as F
+import numpy as np
 import copy
 from torch.nn import CrossEntropyLoss, KLDivLoss, NLLLoss, CosineEmbeddingLoss
 
@@ -184,7 +185,35 @@ def encoder_outputs_kl_loss(hidden_states, clf_scores):
     loss = loss_fct(logp, target)
     return loss / clf_scores.size(0)
 
-# def ql_kl_loss(clf_logits, clf_scores):
+def kl_loss(logv1, mean1, logv2=None, mean2=None, reduction='sum'): 
+    # [batch_size(64), hidden_size(768)]
+    if logv2 is None and mean2 is None:
+        return -0.5 * torch.sum(1 + logv1 - mean1.pow(2) - logv1.exp())
+
+    exponential = 1 + (logv1-logv2) - (mean1-mean2).pow(2)/logv2.exp() - (logv1-logv2).exp()
+    loss = -0.5 * torch.sum(exponential, tuple(range(1, len(exponential.shape))))
+    if reduction:
+        return loss.mean()
+    else:
+        return loss
+
+def kl_weight(annealing_fn, steps, k=None, x0=None, n_total_iter=None, n_cycle=None):
+    if steps is None:
+        return 1
+    if annealing_fn == 'logistic':
+        return float(1/(1+np.exp(-k*(steps-x0))))
+    elif annealing_fn == 'linear':
+        return min(1, steps/x0)
+    elif annealing_fn == 'cyclic':
+        return frange_cycle_linear(n_total_iter, steps, n_cycle)
+
+def frange_cycle_linear(n_total, curr, start=0.0, stop=1.0, n_cycle=4, ratio=1.0):
+    L = np.ones(n_total) * stop
+    period = n_total/n_cycle
+    step = (stop-start)/(period*ratio) # linear schedule
+    return min(stop, start + step * (curr % period))
+
+# def ql_kl_loss(clf_logits, clf_score):
 #     loss_fct = KLDivLoss(reduction='sum')
 #     logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
 #     target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)

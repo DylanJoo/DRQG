@@ -1,3 +1,5 @@
+mkdir -p /workspace/results
+
 # scidocs
 for folder in models/checkpoint/*$1*;do
     name=${folder##*/}

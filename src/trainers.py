@@ -6,7 +6,8 @@ from torch.nn import functional as F
 from models.loss import (
     gen_mle_loss, gen_mle_unloss, 
     cosine_sim_loss, inbatch_cont_sim_loss,
-    slic_margin_loss
+    slic_margin_loss,
+    kl_loss, kl_weight
 )
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -114,7 +115,7 @@ class TrainerForRelQG(TrainerForQG):
         )
         outputs_reverse = model(
                 decoder_input_ids=model._shift_right(labels_reverse),
-                encoder_outputs=encoder_outputs
+                encoder_outputs=encoder_outputs,
         )
         lm_logits_reverse = outputs_reverse.get('logits')
 
@@ -175,22 +176,29 @@ class TrainerForRelQG(TrainerForQG):
         train_logs += f"\nCosineSim: {loss_sim}"
 
         ### (4) In-batch similarity
-        sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
-        loss_sim = inbatch_cont_sim_loss(
-                sequence_hidden_states, 
-                self._train_batch_size,
-                reduction=False,
-                temperature=self.args.tau,
-                document_wise=self.args.document_wise_contrastive,
-                relevance_wise=self.args.relevance_wise_contrastive
-        )
-        train_logs += f"\nInbatchSim: {loss_sim.mean()}"
+        if self.args.enable_similarity_loss == 'inbatch':
+            sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
+            loss_sim = inbatch_cont_sim_loss(
+                    sequence_hidden_states, 
+                    self._train_batch_size,
+                    reduction=False,
+                    temperature=self.args.tau,
+                    document_wise=self.args.document_wise_contrastive,
+                    relevance_wise=self.args.relevance_wise_contrastive
+            )
+            train_logs += f"\nInbatchSim: {loss_sim.mean()}"
+            loss += loss_sim.mean()
 
         ## KL regularization
-        # loss_kl = 
-
-        if self.args.enable_similarity_loss == 'inbatch':
-            loss += loss_sim.mean()
+        if self.args.enable_vae_loss:
+            loss_kl = kl_loss(model.vae_logv, model.vae_mean)
+            weight = kl_weight(annealing_fn='logistic', 
+                               steps=training_steps, 
+                               k=0.0025, x0=2500, 
+                               n_total_iter=None,
+                               n_cycle=None)
+            train_logs += f"\nKLDiv: {loss_kl.mean() * weight} = {loss_kl.mean()} x {weight}"
+            loss += loss_kl.mean() * weight
 
         if training_steps % 50 == 0:
             print(train_logs)
