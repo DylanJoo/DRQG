@@ -44,27 +44,6 @@ class DataCollatorBase:
 
         return inputs, passages
 
-    # def prepare_input(self, passage, queries, rel_scores, m=1):
-    #
-    #     texts_src = []
-    #     texts_tgt = []
-    #     scores = []
-    #
-    #     for i in range(m):
-    #         j = i
-    #         try:
-    #             texts_tgt += [queries[j]]
-    #             scores += [rel_scores[j]]
-    #         except: 
-    #             offset = int(j % len(queries))
-    #             texts_tgt += [queries[offset]]
-    #             scores += [rel_scores[offset]]
-    #
-    #         printed_score = round(scores[-1]*100)
-    #         texts_src += [self.prefix.format(printed_score, passage)]
-    #
-    #     return texts_src, texts_tgt, scores
-
     def prepare_input(self, passage, queries, rel_scores, m=2, k=1):
         assert m >= k, f'm={m} is not larger than k={k}'
         # assert m <= len(queries), f'm needs to be smaller than {len(queries)}'
@@ -187,6 +166,61 @@ class DataCollatorForPromptQG(DataCollatorForBaseline):
         else:
             inputs = super().__call__(features, False)
             inputs['attention_mask'] = self._expand(inputs['attention_mask'])
+            return inputs
+
+    def _expand(self, mask):
+        additional_mask = torch.ones((mask.size(0), self.prompt_length))
+        return torch.cat([additional_mask, mask], -1)
+
+@dataclass
+class DataCollatorForPromptQG_test(DataCollatorForBaseline):
+    prompt_length: int = 0
+    m_negatives: int = 2
+    m_positives: int = 2
+    random: bool = False
+    k: int = 1
+    decoder_start_token_id: int = 0
+    pad_token_id: int = 0
+    corrupt_token_id: int = 0
+    random_corrupt_rate: Optional[float] = None
+
+    # this is clone from 'https://github.com/huggingface/transformers/blob/v4.28.1/src/transformers/models/t5/modeling_t5.py#L1523'
+    def _random_and_shift_right(self, input_ids, rel_labels):
+        decoder_start_token_id = self.decoder_start_token_id
+        pad_token_id = self.pad_token_id
+        corrupt_token_id = self.corrupt_token_id
+
+        # random masking
+        mask = torch.empty(input_ids.shape).bernoulli(1-self.random_corrupt_rate).bool()
+        mask[(rel_labels == 1), :] = 1 # positive would not be masked
+        mask[:, 0] = 1 # the first token would not be masked
+
+        # new
+        shifted_input_ids = input_ids.new_zeros(input_ids.shape)
+        shifted_input_ids[..., 1:] = input_ids[..., :-1].clone()
+        shifted_input_ids[..., 0] = decoder_start_token_id
+        shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
+        shifted_input_ids.masked_fill_(~mask, corrupt_token_id)
+
+        return shifted_input_ids
+
+    def __call__(self, 
+                 features: List[Dict[str, Any]], 
+                 is_eval: Optional[bool] = False) -> Dict[str, Any]:
+
+        if is_eval:
+            inputs, passage = super().__call__(features, True)
+            inputs['attention_mask'] = self._expand(inputs['attention_mask'])
+            return inputs, passage
+        else:
+            inputs = super().__call__(features, False)
+            inputs['attention_mask'] = self._expand(inputs['attention_mask'])
+            # random mask the decoder input ids
+            if self.random_corrupt_rate:
+                inputs['decoder_input_ids'] = self._random_and_shift_right(
+                        input_ids=inputs['labels'],
+                        rel_labels=inputs['rel_labels']
+                )
             return inputs
 
     def _expand(self, mask):

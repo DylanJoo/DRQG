@@ -91,7 +91,6 @@ class TrainerForRelQG(TrainerForQG):
         labels_mask = inputs.pop('decoder_attention_mask')
         labels_mask_reverse = self.reverse_positions(labels_mask)
         labels = inputs.get("labels").to(self.args.device)
-        labels_reverse = self.reverse_positions(labels)
         training_steps = copy.deepcopy(self.state.global_step)
         prompt_length = model.prompt_length
 
@@ -102,7 +101,7 @@ class TrainerForRelQG(TrainerForQG):
         L = lm_logits.shape[1]
 
         loss_gen = gen_mle_loss(lm_logits, labels, rel_labels, False)
-        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']
+        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']  # [IMPORTANT]
         train_logs = f"\nMax LE: (pos) {loss_gen_pos.mean()/L} + (neg) {loss_gen_neg.mean()/L}"
         loss = 0.5 * ( loss_gen_pos.mean()/L + loss_gen_neg.mean()/L )
 
@@ -113,6 +112,7 @@ class TrainerForRelQG(TrainerForQG):
                 hidden_states=outputs.encoder_hidden_states,
                 attentions=outputs.encoder_attentions
         )
+        labels_reverse = self.reverse_positions(labels)
         outputs_reverse = model(
                 decoder_input_ids=model._shift_right(labels_reverse),
                 encoder_outputs=encoder_outputs,
@@ -146,7 +146,10 @@ class TrainerForRelQG(TrainerForQG):
         #### (3.2) margin gap with multi-vecor similarity
         if self.args.enable_margin_gap_multivec:
             loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
-            loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
+            # loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
+            # gap_pos = loss_gen_pos-loss_gen_neg_from_pos
+            # gap_neg = loss_gen_neg-loss_gen_pos_from_neg
+            loss_gen_neg_from_pos, loss_gen_pos_from_neg = loss_gen['pos'], loss_gen['neg']
             gap_pos = loss_gen_pos-loss_gen_neg_from_pos
             gap_neg = loss_gen_neg-loss_gen_pos_from_neg
 
@@ -161,7 +164,7 @@ class TrainerForRelQG(TrainerForQG):
             )
             gamma = self.args.gamma
             loss_gap_pos = torch.clamp(gamma*sim['pos']+gap_pos, min=0).mean()
-            loss_gap_neg = torch.clamp(gamma*sim['neg']+gap_neg, min=0).mean()
+            loss_gap_neg = torch.clamp(gamma*sim['neg']+gap_neg, min=0).mean()  #[IMPORTANT]
 
             train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
@@ -169,11 +172,11 @@ class TrainerForRelQG(TrainerForQG):
 
         ## Maximize discripancy 
         ### (x) Cosine similarity 
-        loss_sim = cosine_sim_loss(
-                model.encoder.relevant_prompt, 
-                model.encoder.irrelevant_prompt
-        ).detach().cpu()
-        train_logs += f"\nCosineSim: {loss_sim}"
+        # loss_sim = cosine_sim_loss(
+        #         model.encoder.relevant_prompt, 
+        #         model.encoder.irrelevant_prompt
+        # ).detach().cpu()
+        # train_logs += f"\nCosineSim: {loss_sim}"
 
         ### (4) In-batch similarity
         if self.args.enable_similarity_loss == 'inbatch':
@@ -181,7 +184,7 @@ class TrainerForRelQG(TrainerForQG):
             loss_sim = inbatch_cont_sim_loss(
                     sequence_hidden_states, 
                     self._train_batch_size,
-                    reduction=False,
+                    reduction=True,
                     temperature=self.args.tau,
                     document_wise=self.args.document_wise_contrastive,
                     relevance_wise=self.args.relevance_wise_contrastive
@@ -189,7 +192,7 @@ class TrainerForRelQG(TrainerForQG):
             train_logs += f"\nInbatchSim: {loss_sim.mean()}"
             loss += loss_sim.mean()
 
-        ## KL regularization
+        ## (5) KL regularization (so far, deprecated)
         if self.args.enable_vae_loss:
             loss_kl = kl_loss(model.vae_logv, model.vae_mean)
             weight = kl_weight(annealing_fn='logistic', 

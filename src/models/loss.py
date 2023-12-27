@@ -65,7 +65,7 @@ def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, mea
             logits_hat[seq_labels==1], 
             mask_hat[seq_labels==1],
             ngrams
-    )[m]
+    )[m].detach()
 
     loss_f1_neg = greedy_cos_idf(
             logits_bar[seq_labels!=1], 
@@ -73,7 +73,7 @@ def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, mea
             logits_hat[seq_labels!=1], 
             mask_hat[seq_labels!=1],
             ngrams
-    )[m]
+    )[m].detach()
 
     return {'pos': loss_f1_pos, 'neg': loss_f1_neg}
 
@@ -142,7 +142,7 @@ def inbatch_cont_sim_loss(
     relevance_wise=False
 ):
     device = hidden_states.device
-    BN, L, H = hidden_states.shape
+    BNM, L, H = hidden_states.shape
     if (hidden_states.size(1) != 1) or (len(hidden_states.shape)>2):
         hidden_state = hidden_states.mean(1)
     else:
@@ -151,51 +151,32 @@ def inbatch_cont_sim_loss(
     if norm:
         hidden_state = F.normalize(hidden_state, p=2, dim=-1)
 
-    assert (document_wise and relevance_wise) is False, 'cannot specify both'
-    if document_wise:
+    loss = 0
+    loss_fct = CrossEntropyLoss(reduction='none')
+
+    if document_wise: # document-wise (batch)
         # indoc: B N H x B H N
-        hidden_state = hidden_state.view(bs, BN//bs, H) / temperature
+        hidden_state = hidden_state.view(bs, BNM//bs, H) / temperature
         inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
-        inbatch_scores = inbatch_scores.view(-1, BN//bs)
-        inbatch_labels = torch.arange(0, BN//bs, device=device).repeat(bs)
-    elif relevance_wise:
+        inbatch_scores = inbatch_scores.view(-1, BNM//bs)
+        inbatch_labels = torch.arange(0, BNM//bs, device=device).repeat(bs)
+        loss += loss_fct(inbatch_scores, inbatch_labels).mean()
+    if relevance_wise: # query-wise 
         # indoc: B N H x B H N --> N B H x N H B
-        hidden_state = hidden_state.view(bs, BN//bs, H) / temperature
+        hidden_state = hidden_state.view(bs, BNM//bs, H) / temperature
         hidden_state = hidden_state.permute(1, 0, 2)
         inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
         inbatch_scores = inbatch_scores.view(-1, bs)
-        inbatch_labels = torch.arange(0, bs, device=device).repeat(BN//bs)
-    else:
-        # inbatch: BN H x H BN
+        inbatch_labels = torch.arange(0, bs, device=device).repeat(BNM//bs)
+        loss += loss_fct(inbatch_scores, inbatch_labels).mean()
+    if (document_wise is False) and (relevance_wise is False):
+        # inbatch: BNM H x H BNM
         hidden_state = hidden_state.view(-1, H) / temperature
         inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
-        inbatch_labels = torch.arange(0, BN, device=device)
+        inbatch_labels = torch.arange(0, BNM, device=device)
+        loss += loss_fct(inbatch_scores, inbatch_labels).mean()
 
-    loss_fct = CrossEntropyLoss(reduction='none')
-
-    if reduction:
-        return loss_fct(inbatch_scores, inbatch_labels).mean()
-    else:
-        return loss_fct(inbatch_scores, inbatch_labels)
-
-def encoder_outputs_kl_loss(hidden_states, clf_scores):
-    loss_fct = KLDivLoss(reduction='sum')
-    logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
-    target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
-    loss = loss_fct(logp, target)
-    return loss / clf_scores.size(0)
-
-def kl_loss(logv1, mean1, logv2=None, mean2=None, reduction='sum'): 
-    # [batch_size(64), hidden_size(768)]
-    if logv2 is None and mean2 is None:
-        return -0.5 * torch.sum(1 + logv1 - mean1.pow(2) - logv1.exp())
-
-    exponential = 1 + (logv1-logv2) - (mean1-mean2).pow(2)/logv2.exp() - (logv1-logv2).exp()
-    loss = -0.5 * torch.sum(exponential, tuple(range(1, len(exponential.shape))))
-    if reduction:
-        return loss.mean()
-    else:
-        return loss
+    return loss
 
 def kl_weight(annealing_fn, steps, k=None, x0=None, n_total_iter=None, n_cycle=None):
     if steps is None:
@@ -213,13 +194,24 @@ def frange_cycle_linear(n_total, curr, start=0.0, stop=1.0, n_cycle=4, ratio=1.0
     step = (stop-start)/(period*ratio) # linear schedule
     return min(stop, start + step * (curr % period))
 
-# def ql_kl_loss(clf_logits, clf_score):
-#     loss_fct = KLDivLoss(reduction='sum')
-#     logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
-#     target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
-#     loss = loss_fct(logp, target)
-#     return loss / clf_scores.size(0)
+def ql_kl_loss(clf_logits, clf_score):
+    loss_fct = KLDivLoss(reduction='sum')
+    logp = F.log_softmax(clf_logits.view(-1, 2), -1) # BL 2
+    target = torch.cat([(1-clf_scores).view(-1, 1), clf_scores.view(-1, 1)], -1)
+    loss = loss_fct(logp, target)
+    return loss / clf_scores.size(0)
 
+def kl_loss(logv1, mean1, logv2=None, mean2=None, reduction='sum'): 
+    # [batch_size(64), hidden_size(768)]
+    if logv2 is None and mean2 is None:
+        return -0.5 * torch.sum(1 + logv1 - mean1.pow(2) - logv1.exp())
+
+    exponential = 1 + (logv1-logv2) - (mean1-mean2).pow(2)/logv2.exp() - (logv1-logv2).exp()
+    loss = -0.5 * torch.sum(exponential, tuple(range(1, len(exponential.shape))))
+    if reduction:
+        return loss.mean()
+    else:
+        return loss
 
 # def indoc_kld_loss(hidden_states, hidden_states_src=None, bs=1):
 #     device = hidden_states.device

@@ -72,11 +72,11 @@ class VAE(nn.Module):
             r = torch.randn([BNM, self.latent_size], device=hidden_states.device)
             z = r * std + mean
             hidden_states_r = self.decoder(z)
-            return (hidden_states_r, 
+            return (hidden_states_r[:, None, :],
                     mean.view(-1, self.latent_size), 
                     logv.view(-1, self.latent_size))
         else:
             z = mean
             hidden_states_r = self.decoder(z)
-            return (hidden_states_r,)
+            return (hidden_states_r[:, None, :],)
 

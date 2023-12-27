@@ -40,7 +40,7 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
-    from models.promptRelQG import SoftRelPromptFlanT5
+    from models import SoftRelPromptFlanT5
     model = SoftRelPromptFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
             model_args.instruction_prompt_idx,
@@ -66,7 +66,7 @@ def main():
 
     # Data
     # Datacollator
-    from data import DataCollatorForPromptQG
+    from data import DataCollatorForPromptQG_test as DataCollatorForPromptQG
     used_scores = list(range(0, 101, 101//10))
     used_scores = [s*0.01 for s in used_scores]
     data_collator = DataCollatorForPromptQG(
@@ -80,6 +80,10 @@ def main():
             prefix=model_args.baseline_prefix,
             scores=used_scores,
             prompt_length=prompt_length,
+            decoder_start_token_id=0,
+            pad_token_id=0,
+            corrupt_token_id=32099,
+            random_corrupt_rate=data_args.random_corrupt_rate
     )
 
     # Data

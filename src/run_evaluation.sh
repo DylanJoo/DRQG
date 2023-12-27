@@ -10,7 +10,7 @@ for file in results/*$1*.jsonl;do
         --regressor_name cross-encoder/ms-marco-MiniLM-L-6-v2 \
         --reranker_name $reranker_hf \
         --device cuda:0 \
-        --batch_size 2 >> eval.2.log
+        --batch_size 2 >> eval.1.log
 done
 
 # touch eval.msmarco.log
