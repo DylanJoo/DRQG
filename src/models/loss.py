@@ -34,28 +34,28 @@ def gen_mle_loss(lm_logits, labels, seq_labels, average=True):
 def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
     lm_prob = torch.clamp( (1-lm_logits.softmax(-1)), min=1e-5)
     # lm_prob = torch.clamp( (-lm_logits).softmax(-1), min=1e-5 )
-    lm_likelihood = lm_prob.log()
+    lm_logits = lm_prob.log()
     loss_gen_pos, loss_gen_neg = 0, 0
     loss_fct = NLLLoss(reduction='none')
     B, L, V = lm_logits.shape
 
     if len(labels[seq_labels==1]) > 0:
-        loss_gen_pos_from_neg = loss_fct(
-                lm_likelihood[seq_labels==1].view(-1, V), 
+        loss_gen_pos = loss_fct(
+                lm_logits[seq_labels==1].view(-1, V), 
                 labels[seq_labels==1].view(-1)
         ).view(-1, L).sum(1)
     if len(labels[seq_labels<1]) > 0:
-        loss_gen_neg_from_pos = loss_fct(
-                lm_likelihood[seq_labels<1].view(-1, V), 
+        loss_gen_neg = loss_fct(
+                lm_logits[seq_labels<1].view(-1, V), 
                 labels[seq_labels<1].view(-1)
         ).view(-1, L).sum(1)
 
     if average:
-        return {'neg2pos': loss_gen_pos_from_neg.mean()/L, 
-                'pos2neg': loss_gen_neg_from_pos.mean()/L}
+        return {'pos': loss_gen_pos.mean()/L, 
+                'neg': loss_gen_neg.mean()/L}
     else:
-        return {'neg2pos': loss_gen_pos_from_neg, 
-                'pos2neg': loss_gen_neg_from_pos}
+        return {'pos': loss_gen_pos, 
+                'neg': loss_gen_neg}
 
 def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, measurement='f1', ngrams=[1]):
     m = {'precision': 0, 'recall': 1, 'f1': 2}[measurement]

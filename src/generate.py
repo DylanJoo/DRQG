@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_jsonl")
     parser.add_argument("--device", default='cuda', type=str)
     parser.add_argument("--num_relevance_scores", type=int)
+    parser.add_argument("--activate_prompt_attention", type=int, default=1)
     # generation config
     parser.add_argument("--batch_size", default=2, type=int)
     parser.add_argument("--num_beams", default=1, type=int)
@@ -46,6 +47,11 @@ if __name__ == "__main__":
     )
     generator.model.to(args.device)
     generator.model.eval()
+
+    # READ kwargs
+    generator.model.read_kwargs = {
+            'activate_prompt_attention': bool(args.activate_prompt_attention)
+    }
 
     # Data
     ## [NOTE] preprocess here.

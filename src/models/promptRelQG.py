@@ -13,7 +13,8 @@ class SoftRelPromptFlanT5(FlanT5):
     def __init__(self, config: T5Config, 
                  instruction_prompt_idx: Optional[List[int]] = None, 
                  relevant_prompt_idx: Optional[List[int]] = None,
-                 irrelevant_prompt_idx: Optional[List[int]] = None):
+                 irrelevant_prompt_idx: Optional[List[int]] = None, 
+                 read_kwargs: Optional[Dict] = None):
 
         super().__init__(config)
         print('Used instruction prompt:', instruction_prompt_idx)
@@ -35,7 +36,7 @@ class SoftRelPromptFlanT5(FlanT5):
                 relevant_idx=relevant_prompt_idx,
                 irrelevant_idx=irrelevant_prompt_idx,
                 embed_tokens=self.shared,
-                config=encoder_config, 
+                config=encoder_config,
         )
 
         decoder_config = copy.deepcopy(config)
@@ -52,6 +53,9 @@ class SoftRelPromptFlanT5(FlanT5):
         # Model parallel
         self.model_parallel = False
         self.device_map = None
+
+        # Read kwargs
+        self.read_kwargs = read_kwargs
 
     # [TIPS]
     ## when generation, `input_ids` and `attention_mask` are not required
@@ -71,6 +75,11 @@ class SoftRelPromptFlanT5(FlanT5):
                     rel_scores=rel_scores,
                     **kwargs
             )
+
+        # discard the prompts
+        if self.read_kwargs['activate_prompt_attention'] is False:
+            attention_mask[:, :sum(self.prompt_length)] = 0
+
         return super().forward(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -108,7 +117,6 @@ class SoftRelPromptT5Stack(T5Stack):
         self.irrelevant_prompt = nn.Parameter(torch.rand(
             len(irrelevant_idx), embed_tokens.embedding_dim
         ))
-
 
     def init_from_vocab(self, positive=True, negative=True):
         self.instruction_prompt = nn.Parameter(
@@ -157,7 +165,7 @@ class SoftRelPromptT5Stack(T5Stack):
             prompts += [relevant_prompts]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
-        return super().forward(
+        outputs = super().forward(
                 input_ids=None,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
@@ -166,3 +174,17 @@ class SoftRelPromptT5Stack(T5Stack):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict
         )
+        return outputs
+
+    # def _weighted_attention(self, last_hidden_state):
+    #     prompt_length = len(self.instruction_idx)+len(self.relevant_idx)
+    #     attn_input = self.prompted_attention(last_hidden_state[:, prompt_length:])
+    #     print(attn_input.squeeze(-1).mean(-1))
+    #     attn_prompts = torch.ones(
+    #             (last_hidden_state.size(0), prompt_length, 1)
+    #     ).to(last_hidden_state.device)
+    #
+    #     last_hidden_state = last_hidden_state * \
+    #             torch.cat([attn_prompts, attn_input], dim=1)
+    #
+    #     return last_hidden_state

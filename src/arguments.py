@@ -43,9 +43,6 @@ class ModelArgs(Configs):
     irrelevant_prompt: Optional[str] = field(default=None)
     irrelevant_prompt_idx: Optional[str] = field(default=None)
 
-    # Peft learning
-    n_instruction_prompt: int = field(default=20)
-
     # Controller
     head_size: int = field(default=64)
     pooling: Optional[str] = field(default='mean')
@@ -57,6 +54,7 @@ class ModelArgs(Configs):
     # annealing_fn: str = field(default='cyclic')
     # n_total_iter: Optional[int] = field(default=10000)
     # n_cycle: Optional[int] = field(default=10)
+    activate_prompt_attention: bool = field(default=True)
 
 @dataclass
 class DataArgs(Configs):
@@ -69,7 +67,7 @@ class DataArgs(Configs):
     max_q_length: int = field(default=16)
     m_negative_per_example: int = field(default=1)
     m_positive_per_example: int = field(default=1)
-    random_corrupt_rate: Optional[float] = field(default=None)
+    random_corrupt_rate: Optional[float] = field(default=0.0)
 
 @dataclass
 class TrainingArgs(Configs, Seq2SeqTrainingArguments):
@@ -93,7 +91,6 @@ class TrainingArgs(Configs, Seq2SeqTrainingArguments):
     overwrite_output_dir: bool = field(default=True)
     # Customized arguments
     remove_unused_columns: bool = field(default=False)
-    prefix_tuning: bool = field(default=False)
     random_init: bool = field(default=False)
     # Unliklihood
     enable_unlikelihood: bool = field(default=False)

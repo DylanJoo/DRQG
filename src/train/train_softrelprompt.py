@@ -40,12 +40,17 @@ def main():
     prepare_prompt_idx(model_args, tokenizer)
 
     # Model
+    ## testing kwargs
+    read_kwargs = {
+            'activate_prompt_attention': model_args.activate_prompt_attention
+    }
     from models import SoftRelPromptFlanT5
     model = SoftRelPromptFlanT5.from_pretrained(
             hfmodel_args.model_name_or_path,
             model_args.instruction_prompt_idx,
             model_args.relevant_prompt_idx,
-            model_args.irrelevant_prompt_idx
+            model_args.irrelevant_prompt_idx,
+            read_kwargs=read_kwargs
     )
     prompt_length = len(model_args.instruction_prompt_idx) 
     prompt_length += len(model_args.relevant_prompt_idx) 
@@ -66,7 +71,7 @@ def main():
 
     # Data
     # Datacollator
-    from data import DataCollatorForPromptQG_test as DataCollatorForPromptQG
+    from data import DataCollatorForPromptQG
     used_scores = list(range(0, 101, 101//10))
     used_scores = [s*0.01 for s in used_scores]
     data_collator = DataCollatorForPromptQG(

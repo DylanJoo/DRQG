@@ -43,6 +43,9 @@ class SoftPromptFlanT5(T5ForConditionalGeneration):
         self.model_parallel = False
         self.device_map = None
 
+    def add_kwargs(self, read_kwargs):
+        self.read_kwargs = read_kwargs
+
     def forward(self, 
                 input_ids=None,  
                 attention_mask=None, 
@@ -58,6 +61,11 @@ class SoftPromptFlanT5(T5ForConditionalGeneration):
                     rel_scores=rel_scores,
                     **kwargs
             )
+
+        # discard the prompts
+        if self.read_kwargs['activate_prompt_attention'] is False:
+            attention_mask[:, :sum(self.prompt_length)] = 0
+
         return super().forward(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -116,7 +124,7 @@ class SoftPromptT5Stack(T5Stack):
         prompts += [relevant_prompts]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
-        return super().forward(
+        outputs = super().forward(
                 input_ids=None,
                 attention_mask=attention_mask,
                 inputs_embeds=inputs_embeds,
@@ -125,3 +133,4 @@ class SoftPromptT5Stack(T5Stack):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict
         )
+        return outputs

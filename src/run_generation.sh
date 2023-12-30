@@ -12,9 +12,10 @@ for folder in models/checkpoint/*$1*;do
             --device cuda:0 \
             --num_relevance_scores 10 \
             --num_relevance_prompt 5 \
-            --batch_size 20 \
+            --batch_size 32 \
             --max_length 512 \
             --max_new_tokens 64 \
+            --activate_prompt_attention 0 \
             --num_beams 1
     done
 done

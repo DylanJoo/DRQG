@@ -101,7 +101,7 @@ class TrainerForRelQG(TrainerForQG):
         L = lm_logits.shape[1]
 
         loss_gen = gen_mle_loss(lm_logits, labels, rel_labels, False)
-        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']  # [IMPORTANT]
+        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']  
         train_logs = f"\nMax LE: (pos) {loss_gen_pos.mean()/L} + (neg) {loss_gen_neg.mean()/L}"
         loss = 0.5 * ( loss_gen_pos.mean()/L + loss_gen_neg.mean()/L )
 
@@ -116,14 +116,15 @@ class TrainerForRelQG(TrainerForQG):
         outputs_reverse = model(
                 decoder_input_ids=model._shift_right(labels_reverse),
                 encoder_outputs=encoder_outputs,
+                attention_mask=inputs['attention_mask']
         )
         lm_logits_reverse = outputs_reverse.get('logits')
 
         ### (2) text generation unlikelihood # [deprecated]
         if self.args.enable_unlikelihood:
             loss_gen = gen_mle_unloss(lm_logits_reverse, labels_reverse, rel_labels, False)
-            unloss_gen_pos, unloss_gen_neg = loss_gen['neg2pos'], loss_gen['pos2neg']
-            train_logs += f"\nMax unLE: (neg2pos) {unloss_gen_pos.mean()/L} + (pos2neg) {unloss_gen_neg.mean()/L}"
+            unloss_gen_pos, unloss_gen_neg = loss_gen['pos'], loss_gen['neg']
+            train_logs += f"\nMax unLE: (pos) {unloss_gen_pos.mean()/L} + (neg) {unloss_gen_neg.mean()/L}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
                     0.5 * (unloss_gen_pos.mean()/L + unloss_gen_neg.mean()/L )
 
@@ -131,27 +132,24 @@ class TrainerForRelQG(TrainerForQG):
         #### (3.1) margin gap with sequence probs
         if self.args.enable_margin_gap_prob:
             loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
-            loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
+            loss_gen_neg_from_pos, loss_gen_pos_from_neg = loss_gen['pos'], loss_gen['neg']
             gap_pos = loss_gen_pos-loss_gen_neg_from_pos
             gap_neg = loss_gen_neg-loss_gen_pos_from_neg
 
-            beta = 0.1 
-            loss_gap_pos = torch.clamp(beta+gap_pos, min=0).mean()
-            loss_gap_neg = torch.clamp(beta+gap_neg, min=0).mean()
+            gamma = self.args.gamma
+            loss_gap_pos = torch.clamp(gamma+gap_pos, min=0)
+            loss_gap_neg = torch.clamp(gamma+gap_neg, min=0)
 
-            train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
+            train_logs += f"\nCalibrate-v1: (pos) {loss_gap_pos.mean()/L} + (neg) {loss_gap_neg.mean()/L}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
-                    0.5 * (loss_gap_pos + loss_gap_neg) 
+                    0.5 * (loss_gap_pos.mean()/L + loss_gap_neg.mean()/L)
 
         #### (3.2) margin gap with multi-vecor similarity
         if self.args.enable_margin_gap_multivec:
             loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
-            # loss_gen_pos_from_neg, loss_gen_neg_from_pos = loss_gen['pos'], loss_gen['neg']
-            # gap_pos = loss_gen_pos-loss_gen_neg_from_pos
-            # gap_neg = loss_gen_neg-loss_gen_pos_from_neg
             loss_gen_neg_from_pos, loss_gen_pos_from_neg = loss_gen['pos'], loss_gen['neg']
-            gap_pos = loss_gen_pos-loss_gen_neg_from_pos
-            gap_neg = loss_gen_neg-loss_gen_pos_from_neg
+            gap_pos = loss_gen_pos-loss_gen_neg_from_pos # (B, 1)
+            gap_neg = loss_gen_neg-loss_gen_pos_from_neg # (B, 1)
 
             sim = slic_margin_loss(
                     logits_bar=lm_logits,
@@ -163,21 +161,18 @@ class TrainerForRelQG(TrainerForQG):
                     ngrams=self.args.enable_margin_gap_multivec_ngrams
             )
             gamma = self.args.gamma
-            loss_gap_pos = torch.clamp(gamma*sim['pos']+gap_pos, min=0).mean()
-            loss_gap_neg = torch.clamp(gamma*sim['neg']+gap_neg, min=0).mean()  #[IMPORTANT]
+            loss_gap_pos = torch.clamp(gamma*sim['pos']+gap_pos, min=0) # (B, 1)
+            loss_gap_neg = torch.clamp(gamma*sim['neg']+gap_neg, min=0) # (B, 1)
 
-            train_logs += f"\nGap: (pos) {loss_gap_pos} + (neg) {loss_gap_neg}"
+            train_logs += f"\nCalibrate-v2: (pos) {loss_gap_pos.mean()/L} + (neg) {loss_gap_neg.mean()/L}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
-                    0.5 * (loss_gap_pos + loss_gap_neg) 
+                    0.5 * (loss_gap_pos.mean()/L + loss_gap_neg.mean()/L) 
+
+            train_logs += f"\nCalibrate-v2: (pos from neg) {loss_gen_pos_from_neg.mean()/L}"
+            train_logs += f" + (neg from pos) {loss_gen_neg_from_pos.mean()/L}"
 
         ## Maximize discripancy 
         ### (x) Cosine similarity 
-        # loss_sim = cosine_sim_loss(
-        #         model.encoder.relevant_prompt, 
-        #         model.encoder.irrelevant_prompt
-        # ).detach().cpu()
-        # train_logs += f"\nCosineSim: {loss_sim}"
-
         ### (4) In-batch similarity
         if self.args.enable_similarity_loss == 'inbatch':
             sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
@@ -250,7 +245,7 @@ class TrainerForRelQG(TrainerForQG):
                     rel_scores=rel_scores,
                     num_beams=1
             )
-            print('============\nPassage: ', passage, '\n============')
+            print('============\nPassage: 1', passage, '\n============')
             for i, s in enumerate(self.data_collator.scores):
                 print(f"({i:<3}) >>", self.tokenizer.decode(outputs[i], skip_special_tokens=True))
         model.train()
