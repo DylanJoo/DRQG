@@ -96,10 +96,9 @@ class TrainingArgs(Configs, Seq2SeqTrainingArguments):
     enable_unlikelihood: bool = field(default=False)
 
     # Calibration (prob)
-    enable_margin_gap_prob: Optional[str] = field(default=None)
     # Calibration (BERTScore)
-    enable_margin_gap_multivec: Optional[str] = field(default=None)
-    enable_margin_gap_multivec_ngrams: Optional[List[str]] = field(default=None)
+    enable_calibration: Optional[str] = field(default=None)
+    calibration_margin_ngrams: Optional[List[str]] = field(default=None)
     gamma: Optional[float] = field(default=1.0)
 
     # In-batch encoder similarity

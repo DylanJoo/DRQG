@@ -101,7 +101,7 @@ class TrainerForRelQG(TrainerForQG):
         L = lm_logits.shape[1]
 
         loss_gen = gen_mle_loss(lm_logits, labels, rel_labels, False)
-        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']  
+        loss_gen_pos, loss_gen_neg = loss_gen['pos'], loss_gen['neg']
         train_logs = f"\nMax LE: (pos) {loss_gen_pos.mean()/L} + (neg) {loss_gen_neg.mean()/L}"
         loss = 0.5 * ( loss_gen_pos.mean()/L + loss_gen_neg.mean()/L )
 
@@ -129,8 +129,9 @@ class TrainerForRelQG(TrainerForQG):
                     0.5 * (unloss_gen_pos.mean()/L + unloss_gen_neg.mean()/L )
 
         ### (3) calibration margin loss
-        #### (3.1) margin gap with sequence probs
-        if self.args.enable_margin_gap_prob:
+        #### (3.1) rank with sequence probs
+        # if self.args.enable_margin_gap_prob:
+        if self.args.enable_calibration == 'rank':
             loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
             loss_gen_neg_from_pos, loss_gen_pos_from_neg = loss_gen['pos'], loss_gen['neg']
             gap_pos = loss_gen_pos-loss_gen_neg_from_pos
@@ -145,7 +146,7 @@ class TrainerForRelQG(TrainerForQG):
                     0.5 * (loss_gap_pos.mean()/L + loss_gap_neg.mean()/L)
 
         #### (3.2) margin gap with multi-vecor similarity
-        if self.args.enable_margin_gap_multivec:
+        if self.args.enable_calibration == 'margin': 
             loss_gen = gen_mle_loss(lm_logits_reverse, labels_reverse, rel_labels, False)
             loss_gen_neg_from_pos, loss_gen_pos_from_neg = loss_gen['pos'], loss_gen['neg']
             gap_pos = loss_gen_pos-loss_gen_neg_from_pos # (B, 1)
@@ -157,9 +158,9 @@ class TrainerForRelQG(TrainerForQG):
                     mask_bar=labels_mask,
                     mask_hat=labels_mask_reverse,
                     seq_labels=rel_labels,
-                    measurement=self.args.enable_margin_gap_multivec,
-                    ngrams=self.args.enable_margin_gap_multivec_ngrams
-            )
+                    measurement='f1',
+                    ngrams=self.args.calibration_margin_ngrams
+            )# we have also precision and recall
             gamma = self.args.gamma
             loss_gap_pos = torch.clamp(gamma*sim['pos']+gap_pos, min=0) # (B, 1)
             loss_gap_neg = torch.clamp(gamma*sim['neg']+gap_neg, min=0) # (B, 1)
@@ -167,7 +168,6 @@ class TrainerForRelQG(TrainerForQG):
             train_logs += f"\nCalibrate-v2: (pos) {loss_gap_pos.mean()/L} + (neg) {loss_gap_neg.mean()/L}"
             loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
                     0.5 * (loss_gap_pos.mean()/L + loss_gap_neg.mean()/L) 
-
             train_logs += f"\nCalibrate-v2: (pos from neg) {loss_gen_pos_from_neg.mean()/L}"
             train_logs += f" + (neg from pos) {loss_gen_neg_from_pos.mean()/L}"
 
@@ -175,11 +175,12 @@ class TrainerForRelQG(TrainerForQG):
         ### (x) Cosine similarity 
         ### (4) In-batch similarity
         if self.args.enable_similarity_loss == 'inbatch':
-            sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
+            # sequence_hidden_states = outputs.get('encoder_last_hidden_state')[:, sum(prompt_length):]
+            sequence_hidden_states = outputs.get('encoder_last_hidden_state')
             loss_sim = inbatch_cont_sim_loss(
                     sequence_hidden_states, 
                     self._train_batch_size,
-                    reduction=True,
+                    reduction=False,
                     temperature=self.args.tau,
                     document_wise=self.args.document_wise_contrastive,
                     relevance_wise=self.args.relevance_wise_contrastive
@@ -245,7 +246,7 @@ class TrainerForRelQG(TrainerForQG):
                     rel_scores=rel_scores,
                     num_beams=1
             )
-            print('============\nPassage: 1', passage, '\n============')
+            print('============\nPassage: ', passage, '\n============')
             for i, s in enumerate(self.data_collator.scores):
                 print(f"({i:<3}) >>", self.tokenizer.decode(outputs[i], skip_special_tokens=True))
         model.train()

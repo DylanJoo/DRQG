@@ -1,7 +1,7 @@
 mkdir -p /workspace/results
 
 # scidocs
-for folder in models/checkpoint/*$1*;do
+for folder in models/checkpoint/*$1*/;do
     name=${folder##*/}
     for ckpt in 20000;do
         python3 generate.py \
@@ -15,7 +15,7 @@ for folder in models/checkpoint/*$1*;do
             --batch_size 32 \
             --max_length 512 \
             --max_new_tokens 64 \
-            --activate_prompt_attention 0 \
+            --activate_prompt_attention 1 \
             --num_beams 1
     done
 done
