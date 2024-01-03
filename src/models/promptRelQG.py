@@ -65,6 +65,7 @@ class SoftRelPromptFlanT5(FlanT5):
                 attention_mask=None, 
                 rel_scores=None, 
                 encoder_outputs=None, 
+                output_hidden_states=True,
                 return_loss=True,
                 **kwargs):
 
@@ -84,6 +85,7 @@ class SoftRelPromptFlanT5(FlanT5):
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 encoder_outputs=encoder_outputs,
+                output_hidden_states=output_hidden_states,
                 **kwargs
         )
 

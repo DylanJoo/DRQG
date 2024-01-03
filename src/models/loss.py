@@ -57,20 +57,20 @@ def gen_mle_unloss(lm_logits, labels, seq_labels, average=True):
         return {'pos': loss_gen_pos, 
                 'neg': loss_gen_neg}
 
-def slic_margin_loss(logits_bar, logits_hat, mask_bar, mask_hat, seq_labels, measurement='f1', ngrams=[1]):
+def slic_margin_loss(embeds_bar, embeds_hat, mask_bar, mask_hat, seq_labels, measurement='f1', ngrams=[1]):
     m = {'precision': 0, 'recall': 1, 'f1': 2}[measurement]
     loss_f1_pos = greedy_cos_idf(
-            logits_bar[seq_labels==1], 
+            embeds_bar[seq_labels==1], 
             mask_bar[seq_labels==1],
-            logits_hat[seq_labels==1], 
+            embeds_hat[seq_labels==1], 
             mask_hat[seq_labels==1],
             ngrams
     )[m].detach()
 
     loss_f1_neg = greedy_cos_idf(
-            logits_bar[seq_labels!=1], 
+            embeds_bar[seq_labels!=1], 
             mask_bar[seq_labels!=1],
-            logits_hat[seq_labels!=1], 
+            embeds_hat[seq_labels!=1], 
             mask_hat[seq_labels!=1],
             ngrams
     )[m].detach()
@@ -132,8 +132,19 @@ def cosine_sim_loss(x, y):
     target = torch.tensor([-1]).to(x.device)
     return loss_fct(x, y, target).mean()
 
-def inbatch_cont_sim_loss(
+def average_pooling(hidden_states, attention_mask=None):
+    if (hidden_states.size(1) != 1) or (len(hidden_states.shape)>2):
+        if attention_mask is not None:
+            # print(hidden_states.shape)
+            # print(attention_mask.shape)
+            hidden_state = torch.mean(hidden_states * attention_mask.unsqueeze(-1), dim=1)
+        else:
+            hidden_state = torch.mean(hidden_states, dim=1)
+    return hidden_state
+
+def inbatch_cont_dd_sim_loss(
     hidden_states, 
+    attention_mask=None, 
     bs=1, 
     norm=False, 
     reduction=None, 
@@ -143,14 +154,9 @@ def inbatch_cont_sim_loss(
 ):
     device = hidden_states.device
     BNM, L, H = hidden_states.shape
-    if (hidden_states.size(1) != 1) or (len(hidden_states.shape)>2):
-        hidden_state = hidden_states.mean(1)
-    else:
-        hidden_state = hidden_states
-
+    hidden_state = average_pooling(hidden_states, attention_mask)
     if norm:
         hidden_state = F.normalize(hidden_state, p=2, dim=-1)
-
     loss = 0
     loss_fct = CrossEntropyLoss(reduction='none')
 
@@ -173,6 +179,57 @@ def inbatch_cont_sim_loss(
         # inbatch: BNM H x H BNM
         hidden_state = hidden_state.view(-1, H) / temperature
         inbatch_scores = hidden_state @ hidden_state.transpose(-1, -2)
+        inbatch_labels = torch.arange(0, BNM, device=device)
+        loss += loss_fct(inbatch_scores, inbatch_labels).mean()
+
+    return loss
+
+def inbatch_cont_qd_sim_loss(
+    hidden_states, 
+    q_hidden_states, 
+    attention_mask=None,
+    q_attention_mask=None,
+    bs=1, 
+    norm=False, 
+    reduction=None, 
+    temperature=1,
+    document_wise=False,
+    relevance_wise=False
+):
+    device = hidden_states.device
+    BNM, L, H = hidden_states.shape
+    hidden_state = average_pooling(hidden_states, attention_mask)
+    q_hidden_state = average_pooling(q_hidden_states, q_attention_mask)
+    if norm:
+        hidden_state = F.normalize(hidden_state, p=2, dim=-1)
+        q_hidden_state = F.normalize(q_hidden_state, p=2, dim=-1)
+
+    loss = 0
+    loss_fct = CrossEntropyLoss(reduction='none')
+
+    if document_wise: # document-wise (batch)
+        # indoc: B N H x B H N
+        hidden_state = hidden_state.view(bs, BNM//bs, H) / temperature
+        q_hidden_state = q_hidden_state.view(bs, BNM//bs, H) / temperature
+        inbatch_scores = hidden_state @ q_hidden_state.transpose(-1, -2)
+        inbatch_scores = inbatch_scores.view(-1, BNM//bs)
+        inbatch_labels = torch.arange(0, BNM//bs, device=device).repeat(bs)
+        loss += loss_fct(inbatch_scores, inbatch_labels).mean()
+    if relevance_wise: # query-wise 
+        # indoc: B N H x B H N --> N B H x N H B
+        hidden_state = hidden_state.view(bs, BNM//bs, H) / temperature
+        q_hidden_state = q_hidden_state.view(bs, BNM//bs, H) / temperature
+        hidden_state = hidden_state.permute(1, 0, 2)
+        q_hidden_state = q_hidden_state.permute(1, 0, 2)
+        inbatch_scores = hidden_state @ q_hidden_state.transpose(-1, -2)
+        inbatch_scores = inbatch_scores.view(-1, bs)
+        inbatch_labels = torch.arange(0, bs, device=device).repeat(BNM//bs)
+        loss += loss_fct(inbatch_scores, inbatch_labels).mean()
+    if (document_wise is False) and (relevance_wise is False):
+        # inbatch: BNM H x H BNM
+        hidden_state = hidden_state.view(-1, H) / temperature
+        q_hidden_state = q_hidden_state.view(-1, H) / temperature
+        inbatch_scores = hidden_state @ q_hidden_state.transpose(-1, -2)
         inbatch_labels = torch.arange(0, BNM, device=device)
         loss += loss_fct(inbatch_scores, inbatch_labels).mean()
 
