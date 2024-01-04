@@ -2,7 +2,6 @@ import json
 import argparse
 import numpy as np
 from tqdm import tqdm
-from transformers import AutoConfig, AutoTokenizer
 from evaluation import READEval
 from datasets import Dataset
 

@@ -7,7 +7,6 @@ import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from arguments import *
 from utils import batch_iterator
 from transformers import AutoConfig, AutoTokenizer
 from evaluation import READGen
@@ -60,20 +59,16 @@ if __name__ == "__main__":
         for line in tqdm(f):
             item = json.loads(line.strip())
 
-            # SCI-docs
-            if 'scifact' in args.corpus_jsonl:
-                title = item['title']
-                if isinstance(item['abstract'], list):
-                    abstract = " ".join(item['abstract'])
-                else:
-                    abstract = item['abstract']
-                content = title + " " + abstract
-                data.append({'doc_id': item['doc_id'], 'passage': content})
-
+            # customize each datasets here.
             # msmarco
             if 'msmarco' in args.corpus_jsonl:
                 data.append({'doc_id': '', 'passage': item['passage']})
-
+            else:
+                docid = item.get('_id')
+                title = item.get('title', "")
+                text = item.get('text', "")
+                content = title + " " + text
+                data.append({'doc_id': docid, 'passage': content})
 
     dataset = Dataset.from_list(data)
     print(dataset)
