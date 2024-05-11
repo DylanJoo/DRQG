@@ -8,7 +8,7 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy import stats
 # module
-from .encoder import GTREncoder
+from .encoder import GTREncoder, GTEEncoder
 from .readgen import READGen as generator
 # root
 from utils import batch_iterator
@@ -17,9 +17,9 @@ class READEval:
     def __init__(
         self, 
         dataset=None,
-        encoder_name='DylanJHJ/gtr-t5-base',
-        regressor_name='cross-encoder/ms-marco-MiniLM-L-6-v2',
-        reranker_name='castorini/monot5-large-msmarco-10k',
+        encoder_name=None,
+        regressor_name=None,
+        reranker_name=None,
         device='cuda',
         generator=None, 
     ):
@@ -29,7 +29,10 @@ class READEval:
 
         # diversity
         if encoder_name:
-            self.encoder = GTREncoder.from_pretrained(encoder_name)
+            if 'gte' in encoder_name.lower():
+                self.encoder = GTEEncoder.from_pretrained(encoder_name)
+            else:
+                self.encoder = GTREncoder.from_pretrained(encoder_name)
             self.encoder_tokenizer = AutoTokenizer.from_pretrained(encoder_name)
             self.encoder.eval()
             self.encoder.to(device)
@@ -45,7 +48,7 @@ class READEval:
         # ranking for reranking (crossencoder)
         if reranker_name:
             self.reranker = T5ForConditionalGeneration.from_pretrained(reranker_name)
-            self.reranker_tokenizer = T5Tokenizer.from_pretrained(reranker_name)
+            self.reranker_tokenizer = AutoTokenizer.from_pretrained(reranker_name)
             self.reranker.eval()
             self.reranker.to(self.device)
 

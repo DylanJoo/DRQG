@@ -27,13 +27,11 @@ if __name__ == "__main__":
         for line in tqdm(f):
             item = json.loads(line.strip())
 
-            if isinstance(item['abstract'], list):
-                title = item['title']
-                abstract  = " ".join(item['abstract'])
-            else:
-                title = item['title']
-                abstract = item['abstract']
-            corpus[item['doc_id']] = title + " " + abstract
+            docid = str(item.get('_id'))
+            title = item.get('title', "")
+            text = item.get('text', "")
+            content = title + " " + text
+            corpus[docid] = content
 
     ## load prediction
     data = []

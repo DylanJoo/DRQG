@@ -79,7 +79,7 @@ if __name__ == "__main__":
         for batch in tqdm(data_iterator, total=len(dataset)//args.batch_size+1):
             outputs = generator.batch_generate(
                     batch['passage'],
-                    max_length=512,
+                    max_length=args.max_length,
                     max_new_tokens=args.max_new_tokens,
                     num_beams=args.num_beams,
                     do_sample=args.do_sample,
