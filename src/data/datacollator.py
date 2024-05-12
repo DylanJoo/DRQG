@@ -146,32 +146,6 @@ class DataCollatorForBaseline(DataCollatorBase):
         inputs['passage'] = features[0]['passage']
         return inputs
 
-
-# @dataclass
-# class DataCollatorForPromptQG(DataCollatorForBaseline):
-#     prompt_length: int = 0
-#     m_negatives: int = 2
-#     m_positives: int = 2
-#     random: bool = False
-#     k: int = 1
-#
-#     def __call__(self, 
-#                  features: List[Dict[str, Any]], 
-#                  is_eval: Optional[bool] = False) -> Dict[str, Any]:
-#
-#         if is_eval:
-#             inputs, passage = super().__call__(features, True)
-#             inputs['attention_mask'] = self._expand(inputs['attention_mask'])
-#             return inputs, passage
-#         else:
-#             inputs = super().__call__(features, False)
-#             inputs['attention_mask'] = self._expand(inputs['attention_mask'])
-#             return inputs
-#
-#     def _expand(self, mask):
-#         additional_mask = torch.ones((mask.size(0), self.prompt_length))
-#         return torch.cat([additional_mask, mask], -1)
-
 @dataclass
 class DataCollatorForPromptQG(DataCollatorForBaseline):
     prompt_length: int = 0
