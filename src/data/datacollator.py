@@ -20,9 +20,11 @@ class DataCollatorBase:
     max_p_length: Optional[int] = 512
     max_q_length: Optional[int] = 64
     return_tensors: str = "pt"
-    prefix: Optional[str] = "{1}"
+    prefix: Optional[str] = "{0}"
     scores: List[float] = None
     device: Optional[str] = None
+    random: bool = False
+    k: int = 1
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
 
@@ -102,7 +104,6 @@ class DataCollatorForBaseline(DataCollatorBase):
                     batch['positive'], 
                     batch['positive_score'],
                     m=self.m_positives,
-                    k=self.k
             )
             ## m negative (reverse)
             ## negative: 0.2, 0.1, 0 --> 0, 0.1, 0.2 ... 
@@ -111,11 +112,10 @@ class DataCollatorForBaseline(DataCollatorBase):
                     batch['negative'][::-1], 
                     batch['negative_score'][::-1],
                     m=self.m_negatives,
-                    k=self.k
             )
             ## change them into the same ordering
             ## since we will use the positive and negative pairwise loss
-            ## align them with [top1, bottom2] and [top2, bottom1]
+            ## align them with [top1, bottom2] and [top2, bottom1] if m=2
             src0, tgt0, score0 = src0[::-1], tgt0[::-1], score0[::-1]
             texts_src += src1 + src0
             texts_tgt += tgt1 + tgt0
@@ -191,7 +191,7 @@ class DataCollatorForPromptQG(DataCollatorForBaseline):
             inputs['attention_mask'] = self._expand(inputs['attention_mask'])
 
             # random mask the decoder input ids
-            if self.random_corrupt_rate > 0:
+            if self.random_corrupt_rate is not None:
                 inputs['decoder_input_ids'] = self._random_and_shift_right(
                         input_ids=inputs['labels'],
                         rel_labels=inputs['rel_labels']

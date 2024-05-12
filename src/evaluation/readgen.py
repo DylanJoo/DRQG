@@ -50,7 +50,7 @@ class READGen:
 
         # tokenization
         if prefix is not None:
-            scaled_relevance_scores [round(r*100) for r in self.relevance_scores]
+            scaled_relevance_scores = [round(r*100) for r in self.relevance_scores]
             text_inputs_with_rel = list(
                     itertools.product(text_inputs, scaled_relevance_scores)
             )

@@ -6,10 +6,10 @@ RESULT_DIR=/work/jhju/readqg-results
 
 for dataset in scifact arguana fiqa nfcorpus scidocs;do
 # for dataset in scifact;do
-    # decoding=_top5
-    decoding=_top10
+    decoding=greedy
+    # decoding=_top10
     # decoding=_beam3
-    mkdir -p ${RESULT_DIR}/${dataset}${decoding}/
+    mkdir -p ${RESULT_DIR}/${dataset}_${decoding}/
 
     for folder in ${MODEL_DIR}/*$1*;do
         name=${folder##*/}
@@ -20,15 +20,15 @@ for dataset in scifact arguana fiqa nfcorpus scidocs;do
                     --corpus_jsonl ~/datasets/${dataset}/corpus.jsonl \
                     --model_name  ${folder}/checkpoint-${ckpt} \
                     --tokenizer_name google/flan-t5-base \
-                    --output_jsonl ${RESULT_DIR}/${dataset}${decoding}/${name}-${ckpt}.jsonl \
+                    --output_jsonl ${RESULT_DIR}/${dataset}_${decoding}/${name}-${ckpt}.jsonl \
                     --device cuda \
                     --num_relevance_scores 10 \
-                    --num_relevance_prompt 5 \
+                    --num_relevant_prompt 1 \
                     --batch_size 32 \
                     --max_length 512 \
                     --max_new_tokens 64 \
                     --activate_prompt_attention 1 \
-                    --do_sample --top_k ${decoding##*top}
+                    --do_sample 
             done
         fi
     done

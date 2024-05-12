@@ -12,6 +12,16 @@ from arguments import *
 
 import os
 
+def prepare_prompt_idx(opt, tokenizer):
+    get_tokenized_idx = lambda x: tokenizer.encode(x, add_special_tokens=False)
+
+    if opt.instruction_prompt:
+        opt.instruction_prompt_idx = get_tokenized_idx(opt.instruction_prompt)
+    if opt.relevant_prompt:
+        opt.relevant_prompt_idx = get_tokenized_idx(opt.relevant_prompt)
+    if opt.irrelevant_prompt:
+        opt.irrelevant_prompt_idx = get_tokenized_idx(opt.irrelevant_prompt)
+
 def main():
     # Parse argument for huggingface packages
     parser = HfArgumentParser(
@@ -27,6 +37,7 @@ def main():
     # Preparation 
     # (tokenizer)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
+    prepare_prompt_idx(model_args, tokenizer)
 
     # Model
     ## [May 11] guess this is the oldest one.
@@ -41,14 +52,12 @@ def main():
     model.encoder.init_from_vocab()
 
     print('\n')
-    if training_args.prefix_tuning:
-        for name, param in model.named_parameters():
-            if 'prompt' in name:
-                param.requires_grad = True
-                print('param {} will be optimized.'.format(name))
-            else:
-                param.requires_grad = False
-    print('\n')
+    for name, param in model.named_parameters():
+        if 'prompt' in name:
+            param.requires_grad = True
+            print('param {} will be optimized.'.format(name))
+        else:
+            param.requires_grad = False
 
     ## Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
@@ -56,17 +65,17 @@ def main():
 
     # Data
     # Datacollator
-    from data import DataCollatorForBaseline
+    from data import DataCollatorForPromptQG
     used_scores = list(range(0, 101, 101//10))
     used_scores = [s*0.01 for s in used_scores]
-    data_collator = DataCollatorForBaseline(
+    data_collator = DataCollatorForPromptQG(
             tokenizer=tokenizer, 
             max_p_length=data_args.max_p_length,
-            max_q_length=data_args.max_p_length,
+            max_q_length=data_args.max_q_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
-            k=training_args.sample_random, 
             prefix=model_args.baseline_prefix,
+            prompt_length=prompt_length,
             scores=used_scores
     )
 
@@ -89,8 +98,8 @@ def main():
         dataset['test'] = None
 
     # Trainer
-    from trainers import TrainerForQG
-    trainer = TrainerForQG(
+    from trainers import TrainerBase
+    trainer = TrainerBase(
             model=model, 
             args=training_args,
             train_dataset=dataset['train'],

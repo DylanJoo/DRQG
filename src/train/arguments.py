@@ -67,7 +67,7 @@ class DataArgs(Configs):
     max_q_length: int = field(default=16)
     m_negative_per_example: int = field(default=1)
     m_positive_per_example: int = field(default=1)
-    random_corrupt_rate: Optional[float] = field(default=0.0)
+    random_corrupt_rate: Optional[float] = field(default=None)
 
 @dataclass
 class TrainingArgs(Configs, Seq2SeqTrainingArguments):

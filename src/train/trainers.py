@@ -199,20 +199,20 @@ class TrainerForRelQG(TrainerForQG):
             loss += loss_sim.mean()
 
         ### (4) In-batch similarity -- qd
-        if self.args.enable_similarity_loss == 'qd':
-            loss_sim = inbatch_cont_qd_sim_loss(
-                    d_hidden_states,
-                    q_hidden_states,
-                    d_attention_mask,
-                    q_attention_mask,
-                    bs=self._train_batch_size,
-                    reduction=False,
-                    temperature=self.args.tau,
-                    document_wise=self.args.document_wise_contrastive,
-                    relevance_wise=self.args.relevance_wise_contrastive
-            )
-            train_logs += f"\nInbatchSim: {loss_sim.mean()}"
-            loss += loss_sim.mean()
+        # if self.args.enable_similarity_loss == 'qd':
+        #     loss_sim = inbatch_cont_qd_sim_loss(
+        #             d_hidden_states,
+        #             q_hidden_states,
+        #             d_attention_mask,
+        #             q_attention_mask,
+        #             bs=self._train_batch_size,
+        #             reduction=False,
+        #             temperature=self.args.tau,
+        #             document_wise=self.args.document_wise_contrastive,
+        #             relevance_wise=self.args.relevance_wise_contrastive
+        #     )
+        #     train_logs += f"\nInbatchSim: {loss_sim.mean()}"
+        #     loss += loss_sim.mean()
 
         ## (5) KL regularization (so far, deprecated)
         # if self.args.enable_vae_loss:

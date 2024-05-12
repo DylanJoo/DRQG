@@ -77,7 +77,7 @@ def main():
     data_collator = DataCollatorForPromptQG(
             tokenizer=tokenizer, 
             max_p_length=data_args.max_p_length,
-            max_q_length=data_args.max_p_length,
+            max_q_length=data_args.max_q_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
             random=training_args.sample_random, # if random, will check topk
