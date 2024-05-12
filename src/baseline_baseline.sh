@@ -6,12 +6,12 @@ MODEL_DIR=/work/jhju/readqg-baseline
 
 for bs in 4;do
     let m=32/2/$bs
-    for k in 1 2 4;do
-        python3 train/train_softrelprompt.py \
+    for k in 4;do
+        python3 train/train_baseline.py \
             --model_name_or_path google/flan-t5-base \
             --tokenizer_name google/flan-t5-base \
             --config_name google/flan-t5-base \
-            --output_dir ${MODEL_DIR}/baseline_bs${bs}_top${k} \
+            --output_dir ${MODEL_DIR}/baseline_instruct_with_num \
             --max_p_length 128 \
             --max_q_length 16 \
             --per_device_train_batch_size $bs \
@@ -24,19 +24,18 @@ for bs in 4;do
             --save_steps 10000 \
             --train_file ${TRAIN_FILE} \
             --instruction_prompt "Generate a question for the passage with relevance label: " \
-            --relevant_prompt "true true true true true" \
-            --irrelevant_prompt "false false false false false" \
+            --baseline_prefix "{0} passage: {1}" \
             --do_train \
             --sample_random true  \
             --sample_topk $k \
             --gradient_checkpointing true \
-            --run_name prompt=5_batch=${bs}_sample=top${k} > ${MODEL_DIR}/baseline_bs${bs}_top${k}.log
+            --run_name ReadQG-baseline-predix > ${MODEL_DIR}/baseline_instruct_with_num
     done
 done
 
 # generation
 mkdir -p /workspace/results/scifact/
-for folder in ${MODEL_DIR}/*baseline*;do
+for folder in ${MODEL_DIR}/baseline_instruct_with_num*;do
     name=${folder##*/}
     for ckpt in 20000;do
         python3 generate.py \
@@ -56,7 +55,7 @@ for folder in ${MODEL_DIR}/*baseline*;do
 done
 
 # evaluation
-for file in results/scifact/*baseline*.jsonl;do
+for file in results/scifact_greedy/baseline_instruct_with_num.jsonl;do
     python3 evaluate.py \
         --corpus_jsonl ~/datasets/scifact/corpus.jsonl \
         --prediction $file \

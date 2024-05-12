@@ -25,22 +25,30 @@ def main():
                 parser.parse_args_into_dataclasses()
 
     # Preparation 
-    # tokenizer
+    # (tokenizer)
     tokenizer = AutoTokenizer.from_pretrained(hfmodel_args.tokenizer_name)
 
     # Model
-    from models import FlanT5
-    model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
+    ## [May 11] guess this is the oldest one.
+    # from models import FlanT5
+    # model = FlanT5.from_pretrained(hfmodel_args.model_name_or_path)
+    from models.promptQGBase import SoftPromptFlanT5
+    model = SoftPromptFlanT5.from_pretrained(
+            hfmodel_args.model_name_or_path,
+            model_args.instruction_prompt_idx
+    )
+    prompt_length = len(model_args.instruction_prompt_idx)
+    model.encoder.init_from_vocab()
 
-    ## Freezing
-    ### Prefix tuning (hard)
+    print('\n')
     if training_args.prefix_tuning:
         for name, param in model.named_parameters():
-            if 'shared' in name:
+            if 'prompt' in name:
                 param.requires_grad = True
                 print('param {} will be optimized.'.format(name))
             else:
                 param.requires_grad = False
+    print('\n')
 
     ## Generation config
     generation_config = GenerationConfig.from_model_config(model.config)
@@ -57,6 +65,7 @@ def main():
             max_q_length=data_args.max_p_length,
             m_negatives=data_args.m_negative_per_example,
             m_positives=data_args.m_positive_per_example,
+            k=training_args.sample_random, 
             prefix=model_args.baseline_prefix,
             scores=used_scores
     )
@@ -92,6 +101,13 @@ def main():
     results = trainer.train(
             resume_from_checkpoint=training_args.resume_from_checkpoint
     )
+
+    # output configs
+    model_args.dumps(training_args.output_dir+'/model_config.json')
+    hfmodel_args.dumps(training_args.output_dir+'/hfmodel_config.json')
+    data_args.dumps(training_args.output_dir+'/data_config.json')
+    training_args.dumps(training_args.output_dir+'/train_config.json')
+
 
     return results
 

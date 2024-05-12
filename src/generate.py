@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", default='cuda', type=str)
     parser.add_argument("--num_relevance_scores", type=int)
     parser.add_argument("--activate_prompt_attention", type=int, default=1)
+    parser.add_argument("--prefix", type=str, default=None)
     # generation config
     parser.add_argument("--batch_size", default=2, type=int)
     parser.add_argument("--num_beams", default=1, type=int)
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--do_sample", default=False, action='store_true')
     parser.add_argument("--top_k", default=None, type=int)
     parser.add_argument("--top_p", default=1.0, type=float)
-    parser.add_argument("--num_relevance_prompt", default=1, type=int)
+    parser.add_argument("--num_relevant_prompt", default=1, type=int)
 
     args = parser.parse_args()
 
@@ -42,7 +43,7 @@ if __name__ == "__main__":
             num_relevance_scores=args.num_relevance_scores,
             output_jsonl=args.output_jsonl,
             device=args.device,
-            num_relevance_prompt_idx=args.num_relevance_prompt
+            num_relevant_prompt_idx=args.num_relevant_prompt
     )
     generator.model.to(args.device)
     generator.model.eval()
@@ -80,6 +81,7 @@ if __name__ == "__main__":
             outputs = generator.batch_generate(
                     batch['passage'],
                     max_length=args.max_length,
+                    prefix=args.prefix,
                     max_new_tokens=args.max_new_tokens,
                     num_beams=args.num_beams,
                     do_sample=args.do_sample,
