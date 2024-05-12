@@ -32,7 +32,7 @@ class DataCollatorBase:
         for passage in passages:
             for score in self.scores:
                 printed_score = round(score*100)
-                texts.append(self.prefix.format(printed_score, passage))
+                texts.append(self.prefix.format(passage, printed_score))
 
         inputs = self.tokenizer(
                 texts,
@@ -70,8 +70,8 @@ class DataCollatorBase:
                 texts_tgt += [queries[offset]]
                 scores += [rel_scores[offset]]
 
-            printed_score = round(scores[-1]*100)
-            texts_src += [self.prefix.format(printed_score, passage)]
+            printed_score = round(scores[-1]*100) # round at 1 digit
+            texts_src += [self.prefix.format(passage, printed_score)]
 
         return texts_src, texts_tgt, scores
 

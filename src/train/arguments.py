@@ -29,7 +29,7 @@ class ModelArgs(Configs):
     add_classification_head: bool = field(default=False)
 
     # Baseline and hard prompt # {1} means passage
-    baseline_prefix: Optional[str] = field(default='{1}')
+    baseline_prefix: Optional[str] = field(default='{0}')
 
     # Soft prompt 
     instruction_prompt: Optional[str] = field(default=None)

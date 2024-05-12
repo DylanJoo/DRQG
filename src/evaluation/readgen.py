@@ -1,3 +1,4 @@
+import itertools
 import torch
 from typing import List, Optional, Tuple, Union, Dict, Any
 from transformers import AutoConfig, AutoTokenizer
@@ -25,8 +26,8 @@ class READGen:
                 config=AutoConfig.from_pretrained(model_path),
                 num_instruction_prompt_idx=\
                         kwargs.get('num_instruction_prompt_idx', 13),
-                num_relevance_prompt_idx=\
-                        kwargs.get('num_relevance_prompt_idx', 1)
+                num_relevant_prompt_idx=\
+                        kwargs.get('num_relevant_prompt_idx', 1)
         )
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.prompt_length = sum(self.model.prompt_length)
@@ -42,24 +43,40 @@ class READGen:
         )
         return torch.cat([additional_mask, mask], -1)
 
-    def batch_generate(self, text_inputs, **kwargs):
+    def batch_generate(self, text_inputs, prefix=None, **kwargs):
         # prepare inputs 
         M = len(text_inputs) # batch_size
         N = len(self.relevance_scores) # N
 
         # tokenization
-        inputs = self.tokenizer(
-                text_inputs, 
-                max_length=kwargs.pop('max_length', 512),
-                truncation=kwargs.pop('truncation', True),
-                padding=kwargs.pop('padding', True),
-                return_tensors='pt'
-        ).to(self.device)
-
-        input_ids = inputs['input_ids'].repeat_interleave(N, 0)
-        attn_mask = inputs['attention_mask'].repeat_interleave(N, 0)
-        rel_scores = self.relevance_scores.repeat(M)
-        attn_mask = self._expand(attn_mask)
+        if prefix is not None:
+            scaled_relevance_scores [round(r*100) for r in self.relevance_scores]
+            text_inputs_with_rel = list(
+                    itertools.product(text_inputs, scaled_relevance_scores)
+            )
+            inputs = self.tokenizer(
+                    prefix.format(text_inputs, scaled_relevance_scores), 
+                    max_length=kwargs.pop('max_length', 512),
+                    truncation=kwargs.pop('truncation', True),
+                    padding=kwargs.pop('padding', True),
+                    return_tensors='pt'
+            ).to(self.device)
+            input_ids = inputs['input_ids']
+            attn_mask = inputs['attention_mask']
+            rel_scores = self.relevance_scores.repeat(M)
+            attn_mask = self._expand(attn_mask)
+        else:
+            inputs = self.tokenizer(
+                    text_inputs, 
+                    max_length=kwargs.pop('max_length', 512),
+                    truncation=kwargs.pop('truncation', True),
+                    padding=kwargs.pop('padding', True),
+                    return_tensors='pt'
+            ).to(self.device)
+            input_ids = inputs['input_ids'].repeat_interleave(N, 0)
+            attn_mask = inputs['attention_mask'].repeat_interleave(N, 0)
+            rel_scores = self.relevance_scores.repeat(M)
+            attn_mask = self._expand(attn_mask)
 
         # generate
         output_ids = self.model.generate(
