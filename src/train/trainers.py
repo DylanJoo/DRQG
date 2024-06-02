@@ -131,12 +131,12 @@ class TrainerForRelQG(TrainerForQG):
         q_hidden_states_reverse = outputs_reverse.get('decoder_hidden_states')[-1]
 
         ### (2) text generation unlikelihood # [deprecated]
-        if self.args.enable_unlikelihood:
-            loss_gen = gen_mle_unloss(lm_logits_reverse, labels_reverse, rel_labels, False)
-            unloss_gen_pos, unloss_gen_neg = loss_gen['pos'], loss_gen['neg']
-            train_logs += f"\nMax unLE: (pos) {unloss_gen_pos.mean()/L} + (neg) {unloss_gen_neg.mean()/L}"
-            loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
-                    0.5 * (unloss_gen_pos.mean()/L + unloss_gen_neg.mean()/L )
+        # if self.args.enable_unlikelihood:
+        #     loss_gen = gen_mle_unloss(lm_logits_reverse, labels_reverse, rel_labels, False)
+        #     unloss_gen_pos, unloss_gen_neg = loss_gen['pos'], loss_gen['neg']
+        #     train_logs += f"\nMax unLE: (pos) {unloss_gen_pos.mean()/L} + (neg) {unloss_gen_neg.mean()/L}"
+        #     loss = 0.5 * (loss_gen_pos.mean()/L + loss_gen_neg.mean()/L) + \
+        #             0.5 * (unloss_gen_pos.mean()/L + unloss_gen_neg.mean()/L )
 
         ### (3) calibration margin loss
         #### (3.1) rank 
@@ -182,7 +182,6 @@ class TrainerForRelQG(TrainerForQG):
                     0.5 * (loss_gap_pos.mean()/L + loss_gap_neg.mean()/L) 
 
         ## Maximize discripancy 
-        ### (x) Cosine similarity 
         ### (4) In-batch similarity -- dd
         if self.args.enable_similarity_loss == 'dd':
             # d_hidden_states = d_hidden_states[:, sum(prompt_length):]
