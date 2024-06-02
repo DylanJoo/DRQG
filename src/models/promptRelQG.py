@@ -177,16 +177,3 @@ class SoftRelPromptT5Stack(T5Stack):
                 return_dict=return_dict
         )
         return outputs
-
-    # def _weighted_attention(self, last_hidden_state):
-    #     prompt_length = len(self.instruction_idx)+len(self.relevant_idx)
-    #     attn_input = self.prompted_attention(last_hidden_state[:, prompt_length:])
-    #     print(attn_input.squeeze(-1).mean(-1))
-    #     attn_prompts = torch.ones(
-    #             (last_hidden_state.size(0), prompt_length, 1)
-    #     ).to(last_hidden_state.device)
-    #
-    #     last_hidden_state = last_hidden_state * \
-    #             torch.cat([attn_prompts, attn_input], dim=1)
-    #
-    #     return last_hidden_state

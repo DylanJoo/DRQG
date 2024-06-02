@@ -16,7 +16,7 @@ def passage_centric_dataset(path):
 def _reshape(x):
     return np.array(x).reshape(-1, 1)
 
-def convert_to_passage_centric(args):
+def convert_to_document_centric(args):
     data=pickle.load(open(args.input_pkl, 'rb'))
 
     from data_utils import load_collection, load_queries
@@ -89,4 +89,4 @@ if __name__ == '__main__':
             help='the maximun number of obtained negative query.')
     args = parser.parse_args()
 
-    convert_to_passage_centric(args)
+    convert_to_document_centric(args)

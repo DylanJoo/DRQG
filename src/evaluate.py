@@ -107,14 +107,14 @@ if __name__ == "__main__":
     listofscores = ["{:.4f}".format(np.mean(outputs[metric])) \
             for metric in outputs]
     print(" | ".join(listofscores))
-        # print("{:<10}| {:.4f} | {:.4f} | {:.4f} | {:.4f}".format(
-        #     metric,
-        #     np.mean(outputs[metric]),
-        #     np.std(outputs[metric]),
-        #     np.min(outputs[metric]),
-        #     np.max(outputs[metric]),
-        # ))
-        # print("{:<10} | {:.4f}".format(metric, np.mean(outputs[metric])))
+    print("{:<10}| {:.4f} | {:.4f} | {:.4f} | {:.4f}".format(
+        metric,
+        np.mean(outputs[metric]),
+        np.std(outputs[metric]),
+        np.min(outputs[metric]),
+        np.max(outputs[metric]),
+    ))
+    print("{:<10} | {:.4f}".format(metric, np.mean(outputs[metric])))
 
     if args.output_jsonl is not None:
         with open(args.output_jsonl, 'w') as f:
