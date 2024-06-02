@@ -145,3 +145,46 @@ calibrate_rank_ibn_na-20000
 0.4102 | 0.1968 | 0.4877 | 0.4845 | 0.9361 | 0.5403 | 0.3958
 calibrate_rank_ibn_qd-20000
 0.4248 | 0.2040 | 0.4126 | 0.4010 | 0.8777 | 0.5236 | 0.3541
+
+calibrate_margin_ibn_dd_prompt_1-20000
+0.2059 | 0.0841 | 0.2639 | 0.2512 | 0.9830 | 0.9082 | 0.0748
+calibrate_margin_ibn_dd_prompt_10-20000
+0.1990 | 0.0802 | 0.3840 | 0.3790 | 0.9782 | 0.8877 | 0.0905
+calibrate_margin_ibn_na_prompt_1-20000
+0.2291 | 0.0921 | 0.4214 | 0.4216 | 0.9755 | 0.8276 | 0.1480
+calibrate_margin_ibn_na_prompt_10-20000
+0.2452 | 0.1009 | 0.4198 | 0.4206 | 0.9677 | 0.7865 | 0.1812
+
+baseline
+baseline_instruct_with_num-20000
+0.9542 | 0.9534 | 0.0008
+top10
+top10
+top10
+top10
+baseline_selfconsist_dd-20000
+0.3897 | 0.1866 | 0.0965 | 0.0990 | 0.8820 | 0.8296 | 0.0524
+baseline_selfconsist_na-20000
+0.3959 | 0.1897 | 0.3420 | 0.3397 | 0.9288 | 0.6833 | 0.2456
+greedy
+baseline_selfconsist_dd-20000
+0.1538 | 0.0603 | 0.1039 | 0.1027 | 0.9574 | 0.9380 | 0.0194
+baseline_selfconsist_na-20000
+0.2158 | 0.0871 | 0.3484 | 0.3467 | 0.9719 | 0.8546 | 0.1173
+greedy
+greedy
+greedy
+greedy
+calibrate_margin_ibn_dd_prompt_10-20000
+0.2062 | 0.0834 | 0.9795 | 0.8800 | 0.0995
+calibrate_margin_ibn_dd_prompt_1-20000
+0.2093 | 0.0856 | 0.9817 | 0.9035 | 0.0782
+greedy
+greedy
+greedy
+calibrate_rank_ibn_dd_prompt_10-20000
+0.1923 | 0.0773 | 0.9857 | 0.9439 | 0.0418
+calibrate_rank_ibn_dd_prompt_1-20000
+0.2040 | 0.0824 | 0.9717 | 0.9158 | 0.0558
+calibrate_margin_ibn_dd-20000
+0.1890 | 0.0762 | 0.9782 | 0.9456 | 0.0326

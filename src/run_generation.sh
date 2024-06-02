@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
 MODEL_DIR=/work/jhju/readqg-baseline
 RESULT_DIR=/work/jhju/readqg-results
@@ -7,11 +7,11 @@ RESULT_DIR=/work/jhju/readqg-results
 for dataset in scifact arguana fiqa nfcorpus scidocs;do
 # for dataset in scifact;do
     decoding=greedy
-    # decoding=_top10
-    # decoding=_beam3
+    # decoding=top10
+    # decoding=beam3
     mkdir -p ${RESULT_DIR}/${dataset}_${decoding}/
 
-    for folder in ${MODEL_DIR}/*$1*;do
+    for folder in ${MODEL_DIR}/*$1;do
         name=${folder##*/}
         if [[ "$folder" != *"log" ]]; then
             echo ${folder}
@@ -21,14 +21,13 @@ for dataset in scifact arguana fiqa nfcorpus scidocs;do
                     --model_name  ${folder}/checkpoint-${ckpt} \
                     --tokenizer_name google/flan-t5-base \
                     --output_jsonl ${RESULT_DIR}/${dataset}_${decoding}/${name}-${ckpt}.jsonl \
-                    --device cuda \
+                    --device cuda:0 \
                     --num_relevance_scores 10 \
-                    --num_relevant_prompt 1 \
+                    --num_relevant_prompt ${folder##*_} \
                     --batch_size 32 \
-                    --max_length 512 \
+                    --max_length 384 \
                     --max_new_tokens 64 \
-                    --activate_prompt_attention 1 \
-                    --do_sample 
+                    --activate_prompt_attention 1
             done
         fi
     done

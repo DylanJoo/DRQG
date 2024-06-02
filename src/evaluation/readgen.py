@@ -27,7 +27,7 @@ class READGen:
                 num_instruction_prompt_idx=\
                         kwargs.get('num_instruction_prompt_idx', 13),
                 num_relevant_prompt_idx=\
-                        kwargs.get('num_relevant_prompt_idx', 1)
+                        kwargs.get('num_relevant_prompt_idx', 0)
         )
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.prompt_length = sum(self.model.prompt_length)
@@ -50,12 +50,13 @@ class READGen:
 
         # tokenization
         if prefix is not None:
-            scaled_relevance_scores = [round(r*100) for r in self.relevance_scores]
+            scaled_relevance_scores = [round(r*100) for r in self.relevance_scores.detach().cpu().numpy()]
             text_inputs_with_rel = list(
                     itertools.product(text_inputs, scaled_relevance_scores)
             )
+            text_inputs_with_rel = [(s, t) for (t, s) in text_inputs_with_rel] # reverse
             inputs = self.tokenizer(
-                    prefix.format(text_inputs, scaled_relevance_scores), 
+                    [prefix.format(s, t) for (s, t) in text_inputs_with_rel], 
                     max_length=kwargs.pop('max_length', 512),
                     truncation=kwargs.pop('truncation', True),
                     padding=kwargs.pop('padding', True),

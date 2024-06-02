@@ -28,7 +28,8 @@ for dataset in scifact arguana fiqa nfcorpus scidocs;do
                     --max_length 512 \
                     --max_new_tokens 64 \
                     --activate_prompt_attention 1 \
-                    --do_sample 
+                    --do_sample \
+                    --top_k 10
             done
         fi
     done

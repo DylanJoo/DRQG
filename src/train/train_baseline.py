@@ -97,6 +97,8 @@ def main():
     else:
         dataset['test'] = None
 
+    print(n_examples)
+    exit(0)
     # Trainer
     from trainers import TrainerBase
     trainer = TrainerBase(

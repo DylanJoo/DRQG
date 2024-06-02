@@ -86,12 +86,16 @@ class SoftPromptT5Stack(T5Stack):
         self.instruction_prompt = nn.Parameter(torch.rand(
             num_instruction_idx, embed_tokens.embedding_dim
         ))
-        self.relevant_prompt = nn.Parameter(torch.rand(
-            num_relevant_idx, embed_tokens.embedding_dim
-        ))
-        self.irrelevant_prompt = nn.Parameter(torch.rand(
-            num_relevant_idx, embed_tokens.embedding_dim
-        ))
+        if num_relevant_idx != 0:
+            self.relevant_prompt = nn.Parameter(torch.rand(
+                num_relevant_idx, embed_tokens.embedding_dim
+            ))
+            self.irrelevant_prompt = nn.Parameter(torch.rand(
+                num_relevant_idx, embed_tokens.embedding_dim
+            ))
+        else:
+            self.relevant_prompt = None
+            self.irrelevant_prompt = None
 
     def forward(self, 
                 input_ids=None,
@@ -113,15 +117,16 @@ class SoftPromptT5Stack(T5Stack):
         prompts = []
         prompts += [self.instruction_prompt.repeat(B, 1, 1)]
 
-        relevant_prompts = torch.matmul(
-                rel_scores.view(-1, 1), 
-                self.relevant_prompt.view(1, -1)
-        ) + torch.matmul(
-                (1-rel_scores).view(-1, 1), 
-                self.irrelevant_prompt.view(1, -1)
-        )
-        relevant_prompts = relevant_prompts.view(B, -1, H)
-        prompts += [relevant_prompts]
+        if self.relevant_prompt is not None and self.irrelevant_prompt is not None:
+            relevant_prompts = torch.matmul(
+                    rel_scores.view(-1, 1), 
+                    self.relevant_prompt.view(1, -1)
+            ) + torch.matmul(
+                    (1-rel_scores).view(-1, 1), 
+                    self.irrelevant_prompt.view(1, -1)
+            )
+            relevant_prompts = relevant_prompts.view(B, -1, H)
+            prompts += [relevant_prompts]
 
         inputs_embeds = torch.cat(prompts + [inputs_embeds], dim=1)
         outputs = super().forward(
